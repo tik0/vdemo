@@ -1,0 +1,20 @@
+#!/bin/bash
+
+if [ -z "$2" ]; then
+    echo "$0 starts single vdemo component"
+    echo "usage: $0 <vdemo-config-file> <component-file>"
+    exit 1
+fi
+
+export VDEMO_demoConfig
+if [ -z "${VDEMO_root}" ]; then
+    VDEMO_root="@INSTALLPATH@"
+    echo 'VDEMO_root=${VDEMO_root} (per default)' >&2
+fi
+VDEMO_demoConfig="$1"
+comp="$2"
+source "$VDEMO_demoConfig"
+
+$comp single
+
+
