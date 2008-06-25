@@ -3,7 +3,6 @@ VDEMO_root?=/vol/mobirob/demo/bin
 
 SCRIPTS=        \
 		vdemo \
-		vdemo.config \
                 vdemo_base.sh \
                 vdemo_component \
                 vdemo_controller.tcl \
