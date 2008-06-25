@@ -139,10 +139,6 @@ function vdemo_start_component {
 	return 1
     fi
     VDEMO_component="$1"
-    if [ "$LD_LIBRARY_PATH_store" ]; then
-	LD_LIBRARY_PATH="$LD_LIBRARY_PATH_store:$LD_LIBRARY_PATH"
-	export LD_LIBRARY_PATH
-    fi
     
     if  [ -z $VDEMO_title ]; then
 	VDEMO_title=`basename VDEMO_component`
@@ -150,11 +146,12 @@ function vdemo_start_component {
 
 #    VDEMO_pidfile=/tmp/VDEMO_component_${VDEMO_title}_${USER}.pid
 
-    echo "starting $VDEMO_title as 'DISPLAY=${VDEMO_componentDisplay} $* 2>&1 ${VDEMO_logging}' " >&2
+    echo "starting $VDEMO_title as 'DISPLAY=${VDEMO_componentDisplay} LD_LIBRARY_PATH=$LD_LIBRARY_PATH_store:$LD_LIBRARY_PATH; $* 2>&1 ${VDEMO_logging}' " >&2
     
     xterm -fg green -bg black -iconic -title "starting $VDEMO_title" -e \
 	screen -t "$VDEMO_title" -S "$VDEMO_title" \
-	/bin/bash -i -c "export DISPLAY=${VDEMO_componentDisplay}; $* 2>&1 ${VDEMO_logging}" &
+	/bin/bash -i -c "export DISPLAY=${VDEMO_componentDisplay}; LD_LIBRARY_PATH=$LD_LIBRARY_PATH_store:$LD_LIBRARY_PATH; $* 2>&1 ${VDEMO_logging}" &
+
 }
 
 # get all direct and indirect children of a process
