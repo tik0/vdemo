@@ -1,5 +1,6 @@
 #VDEMO_root?=/vol/vampire/demos/vdemo_base
-VDEMO_root?=/vol/mobirob/demo/bin
+bindir?=/vol/mobirob/demo/bin
+VDEMO_root?=$(bindir)
 
 SCRIPTS=        \
 		vdemo \
