@@ -1,6 +1,7 @@
 #VDEMO_root?=/vol/vampire/demos/vdemo_base
-bindir?=/vol/mobirob/demo/bin
-VDEMO_root?=$(bindir)
+#bindir?=/tmp/VDEMO-FAKE-INSTALL
+
+VDEMO_root=$(bindir)
 
 SCRIPTS=        \
 		vdemo \
@@ -24,13 +25,23 @@ $(INSTALL_SCRIPTS): ./.install
 	mkdir -p ./.install
 
 ./.install/%:	%
-	cat $< | sed "s#@INSTALLPATH@#$(VDEMO_root)#g" > $@
+	@(if [ -z "$(bindir)" ]; then \
+		echo 'set $$(bindir) in order to install' >&2 ;\
+		exit 1;\
+	fi)	
+	cat $< | sed "s#@bindir@#$(bindir)#g"  | \
+		sed "s#@datadir@#$(datadir)#g"  | \
+		sed "s#@libdir@#$(libdir)#g"  | \
+		sed "s#@sharedstatedir@#$(sharedstatedir)#g" > $@ || rm -f "$@"
 
 
 
-install:	$(INSTALL_SCRIPTS)
+
+
+install:	$(INSTALL_SCRIPTS) 
 	-install -m 2775 -d $(VDEMO_root)
 	install -m 755 $^ $(VDEMO_root)
+	rm -rf ./.install
 
 clean:
 	rm -rf ./.install

@@ -8,7 +8,7 @@ fi
 
 export VDEMO_demoConfig
 if [ -z "${VDEMO_root}" ]; then
-    VDEMO_root="@INSTALLPATH@"
+    VDEMO_root="@bindir@"
     echo 'VDEMO_root=${VDEMO_root} (per default)' >&2
 fi
 VDEMO_demoConfig="$1"
