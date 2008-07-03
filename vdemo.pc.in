@@ -1,0 +1,10 @@
+prefix=      @PREFIX@
+exec_prefix= @PREFIX@
+libdir=      @VDEMO_root@
+includedir=  @INCLUDEDIR@
+
+Name:        vdemo
+Description: vdemo
+Version:     @PROGVERSION@
+Libs:        
+Cflags:      
