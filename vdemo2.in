@@ -101,9 +101,9 @@ fi
 
 eval $VARS
 
-if [ -z "/tmp/hurga/lib/vdemo" ]; then
-    VDEMO_root="/tmp/hurga/lib/vdemo"
-    echo 'VDEMO_root=/tmp/hurga/lib/vdemo (per default)' >&2
+if [ -z "${VDEMO_root}" ]; then
+    VDEMO_root="@VDEMO_root@"
+    echo 'VDEMO_root=${VDEMO_root} (per default)' >&2
 fi
 
 
