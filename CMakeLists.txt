@@ -35,6 +35,6 @@ CONFIGURE_FILE(vdemo2.in vdemo2)
 CONFIGURE_FILE(vdemo_component.in vdemo_component)
 INSTALL(FILES vdemo.pc DESTINATION ${LIBDIR}/pkgconfig)
 INSTALL(PROGRAMS vdemo vdemo2 vdemo_component DESTINATION ${BINDIR})
-INSTALL(FILES vdemo_base.sh vdemo_controller.tcl vdemo2_controller.tcl vdemo_standard_component_suffix.sh DESTINATION ${VDEMO_root})
+INSTALL(PROGRAMS vdemo_base.sh vdemo_controller.tcl vdemo2_controller.tcl vdemo_standard_component_suffix.sh DESTINATION ${VDEMO_root})
 
 
