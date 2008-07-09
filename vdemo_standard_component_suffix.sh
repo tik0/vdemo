@@ -112,8 +112,8 @@ if [ -z "$VDEMO_root" ]; then
 fi
 
 # run the 
-source "$VDEMO_sysConfig" $VDEMO_sysConfigOptions
-source "$VDEMO_scripts/vdemo_base.sh"
+#source "$VDEMO_sysConfig" $VDEMO_sysConfigOptions
+source "$VDEMO_root/vdemo_base.sh"
 
 case "$1" in
     start)
