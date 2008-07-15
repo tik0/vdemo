@@ -448,7 +448,7 @@ proc checkXCFcomp {comp} {
     }
     if {[string length $WAIT_PUBLISHER($comp)] > 0} {
 	puts "check XCF publisher $WAIT_PUBLISHER($comp)"
-	if {[catch {exec bash -c "xcfinfo -c -s $WAIT_PUBLISHER($comp) | grep -q Running 2>@1" } {XCFOUTPUT}]} {
+	if {[catch {exec bash -c "xcfinfo -c -p $WAIT_PUBLISHER($comp) | grep -q Running 2>@1" } {XCFOUTPUT}]} {
 	    return 0
 	} else {
 	    return 1
