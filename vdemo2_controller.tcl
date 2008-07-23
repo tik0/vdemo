@@ -431,7 +431,7 @@ proc checkXCFcomp {comp} {
     global WAIT_PUBLISHER WAIT_SERVER XC_COMPNAME
     if {[string length $WAIT_SERVER($comp)] > 0} {
 	puts "check XCF server $WAIT_SERVER($comp)"
-	if {[catch {exec bash -c "xcfinfo -c -s $WAIT_SERVER($comp) | grep -q Running 2>@1" } {XCFOUTPUT}]} {
+	if {[catch {exec bash -c "xcfinfo -c -s $WAIT_SERVER($comp) | grep -q Running 2>&1" } {XCFOUTPUT}]} {
 	    return 0
 	} else {
 	    return 1
@@ -439,7 +439,7 @@ proc checkXCFcomp {comp} {
     }
     if {[string length $XC_COMPNAME($comp)] > 0} {
 	puts "check XCF server $XC_COMPNAME($comp)"
-	if {[catch {exec bash -c "xcfinfo -c -s $XC_COMPNAME($comp) | grep -q Running 2>@1" } {XCFOUTPUT}]} {
+	if {[catch {exec bash -c "xcfinfo -c -s $XC_COMPNAME($comp) | grep -q Running 2>&1" } {XCFOUTPUT}]} {
 	    puts $XCFOUTPUT
 	    return 0
 	} else {
@@ -448,7 +448,7 @@ proc checkXCFcomp {comp} {
     }
     if {[string length $WAIT_PUBLISHER($comp)] > 0} {
 	puts "check XCF publisher $WAIT_PUBLISHER($comp)"
-	if {[catch {exec bash -c "xcfinfo -c -p $WAIT_PUBLISHER($comp) | grep -q Running 2>@1" } {XCFOUTPUT}]} {
+	if {[catch {exec bash -c "xcfinfo -c -p $WAIT_PUBLISHER($comp) | grep -q Running 2>&1" } {XCFOUTPUT}]} {
 	    return 0
 	} else {
 	    return 1
