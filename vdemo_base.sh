@@ -46,7 +46,7 @@ function stop_Xserver {
 }
 
 function vdemo_pidFromScreen {
-    VDEMO_title="$1"
+    VDEMO_title="$1_"
     screen -ls ${VDEMO_title} | grep ${VDEMO_title} | cut -f1 -d. | tr -d "\t "
 }
 
@@ -78,14 +78,14 @@ function vdemo_check_component {
 # reattach to a running "screened" component
 # $1:   title of the component
 function vdemo_reattach_screen {
-    VDEMO_title="$1"
+    VDEMO_title="$1_"
     screen -d -r -S "$VDEMO_title"
 }
 
 # detach a  "screened" component
 # $1:   title of the component
 function vdemo_detach_screen {
-    VDEMO_title="$1"
+    VDEMO_title="$1_"
     screen -d -S "$VDEMO_title"
 }
 
@@ -101,6 +101,7 @@ function vdemo_start_component {
     VDEMO_title=""
     VDEMO_componentDisplay="${DISPLAY}"
     VDEMO_logging=""
+    ICONIC="-iconic"
     while [ $# -gt 0 ]; do
 	case $1 in
 	    "-n"|"--name")
@@ -121,6 +122,9 @@ function vdemo_start_component {
 		;;
 	    --)
 		break
+		;;
+	    "--noiconic")
+      ICONIC=""
 		;;
 	    -*)
 		echo "illegal option $1" >& 2
@@ -145,13 +149,13 @@ function vdemo_start_component {
     fi
 
 #    VDEMO_pidfile=/tmp/VDEMO_component_${VDEMO_title}_${USER}.pid
+    cmd="DISPLAY=${VDEMO_componentDisplay} LD_LIBRARY_PATH=$LD_LIBRARY_PATH_store:$LD_LIBRARY_PATH $* 2>&1 ${VDEMO_logging}"
 
-    echo "starting $VDEMO_title as 'DISPLAY=${VDEMO_componentDisplay} LD_LIBRARY_PATH=$LD_LIBRARY_PATH_store:$LD_LIBRARY_PATH; $* 2>&1 ${VDEMO_logging}' " >&2
+    echo "starting $VDEMO_title as '$cmd' " >&2
     
-    xterm -fg green -bg black -iconic -title "starting $VDEMO_title" -e \
-	screen -t "$VDEMO_title" -S "$VDEMO_title" \
-	/bin/bash -i -c "export DISPLAY=${VDEMO_componentDisplay}; LD_LIBRARY_PATH=$LD_LIBRARY_PATH_store:$LD_LIBRARY_PATH; $* 2>&1 ${VDEMO_logging}" &
-
+    xterm -fg green -bg black $ICONIC -title "starting $VDEMO_title" -e \
+	screen -t "$VDEMO_title" -S "${VDEMO_title}_" \
+	/bin/bash -i -c "$cmd" &
 }
 
 # get all direct and indirect children of a process
@@ -159,7 +163,7 @@ function all_children {
     PIDS="$*"
     CHILDREN=""
     for P in $PIDS; do
-	echo $P
+	echo -n " $P"
 	curr_children=`/bin/ps --ppid $P -o pid --no-headers`
 	if [ "$curr_children" ]; then
 	    all_children "$curr_children"
