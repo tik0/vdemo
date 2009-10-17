@@ -108,6 +108,8 @@ fi
 
 
 VDEMO_demoConfig="$1"
+if [[ "$1" != /* ]]; then VDEMO_demoConfig=`pwd`/$1; fi
+
 source "$VDEMO_demoConfig"
 
 export VDEMO_demoConfig VDEMO_root
