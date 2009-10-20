@@ -150,8 +150,8 @@ proc gui_tcl {} {
 	pack $COMPWIDGET.$c.level -side left
 
 	label $COMPWIDGET.$c.group -anchor e -foreground blue -font "$FONT" -width 10 -text "$GROUP($c)" 
-	label $COMPWIDGET.$c.label -font "$BOLDFONT" -width 20 -anchor e -text "$COMMAND($c)@" 
-	entry $COMPWIDGET.$c.host -borderwidth 1 -font "$FONT" -width 20 -textvariable HOST($c)
+	label $COMPWIDGET.$c.label -font "$BOLDFONT" -width 15 -anchor e -text "$COMMAND($c)@" 
+	entry $COMPWIDGET.$c.host -borderwidth 1 -font "$FONT" -width 10 -textvariable HOST($c)
 	pack $COMPWIDGET.$c.label -side left -fill x
 	pack $COMPWIDGET.$c.host -side left
 	pack $COMPWIDGET.$c.group -side left -fill x
@@ -161,6 +161,7 @@ proc gui_tcl {} {
 	checkbutton $COMPWIDGET.$c.noauto -font "$BOLDFONT" -borderwidth 1 -text "no auto" -variable NOAUTO($c) -foreground blue
 	checkbutton $COMPWIDGET.$c.ownx -font "$BOLDFONT" -borderwidth 1 -text "own X" -variable USEX($c)
 	checkbutton $COMPWIDGET.$c.logging -font "$BOLDFONT" -borderwidth 1 -text "logging" -variable LOGGING($c)
+	button $COMPWIDGET.$c.logoutput -font "$BOLDFONT" -pady -3 -padx -7 -borderwidth 1 -text "view log" -command "component_cmd $c showlog"
 	frame $COMPWIDGET.$c.terminal
 	set SCREENED($c) 0
 	checkbutton $COMPWIDGET.$c.terminal.screen -pady -3 -padx -7 -font "$BOLDFONT" -borderwidth 1 -text "screened" -command "component_cmd $c screen" -variable SCREENED($c) -onvalue 1 -offvalue 0
@@ -176,9 +177,10 @@ proc gui_tcl {} {
 	    set intercept_disabled "disabled"
 	    set button_text "not interceptable"
 	}	
-	button $COMPWIDGET.$c.intercept -pady -3 -padx -7 -font "$BOLDFONT" -activebackground white -borderwidth 1 -state $intercept_disabled -text "$button_text" -width 35 -command "intercept_component $c"
+	button $COMPWIDGET.$c.intercept -pady -3 -padx -7 -font "$BOLDFONT" -activebackground white -borderwidth 1 -state $intercept_disabled -text "$button_text" -width 20 -command "intercept_component $c"
 	
 	pack $COMPWIDGET.$c.ownx -side right 
+	pack $COMPWIDGET.$c.logoutput -side right 
 	pack $COMPWIDGET.$c.logging -side right 
 	pack $COMPWIDGET.$c.intercept -side right
 	pack $COMPWIDGET.$c.terminal -side right 
@@ -203,7 +205,7 @@ proc gui_tcl {} {
     # button to control ALL components
     frame $base.components.all -relief groove -borderwidth 1
     pack $base.components.all -side top -fill both
-    label $base.components.all.label -width 53 -anchor e -font "$BOLDFONT" -text "ALL COMPONENTS" -foreground blue
+    label $base.components.all.label -anchor e -font "$BOLDFONT" -text "ALL COMPONENTS" -foreground blue
     pack $base.components.all.label -side left -fill x
     button $base.components.all.start -font "$BOLDFONT" -pady -3 -padx -7 -borderwidth 1 -text "start" -foreground blue -command "allcomponents_cmd start"
     button $base.components.all.stop -font "$BOLDFONT" -pady -3 -padx -7 -borderwidth 1 -text "stop" -foreground blue -command "allcomponents_cmd stop"
@@ -242,7 +244,7 @@ proc gui_tcl {} {
     foreach {g} "$groups" {
 	frame $base.components.group.named.$g -relief groove -borderwidth 1
 	pack $base.components.group.named.$g -side top -fill x
-	label $base.components.group.named.$g.label -width 35 -anchor e -font "$BOLDFONT" -text "$g" -foreground blue
+	label $base.components.group.named.$g.label -width 10 -anchor e -font "$BOLDFONT" -text "$g" -foreground blue
 	pack $base.components.group.named.$g.label -side left -fill x
 	button $base.components.group.named.$g.start -font "$BOLDFONT" -pady -3 -padx -3 -borderwidth 1 -text "start" -foreground blue -command "group_cmd start $g"
 	button $base.components.group.named.$g.stop -font "$BOLDFONT" -pady -3 -padx -3 -borderwidth 1 -text "stop" -foreground blue -command "group_cmd stop $g"
@@ -270,7 +272,7 @@ proc gui_tcl {} {
     pack $base.components -side top -fill both -expand yes 
 
     # logarea
-    label $base.logarea -font "$FONT" -textvariable LOGTEXT -width 80 -anchor nw -height 4 -justify left -relief sunken -background white -foreground darkgreen
+    label $base.logarea -font "$FONT" -textvariable LOGTEXT -width 50 -anchor nw -height 4 -justify left -relief sunken -background white -foreground darkgreen
     pack $base.logarea -side top -fill both
 
     set hosts [lsort -unique [string tolower "$hosts"]]
@@ -514,8 +516,10 @@ proc component_cmd {comp cmd} {
     set success 1
     switch $cmd {
 	start {
+       if {$DETACHTIME($comp) < 0} {
+           set component_options "$component_options --noiconic"
+       }
 	    set cmd_line "export LD_LIBRARY_PATH_store=\$LD_LIBRARY_PATH; $component_script $component_options start"
-#	    set cmd_line "(cat $env(VDEMO_demoConfig) && echo $component_script $component_options $cmd) | ssh -X $HOST($comp) 'bash'"
 	    $COMPWIDGET.$comp.start flash
 	    set WAIT_BREAK 0
 	    set_status $comp unknown
@@ -564,6 +568,10 @@ proc component_cmd {comp cmd} {
 	    set cmd_line "$component_script $component_options detach"
 	    ssh_command "$cmd_line" "$HOST($comp)"
 	    set SCREENED($comp) 0
+	}
+	showlog {
+	    set cmd_line "$component_script $component_options showlog"
+	    ssh_command "$cmd_line" "$HOST($comp)"
 	}
 
 	check {

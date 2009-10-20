@@ -80,6 +80,18 @@ function vdemo_check_component {
 function vdemo_reattach_screen {
     VDEMO_title="$1_"
     screen -d -r -S "$VDEMO_title"
+	 failure=$?
+	 if [ $failure == 1 ] ; then
+		  # change title of xterm
+		  echo -ne "\033]0;${1}@${HOSTNAME}\007"
+		  file="/tmp/VDEMO_component_${1}_${USER}.log"
+		  if [ -f $file ] ; then
+				less $file
+		  else
+				sleep 2
+		  fi
+	 fi
+	 return $failure
 }
 
 # detach a  "screened" component
@@ -87,6 +99,13 @@ function vdemo_reattach_screen {
 function vdemo_detach_screen {
     VDEMO_title="$1_"
     screen -d -S "$VDEMO_title"
+}
+
+# show log output of a component
+# $1:   title of the component
+function vdemo_showlog {
+	 xterm -fg white -bg darkblue -title "log of ${1}@${HOSTNAME}" -e \
+		  less "/tmp/VDEMO_component_${1}_${USER}.log"
 }
 
 # start a component. This function has the following options:

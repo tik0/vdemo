@@ -74,6 +74,7 @@ start $title
 # option checks
 vdemo_start_XSERVER=""
 vdemo_start_LOGGING=""
+vdemo_start_ICONIC=""
 
 while [ $# -gt 0 ]; do
     case $1 in
@@ -86,6 +87,9 @@ while [ $# -gt 0 ]; do
 	    ;;
 	"-x"|"--xserver")
 	    vdemo_start_XSERVER="YES"
+	    ;;
+	"--noiconic")
+	    vdemo_start_ICONIC="--noiconic"
 	    ;;
 	-*)
 	    echo "illegal option '$1'" >& 2
@@ -112,7 +116,7 @@ if [ -z "$VDEMO_root" ]; then
 fi
 
 # run the 
-#source "$VDEMO_sysConfig" $VDEMO_sysConfigOptions
+test -f "$VDEMO_sysConfig" && source "$VDEMO_sysConfig" $VDEMO_sysConfigOptions
 source "$VDEMO_root/vdemo_base.sh"
 
 case "$1" in
@@ -127,10 +131,10 @@ case "$1" in
 	if [ "${vdemo_start_XSERVER}" ]; then
 	    comp_display=`start_Xserver`
 	    echo "DISPLAY: $comp_display" >&2 
-	    vdemo_start_component -d $comp_display -n $title $vdemo_start_LOGGING  \
+	    vdemo_start_component -d $comp_display -n $title $vdemo_start_ICONIC $vdemo_start_LOGGING \
 		$component
 	else
-	    vdemo_start_component -n $title $vdemo_start_LOGGING \
+	    vdemo_start_component -n $title $vdemo_start_LOGGING $vdemo_start_ICONIC \
 		$component
 	fi
 	;;
@@ -152,6 +156,10 @@ case "$1" in
 	;;
     detach)
 	vdemo_detach_screen $title
+	exit $?
+	;;
+    showlog)
+	vdemo_showlog $title
 	exit $?
 	;;
     clean)
