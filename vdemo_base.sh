@@ -105,7 +105,7 @@ function vdemo_detach_screen {
 # $1:   title of the component
 function vdemo_showlog {
 	 xterm -fg white -bg darkblue -title "log of ${1}@${HOSTNAME}" -e \
-		  less "/tmp/VDEMO_component_${1}_${USER}.log"
+		  less "/tmp/VDEMO_component_${1}_${USER}.log" &
 }
 
 # start a component. This function has the following options:
