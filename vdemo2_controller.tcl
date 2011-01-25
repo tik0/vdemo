@@ -1,6 +1,6 @@
 #!/bin/bash
 # the next line restarts using wish \
-exec wish "$0" "$@"
+exec wish8.5 "$0" "$@"
 package require Iwidgets 4.0
 
 # if {[catch {package require Scrolledframe}]} \
