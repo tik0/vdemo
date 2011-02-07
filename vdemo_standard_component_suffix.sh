@@ -119,15 +119,31 @@ fi
 test -f "$VDEMO_sysConfig" && source "$VDEMO_sysConfig" $VDEMO_sysConfigOptions
 source "$VDEMO_root/vdemo_base.sh"
 
+# Calls a function if it exists, else return true.
+# $1: function name
+# $2, $3, ...: arguments passed to function
+# returns: If function exists: Return value of function.
+#          If function does not exist: True.
+function call_if_exists {
+  func=$1; shift
+  if declare -f $func >/dev/null; then
+    $func $@
+  else
+    true
+  fi
+}
+
 case "$1" in
     start)
-	clean_component
-	on_start
 	if vdemo_check_component $title; then
  	    echo "$title already running, stopping first">&2
  	    vdemo_stop_component $title
 	    sleep 1
 	fi
+
+	call_if_exists clean_component
+	call_if_exists on_start
+
 	if [ "${vdemo_start_XSERVER}" ]; then
 	    comp_display=`start_Xserver`
 	    echo "DISPLAY: $comp_display" >&2 
@@ -139,14 +155,14 @@ case "$1" in
 	fi
 	;;
     stop)
-	on_stop
 	vdemo_stop_component $title
 	if [ "${vdemo_start_XSERVER}" ]; then
 	    stop_Xserver
 	fi
+	call_if_exists on_stop
 	;;
     check)
-	on_check || true
+	call_if_exists on_check || true
 	vdemo_check_component $title
 	exit $?
 	;;
@@ -167,7 +183,7 @@ case "$1" in
 	    echo "$title is running, stopping before cleaning">&2
 	    vdemo_stop_component $title
 	fi
-	clean_component
+	call_if_exists clean_component
 	;;
     single)
 	if [ "$2" ]; then
@@ -176,10 +192,10 @@ case "$1" in
 	    export VDEMO_demoConfig
 	    source "$2"
 	fi
-	clean_component
-	on_start
+	call_if_exists clean_component
+	call_if_exists on_start
 	bash -c "$component"
-	on_stop
+	call_if_exists on_stop
 	;;
     *)
 	echo "wrong argument. $HELP" >&2 

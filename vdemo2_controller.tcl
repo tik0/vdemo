@@ -164,7 +164,7 @@ proc gui_tcl {} {
 	button $COMPWIDGET.$c.logoutput -font "$BOLDFONT" -pady -3 -padx -7 -borderwidth 1 -text "view log" -command "component_cmd $c showlog"
 	frame $COMPWIDGET.$c.terminal
 	set SCREENED($c) 0
-	checkbutton $COMPWIDGET.$c.terminal.screen -pady -3 -padx -7 -font "$BOLDFONT" -borderwidth 1 -text "screened" -command "component_cmd $c screen" -variable SCREENED($c) -onvalue 1 -offvalue 0
+	checkbutton $COMPWIDGET.$c.terminal.screen -pady -3 -padx -7 -font "$BOLDFONT" -borderwidth 1 -text "show term" -command "component_cmd $c screen" -variable SCREENED($c) -onvalue 1 -offvalue 0
 	if {[isXCFComp $c]} {
 	    if {[string length $WAIT_SERVER($c)] > 0} {
 		set button_text "SERV. $WAIT_SERVER($c)"
@@ -684,10 +684,10 @@ proc connect_hosts {} {
 	exec mkfifo "$f.in"
 	exec mkfifo "$f.out"
 
-	exec screen -dmS "vdemo-$fifo_host($f)" bash -c "tail -s 0.1 -n 10000 -f $f.in | ssh -X  $fifo_host($f) bash --login --rcfile /etc/profile | while read s; do echo \$s > $f.out; done"
-#	exec screen -dmS "vdemo-$fifo_host($f)" bash -c "tail -s 1 -n 10000 -f $f.in | ssh -X  $fifo_host($f) bash --login --norc | while read s; do echo \$s > $f.out; done"
+	exec xterm -title "establish ssh connection to $f" -n "$f" -e screen -mS "vdemo-$fifo_host($f)" bash -c "tail -s 0.1 -n 10000 -f $f.in | ssh -X  $fifo_host($f) bash --login --rcfile /etc/profile | while read s; do echo \$s > $f.out; done" &
 
 	ssh_command "source $env(VDEMO_demoConfig)" $fifo_host($f)
+	exec screen -dS "vdemo-$fifo_host($f)"
     }
     destroy .vdemoinit
     destroy .vdemoinit2
