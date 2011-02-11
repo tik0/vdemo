@@ -179,7 +179,7 @@ case "$1" in
 	exit $?
 	;;
     clean)
-	if check_component; then
+	if vdemo_check_component; then
 	    echo "$title is running, stopping before cleaning">&2
 	    vdemo_stop_component $title
 	fi

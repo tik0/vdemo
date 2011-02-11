@@ -46,8 +46,9 @@ function stop_Xserver {
 }
 
 function vdemo_pidFromScreen {
+	 # we append underscore to distinguish between components with same prefix
     VDEMO_title="$1_"
-    screen -ls ${VDEMO_title} | grep ${VDEMO_title} | cut -f1 -d. | tr -d "\t "
+    screen -ls | grep ${VDEMO_title} | cut -f1 -d. | tr -d "\t "
 }
 
 # check for a running component
@@ -78,9 +79,17 @@ function vdemo_check_component {
 # reattach to a running "screened" component
 # $1:   title of the component
 function vdemo_reattach_screen {
-    VDEMO_title="$1_"
-    screen -d -r -S "$VDEMO_title"
-	 failure=$?
+    VDEMO_pid=`vdemo_pidFromScreen $1`
+	 
+	 if [ -n "$VDEMO_pid" ] ; then
+		  screen -d -r "$VDEMO_pid"
+		  failure=$?
+	 else
+		  echo "no screen for $1:"
+		  screen -ls
+		  failure=1
+	 fi
+
 	 if [ $failure == 1 ] ; then
 		  # change title of xterm
 		  echo -ne "\033]0;${1}@${HOSTNAME}\007"
@@ -97,8 +106,8 @@ function vdemo_reattach_screen {
 # detach a  "screened" component
 # $1:   title of the component
 function vdemo_detach_screen {
-    VDEMO_title="$1_"
-    screen -d -S "$VDEMO_title"
+	 VDEMO_pid=`vdemo_pidFromScreen $1`
+    screen -d "$VDEMO_pid"
 }
 
 # show log output of a component
@@ -167,8 +176,7 @@ function vdemo_start_component {
 	VDEMO_title=`basename VDEMO_component`
     fi
 
-#    VDEMO_pidfile=/tmp/VDEMO_component_${VDEMO_title}_${USER}.pid
-    cmd="DISPLAY=${VDEMO_componentDisplay} LD_LIBRARY_PATH=$LD_LIBRARY_PATH_store:$LD_LIBRARY_PATH $* 2>&1 ${VDEMO_logging}"
+    cmd="DISPLAY=${VDEMO_componentDisplay} $* 2>&1 ${VDEMO_logging}"
 
     echo "starting $VDEMO_title as '$cmd' " >&2
     
@@ -194,7 +202,6 @@ function all_children {
 # $1: titl of the component
 function vdemo_stop_component {
     VDEMO_title="$1"
-
     VDEMO_pid=`vdemo_pidFromScreen ${VDEMO_title}`
 
     if [ "$VDEMO_pid" ]; then
