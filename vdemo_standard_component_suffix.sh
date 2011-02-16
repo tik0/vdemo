@@ -115,6 +115,11 @@ if [ -z "$VDEMO_root" ]; then
     exit 1
 fi
 
+if [ -z "$title" ]; then
+	echo '$title is not set. A good default is the name of the process' >&2
+	exit 1
+fi
+
 # run the 
 test -f "$VDEMO_sysConfig" && source "$VDEMO_sysConfig" $VDEMO_sysConfigOptions
 source "$VDEMO_root/vdemo_base.sh"
