@@ -54,7 +54,7 @@ proc parse_options {comp} {
 		incr i
 	    }
 	    -v {
-		set EXPORTS($comp) "$EXPORTS($comp) export $val;"
+		set EXPORTS($comp) "$EXPORTS($comp) $val"
 		incr i
 	    }
 	    -t {
@@ -528,7 +528,7 @@ proc component_cmd {comp cmd} {
     if {$LOGGING($comp)} {
 				set component_options "$component_options -l"
     }
-	 set VARS $EXPORTS($comp)
+	 set VARS "$EXPORTS($comp) "
 
     set success 1
     switch $cmd {
@@ -740,7 +740,8 @@ puts "My process id is $mypid"
 
 parse_env_var
 
-
+# cleanup dangling connections first
+disconnect_hosts
 connect_hosts
 
 update
