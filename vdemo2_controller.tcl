@@ -311,7 +311,7 @@ proc gui_tcl {} {
 
 
 
-    button $base.exit -pady -3 -padx -7 -borderwidth 1 -text "exit" -font "$BOLDFONT" -command {disconnect_hosts; exit}
+    button $base.exit -pady -3 -padx -7 -borderwidth 1 -text "exit" -font "$BOLDFONT" -command {finish}
     pack $base.exit -side bottom -fill x
 
 }
@@ -449,7 +449,7 @@ proc checkXCFcomp {comp} {
     global WAIT_PUBLISHER WAIT_SERVER XC_COMPNAME
     if {[string length $WAIT_SERVER($comp)] > 0} {
 	puts "check XCF server $WAIT_SERVER($comp)"
-	if {[catch {exec bash -c "xcfinfo -c -s $WAIT_SERVER($comp) | grep -q Running 2>&1" } {XCFOUTPUT}]} {
+	if {[catch {exec bash -c "/vol/xcf/bin/xcfinfo -c -s $WAIT_SERVER($comp) | grep -q Running 2>&1" } {XCFOUTPUT}]} {
 	    return 0
 	} else {
 	    return 1
@@ -457,7 +457,7 @@ proc checkXCFcomp {comp} {
     }
     if {[string length $XC_COMPNAME($comp)] > 0} {
 	puts "check XCF server $XC_COMPNAME($comp)"
-	if {[catch {exec bash -c "xcfinfo -c -s $XC_COMPNAME($comp) | grep -q Running 2>&1" } {XCFOUTPUT}]} {
+	if {[catch {exec bash -c "/vol/xcf/bin/xcfinfo -c -s $XC_COMPNAME($comp) | grep -q Running 2>&1" } {XCFOUTPUT}]} {
 	    puts $XCFOUTPUT
 	    return 0
 	} else {
@@ -466,7 +466,7 @@ proc checkXCFcomp {comp} {
     }
     if {[string length $WAIT_PUBLISHER($comp)] > 0} {
 	puts "check XCF publisher $WAIT_PUBLISHER($comp)"
-	if {[catch {exec bash -c "xcfinfo -c -p $WAIT_PUBLISHER($comp) | grep -q Running 2>&1" } {XCFOUTPUT}]} {
+	if {[catch {exec bash -c "/vol/xcf/bin/xcfinfo -c -p $WAIT_PUBLISHER($comp) | grep -q Running 2>&1" } {XCFOUTPUT}]} {
 	    return 0
 	} else {
 	    return 1
@@ -704,6 +704,7 @@ proc connect_hosts {} {
 	exec xterm -title "establish ssh connection to $f" -n "$f" -e screen -mS "vdemo-$fifo_host($f)" bash -c "tail -s 0.1 -n 10000 -f $f.in | ssh -X  $fifo_host($f) bash --login --rcfile /etc/profile | while read s; do echo \$s > $f.out; done" &
 
 	ssh_command "source $env(VDEMO_demoConfig)" $fifo_host($f)
+	ssh_command "export SPREAD_CONFIG=$env(SPREAD_CONFIG)" $fifo_host($f)
 	# transmit current LD_LIBRARY_PATH to remote session
 #	if {[info exists env(LD_LIBRARY_PATH)]} {	
 #		ssh_command "export LD_LIBRARY_PATH=$env(LD_LIBRARY_PATH)" $fifo_host($f)
@@ -732,6 +733,71 @@ proc disconnect_hosts {} {
     }
 }
 
+proc finish {} {
+	 disconnect_hosts
+	 if {$::AUTO_SPREAD_CONF == 1} {
+		  puts "delete generated spread config"
+		  file delete $::env(SPREAD_CONFIG)
+	 }
+    exit	 
+}
+
+proc create_spread_conf {} {
+    global COMPONENTS COMMAND HOST env
+	 set spread_hosts ""
+    foreach {c} "$COMPONENTS" {
+		  if {"$COMMAND($c)" == "spreaddaemon"} {
+		     set spread_hosts "$spread_hosts $HOST($c)"
+		  }
+    }
+	 set spread_hosts [lsort -unique "$spread_hosts"]
+	 if {[llength $spread_hosts] > 0} {
+		 set ::AUTO_SPREAD_CONF 1
+	 } else {
+		 return
+	 }
+
+	 set segments ""
+	 foreach {h} "$spread_hosts" {
+		  set ip [exec nslookup $h | grep Address | tail -n 1 | cut -f 2 -d " "]
+		  set seg [exec echo $ip | cut -f 1,2,3 -d "."]
+		  set segments "$segments $seg"
+		  set IP($h) $ip
+		  if {![info exists hosts($seg)]} {
+					 set hosts($seg) "$h"
+		  } else {
+					 set hosts($seg) "$hosts($seg) $h"
+		  }
+	 }
+	 set segments [lsort -unique "$segments"]
+
+	 set filename "$env(VDEMO_demoRoot)/spread-$env(USER)-$env(XCF_Initial_Host).conf"
+	 set ::env(SPREAD_CONFIG) $filename
+	 if {[catch {open $filename w 0664} fd]} {
+      # something went wrong 
+		error "Could not open $filename."
+	 } 
+    if {![info exists hosts($seg)]} {set ::env(SPREAD_PORT) 4803}
+
+	 set num 1
+	 foreach {seg} "$segments" {
+		  if {$seg == "127.0.0"} {
+					 set sp_seg "127.0.0.255:$env(SPREAD_PORT)"
+		  } else {
+					 set sp_seg "225.0.0.$num:$env(SPREAD_PORT)"
+					 set num [expr $num + 1]
+		  }
+		  puts $fd "Spread_Segment $sp_seg {"
+		  foreach {h} $hosts($seg) {
+				puts $fd "\t $h \t $IP($h)"
+		  }
+		  puts $fd "}"
+		  puts $fd ""
+	 }
+
+	 close $fd
+}
+
 # }}}
 
 
@@ -739,6 +805,11 @@ set mypid [pid]
 puts "My process id is $mypid" 
 
 parse_env_var
+# auto-create spread config
+set ::AUTO_SPREAD_CONF 0
+if {![info exists ::env(SPREAD_CONFIG)]} {
+		  create_spread_conf
+}
 
 # cleanup dangling connections first
 disconnect_hosts
@@ -747,13 +818,3 @@ connect_hosts
 update
 gui_tcl
 update
-
-
-
-
-#ssh_command ls malevich
-#ssh_command "sleep 2" malevich
-#ssh_command "false" malevich
-
-#component_cmd 1_dispatcher_java check
-#disconnect_hosts
