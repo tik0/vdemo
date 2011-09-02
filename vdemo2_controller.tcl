@@ -704,7 +704,9 @@ proc connect_hosts {} {
 	exec xterm -title "establish ssh connection to $f" -n "$f" -e screen -mS "vdemo-$fifo_host($f)" bash -c "tail -s 0.1 -n 10000 -f $f.in | ssh -X  $fifo_host($f) bash --login --rcfile /etc/profile | while read s; do echo \$s > $f.out; done" &
 
 	ssh_command "source $env(VDEMO_demoConfig)" $fifo_host($f)
-	ssh_command "export SPREAD_CONFIG=$env(SPREAD_CONFIG)" $fifo_host($f)
+	if {[info exists env(SPREAD_CONFIG)]} {
+		ssh_command "export SPREAD_CONFIG=$env(SPREAD_CONFIG)" $fifo_host($f)
+	}
 	# transmit current LD_LIBRARY_PATH to remote session
 #	if {[info exists env(LD_LIBRARY_PATH)]} {	
 #		ssh_command "export LD_LIBRARY_PATH=$env(LD_LIBRARY_PATH)" $fifo_host($f)
@@ -759,7 +761,12 @@ proc create_spread_conf {} {
 
 	 set segments ""
 	 foreach {h} "$spread_hosts" {
-		  set ip [exec nslookup $h | grep Address | tail -n 1 | cut -f 2 -d " "]
+		  set ip [exec dig +search +short $h]
+		  if {"$ip" == ""} {
+			  set ip [exec ping -c1 $h | grep "bytes from" | cut -f2 -d "("  | cut -f1 -d ")"]
+		  }
+		  if {"$ip" == ""} {continue}
+
 		  set seg [exec echo $ip | cut -f 1,2,3 -d "."]
 		  set segments "$segments $seg"
 		  set IP($h) $ip
