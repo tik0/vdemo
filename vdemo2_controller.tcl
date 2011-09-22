@@ -141,6 +141,7 @@ proc gui_tcl {} {
     set base ""
     set LOGTEXT "demo configured from '$env(VDEMO_demoConfig)'"
     wm title . "vdemo_controller: $env(VDEMO_demoConfig)"
+    wm geometry . "770x600"
 
     set hosts ""
     set groups ""
