@@ -704,14 +704,14 @@ proc connect_hosts {} {
 
 	exec xterm -title "establish ssh connection to $f" -n "$f" -e screen -mS "vdemo-$fifo_host($f)" bash -c "tail -s 0.1 -n 10000 -f $f.in | ssh -X  $fifo_host($f) bash --login --rcfile /etc/profile | while read s; do echo \$s > $f.out; done" &
 
-	ssh_command "source $env(VDEMO_demoConfig)" $fifo_host($f)
-	if {[info exists env(SPREAD_CONFIG)]} {
-		ssh_command "export SPREAD_CONFIG=$env(SPREAD_CONFIG)" $fifo_host($f)
+	if {[info exists env(VDEMO_exports)]} {
+		 foreach {var} "$env(VDEMO_exports)" {
+			  if {[info exists env($var)]} {
+				  ssh_command "export $var=$env($var)" $fifo_host($f)
+			  }
+		 }
 	}
-	# transmit current LD_LIBRARY_PATH to remote session
-#	if {[info exists env(LD_LIBRARY_PATH)]} {	
-#		ssh_command "export LD_LIBRARY_PATH=$env(LD_LIBRARY_PATH)" $fifo_host($f)
-#	}
+	ssh_command "source $env(VDEMO_demoConfig)" $fifo_host($f)
 	exec screen -dS "vdemo-$fifo_host($f)"
     }
     destroy .vdemoinit

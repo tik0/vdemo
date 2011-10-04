@@ -112,8 +112,8 @@ if [[ "$1" != /* ]]; then VDEMO_demoConfig=`pwd`/$1; fi
 
 source "$VDEMO_demoConfig"
 
-export VDEMO_demoConfig VDEMO_root
-
+VDEMO_exports="SPREAD_CONFIG $VDEMO_exports"
+export VDEMO_demoConfig VDEMO_root VDEMO_exports
 
 $VDEMO_root/vdemo2_controller.tcl
 
