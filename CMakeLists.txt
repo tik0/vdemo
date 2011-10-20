@@ -20,6 +20,11 @@ SET(PROGVERSION 0.2)
 SET(LIBNAME rdsdata)
 SET(PACKET airobots)
 SET(PREFIX ${CMAKE_INSTALL_PREFIX})
+if(NOT XCF_PREFIX)
+SET(XCF_PREFIX "/vol/xcf/")
+endif(NOT XCF_PREFIX)
+
+configure_file("vdemo2_controller.tcl.in" "vdemo2_controller.tcl" @ONLY)
 
 SET(BINDIR "${PREFIX}/bin")
 SET(INCLUDEDIR "${PREFIX}/include")
