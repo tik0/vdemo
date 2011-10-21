@@ -800,6 +800,7 @@ proc create_spread_conf {} {
 				puts $fd "\t $h \t $IP($h)"
 		  }
 		  puts $fd "}"
+		  puts $fd "SocketPortReuse = ON"
 		  puts $fd ""
 	 }
 
