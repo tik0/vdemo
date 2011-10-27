@@ -176,7 +176,7 @@ function vdemo_start_component {
 	VDEMO_title=`basename VDEMO_component`
     fi
 
-    cmd="DISPLAY=${VDEMO_componentDisplay} $* 2>&1 ${VDEMO_logging}"
+    cmd="LD_LIBRARY_PATH=${LD_LIBRARY_PATH} DISPLAY=${VDEMO_componentDisplay} $* 2>&1 ${VDEMO_logging}"
 
     echo "starting $VDEMO_title as '$cmd' " >&2
     

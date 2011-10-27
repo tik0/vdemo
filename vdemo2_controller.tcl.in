@@ -508,7 +508,7 @@ proc wait_ready {comp} {
    
 proc remote_xterm {host} {
     global LOGTEXT env
-    set cmd_line "xterm -fg white -bg black -title $host &"
+    set cmd_line "xterm -fg white -bg black -title $host -e \"export LD_LIBRARY_PATH=$env(LD_LIBRARY_PATH);bash\" &"
     ssh_command "$cmd_line" $host
 }
 
