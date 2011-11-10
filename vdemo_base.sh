@@ -1,3 +1,7 @@
+if [ -z "$VDEMO_logfile_prefix" ]; then
+	 VDEMO_logfile_prefix="/tmp/VDEMO_component_"
+fi
+
 function start_Xserver {
     XPIDFILE=/tmp/VDEMO_xserver_${VDEMO_title}_${USER}.pid
     i=0;
@@ -114,7 +118,7 @@ function vdemo_detach_screen {
 # $1:   title of the component
 function vdemo_showlog {
 	 xterm -fg white -bg darkblue -title "log of ${1}@${HOSTNAME}" -e \
-		  less "${VDEMO_logPath}/VDEMO_component_${1}_${USER}.log" &
+		  less "$VDEMO_logfile_prefix${1}_${USER}.log" &
 }
 
 # start a component. This function has the following options:
@@ -141,9 +145,6 @@ function vdemo_start_component {
 		VDEMO_componentDisplay="$1"
 		;;
 	    "-l"|"--logging")
-		if [ -z "$VDEMO_logfile_prefix" ]; then
-		    VDEMO_logfile_prefix="/tmp/VDEMO_component_"
-		fi
 		VDEMO_logfile="${VDEMO_logfile_prefix}${VDEMO_title}_${USER}.log"
 		echo "logging to ${VDEMO_logfile}" >&2
 		VDEMO_logging="| tee ${VDEMO_logfile}"
