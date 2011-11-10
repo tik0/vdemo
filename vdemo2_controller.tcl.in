@@ -819,6 +819,7 @@ set ::AUTO_SPREAD_CONF 0
 if {![info exists ::env(SPREAD_CONFIG)]} {
 		  create_spread_conf
 }
+if {![info exists ::env(LD_LIBRARY_PATH)]} {set ::env(LD_LIBRARY_PATH) ""}
 
 # cleanup dangling connections first
 disconnect_hosts
