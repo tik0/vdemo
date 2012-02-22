@@ -141,7 +141,7 @@ proc gui_tcl {} {
     set base ""
     set LOGTEXT "demo configured from '$env(VDEMO_demoConfig)'"
     wm title . "vdemo_controller: $env(VDEMO_demoConfig)"
-    wm geometry . "770x600"
+    wm geometry . "850x600"
 
     set hosts ""
     set groups ""
@@ -167,7 +167,7 @@ proc gui_tcl {} {
 	pack $COMPWIDGET.$c.level -side left
 
 	label $COMPWIDGET.$c.group -anchor e -foreground blue -font "$FONT" -width 10 -text "$GROUP($c)" 
-	label $COMPWIDGET.$c.label -font "$BOLDFONT" -width 15 -anchor e -text "$TITLE($c)@" 
+	label $COMPWIDGET.$c.label -font "$BOLDFONT" -width 25 -anchor e -text "$TITLE($c)@" 
 	entry $COMPWIDGET.$c.host -borderwidth 1 -font "$FONT" -width 10 -textvariable HOST($c)
 	pack $COMPWIDGET.$c.label -side left -fill x
 	pack $COMPWIDGET.$c.host -side left
