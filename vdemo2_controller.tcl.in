@@ -806,7 +806,7 @@ proc create_spread_conf {} {
 		  if {$seg == "127.0.0"} {
 					 set sp_seg "127.0.0.255:$env(SPREAD_PORT)"
 		  } else {
-					 set sp_seg "225.0.0.$num:$env(SPREAD_PORT)"
+					 set sp_seg "225.42.65.$num:$env(SPREAD_PORT)"
 					 set num [expr $num + 1]
 		  }
 		  puts $fd "Spread_Segment $sp_seg {"
