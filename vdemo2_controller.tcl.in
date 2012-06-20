@@ -793,7 +793,7 @@ proc create_spread_conf {} {
 	 }
 	 set segments [lsort -unique "$segments"]
 
-	 set filename "$env(VDEMO_demoRoot)/spread-$env(USER)-$env(XCF_Initial_Host).conf"
+	 set filename "/var/tmp/spread-$env(USER)-$env(XCF_Initial_Host).conf"
 	 set ::env(SPREAD_CONFIG) $filename
 	 if {[catch {open $filename w 0664} fd]} {
       # something went wrong 
