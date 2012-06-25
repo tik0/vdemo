@@ -793,12 +793,16 @@ proc create_spread_conf {} {
 	 }
 	 set segments [lsort -unique "$segments"]
 
-	 set filename "/var/tmp/spread-$env(USER)-$env(XCF_Initial_Host).conf"
-	 set ::env(SPREAD_CONFIG) $filename
+	 set filename "$env(VDEMO_demoRoot)/spread-$env(USER)-$env(XCF_Initial_Host).conf"
 	 if {[catch {open $filename w 0664} fd]} {
-      # something went wrong 
-		error "Could not open $filename."
+        # something went wrong 
+		# try local file again
+		set filename "/var/tmp/spread-$env(USER)-$env(XCF_Initial_Host).conf"
+		 if {[catch {open $filename w 0664} fd]} {
+			error "Could not open auto-generated spread configuration $filename"
+	 	} 
 	 } 
+	 set ::env(SPREAD_CONFIG) $filename
     if {![info exists hosts($seg)]} {set ::env(SPREAD_PORT) 4803}
 
 	 set num 1
