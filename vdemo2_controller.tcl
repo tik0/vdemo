@@ -1,6 +1,6 @@
 #!/bin/bash
 # the next line restarts using wish \
-exec wish "$0" "$@"
+exec wish8.5 "$0" "$@"
 package require Iwidgets 4.0
 
 # if {[catch {package require Scrolledframe}]} \
@@ -11,8 +11,8 @@ package require Iwidgets 4.0
 # namespace import ::scrolledframe::scrolledframe
 
 proc parse_options {comp} {
-    global env HOST COMPONENTS ARGS USEX TERMINAL WAIT_READY NOAUTO LOGGING WAIT_SERVER WAIT_PUBLISHER GROUP DETACHTIME XC_COMPNAME COMP_LEVEL
-    set NEWARGS ""
+    global env HOST COMPONENTS ARGS USEX TERMINAL WAIT_READY NOAUTO LOGGING WAIT_SERVER WAIT_PUBLISHER GROUP DETACHTIME XC_COMPNAME COMP_LEVEL EXPORTS TITLE
+    set NEWARGS [list]
     set USEX($comp) 0
     set WAIT_READY($comp) 0
     set WAIT_SERVER($comp) ""
@@ -24,6 +24,8 @@ proc parse_options {comp} {
     set LOGGING($comp) 0
     set COMP_LEVEL($comp) ""
     set XC_COMPNAME($comp) ""
+    set EXPORTS($comp) ""
+
     for {set i 0} \$i<[llength $ARGS($comp)] {incr i} {
         set arg [lindex $ARGS($comp) $i]; set val [lindex $ARGS($comp) [expr $i+1]]
         switch -glob -- $arg {
@@ -51,6 +53,14 @@ proc parse_options {comp} {
 		set GROUP($comp) [string tolower "$val"]
 		incr i
 	    }
+	    -v {
+		set EXPORTS($comp) "$EXPORTS($comp) $val"
+		incr i
+	    }
+	    -t {
+		set TITLE($comp) "$val"
+		incr i
+	    }
             -x {
                 set USEX($comp) 1
             }
@@ -69,17 +79,16 @@ proc parse_options {comp} {
 		incr i
             }
             default {
-                set NEWARGS "$NEWARGS $arg"
+                set NEWARGS [lappend NEWARGS $arg]
             }
         }
     }
-    set ARGS($comp) "$NEWARGS"
+    set ARGS($comp) $NEWARGS
 }
 
 
-
 proc parse_env_var {} {
-    global env HOST COMPONENTS ARGS USEX WATCHFILE COMMAND
+    global env HOST COMPONENTS ARGS USEX WATCHFILE COMMAND TITLE
     set components_list "$env(VDEMO_components)"
     set comp [split "$components_list" ":"]
     set nCompos [llength "$comp"]
@@ -87,6 +96,7 @@ proc parse_env_var {} {
     set WATCHFILE ""
     catch {set WATCHFILE $env(VDEMO_watchfile)}
     puts "VDEMO_watchfile = $WATCHFILE"
+	 puts "COMPONENTS: "
     for {set i 0} { $i < $nCompos } {incr i} {
 	set thisComp [split [lindex "$comp" $i] ","]
 	if {[llength "$thisComp"] == 3} {
@@ -96,15 +106,20 @@ proc parse_env_var {} {
 	    set host [lindex "$thisComp" 1]
 	    set component_name "${i}_${component_name}"
 	    set COMMAND($component_name) "$thisCommand"
+		 set TITLE($component_name) "$thisCommand"
 	    set COMPONENTS "$COMPONENTS $component_name"
 	    
-	    set HOST($component_name) [lindex "$thisComp" 1]
+	    set HOST($component_name) $host
 	    set ARGS($component_name) [lindex $thisComp 2]
-	    puts "COMPONENT:\t$component_name\tHOST: $HOST($component_name)\tARGS: $ARGS($component_name)"
+		 # do not simply tokenize at spaces, but allow quoted strings ("" or '')
+	    set ARGS($component_name) [regexp -all -inline {\S+|[^ =]+=(?:\S+|"[^"]+"|'[^']+')} $ARGS($component_name)]
+       # '"
+	    puts "$component_name\tHOST: $HOST($component_name)\tARGS: $ARGS($component_name)"
 	    # parse options known by the script and remove them from them the list
 	    parse_options "$component_name"
 	}
     }
+	puts ""
     
 }
 
@@ -119,13 +134,14 @@ proc isXCFComp {c} {
 }
 
 proc gui_tcl {} {
-    global HOST COMPONENTS ARGS TERMINAL USEX LOGTEXT env NOAUTO LOGGING WAIT_PUBLISHER WAIT_SERVER GROUP SCREENED XC_COMPNAME COMP_LEVEL COMPWIDGET WATCHFILE COMMAND LEVELS
+    global HOST SCREENED_SSH COMPONENTS ARGS TERMINAL USEX LOGTEXT env NOAUTO LOGGING WAIT_PUBLISHER WAIT_SERVER GROUP SCREENED XC_COMPNAME COMP_LEVEL COMPWIDGET WATCHFILE COMMAND LEVELS TITLE
     set BOLDFONT "-*-helvetica-bold-r-*-*-10-*-*-*-*-*-*-*"
     set FONT "-*-helvetica-medium-r-*-*-10-*-*-*-*-*-*-*"
     set root "."
     set base ""
     set LOGTEXT "demo configured from '$env(VDEMO_demoConfig)'"
     wm title . "vdemo_controller: $env(VDEMO_demoConfig)"
+    wm geometry . "850x600"
 
     set hosts ""
     set groups ""
@@ -151,8 +167,8 @@ proc gui_tcl {} {
 	pack $COMPWIDGET.$c.level -side left
 
 	label $COMPWIDGET.$c.group -anchor e -foreground blue -font "$FONT" -width 10 -text "$GROUP($c)" 
-	label $COMPWIDGET.$c.label -font "$BOLDFONT" -width 20 -anchor e -text "$COMMAND($c)@" 
-	entry $COMPWIDGET.$c.host -borderwidth 1 -font "$FONT" -width 20 -textvariable HOST($c)
+	label $COMPWIDGET.$c.label -font "$BOLDFONT" -width 25 -anchor e -text "$TITLE($c)@" 
+	entry $COMPWIDGET.$c.host -borderwidth 1 -font "$FONT" -width 10 -textvariable HOST($c)
 	pack $COMPWIDGET.$c.label -side left -fill x
 	pack $COMPWIDGET.$c.host -side left
 	pack $COMPWIDGET.$c.group -side left -fill x
@@ -162,9 +178,10 @@ proc gui_tcl {} {
 	checkbutton $COMPWIDGET.$c.noauto -font "$BOLDFONT" -borderwidth 1 -text "no auto" -variable NOAUTO($c) -foreground blue
 	checkbutton $COMPWIDGET.$c.ownx -font "$BOLDFONT" -borderwidth 1 -text "own X" -variable USEX($c)
 	checkbutton $COMPWIDGET.$c.logging -font "$BOLDFONT" -borderwidth 1 -text "logging" -variable LOGGING($c)
+	button $COMPWIDGET.$c.logoutput -font "$BOLDFONT" -pady -3 -padx -7 -borderwidth 1 -text "view log" -command "component_cmd $c showlog"
 	frame $COMPWIDGET.$c.terminal
 	set SCREENED($c) 0
-	checkbutton $COMPWIDGET.$c.terminal.screen -pady -3 -padx -7 -font "$BOLDFONT" -borderwidth 1 -text "screened" -command "component_cmd $c screen" -variable SCREENED($c) -onvalue 1 -offvalue 0
+	checkbutton $COMPWIDGET.$c.terminal.screen -pady -3 -padx -7 -font "$BOLDFONT" -borderwidth 1 -text "show term" -command "component_cmd $c screen" -variable SCREENED($c) -onvalue 1 -offvalue 0
 	if {[isXCFComp $c]} {
 	    if {[string length $WAIT_SERVER($c)] > 0} {
 		set button_text "SERV. $WAIT_SERVER($c)"
@@ -177,9 +194,10 @@ proc gui_tcl {} {
 	    set intercept_disabled "disabled"
 	    set button_text "not interceptable"
 	}	
-	button $COMPWIDGET.$c.intercept -pady -3 -padx -7 -font "$BOLDFONT" -activebackground white -borderwidth 1 -state $intercept_disabled -text "$button_text" -width 35 -command "intercept_component $c"
+	button $COMPWIDGET.$c.intercept -pady -3 -padx -7 -font "$BOLDFONT" -activebackground white -borderwidth 1 -state $intercept_disabled -text "$button_text" -width 20 -command "intercept_component $c"
 	
 	pack $COMPWIDGET.$c.ownx -side right 
+	pack $COMPWIDGET.$c.logoutput -side right 
 	pack $COMPWIDGET.$c.logging -side right 
 	pack $COMPWIDGET.$c.intercept -side right
 	pack $COMPWIDGET.$c.terminal -side right 
@@ -204,7 +222,7 @@ proc gui_tcl {} {
     # button to control ALL components
     frame $base.components.all -relief groove -borderwidth 1
     pack $base.components.all -side top -fill both
-    label $base.components.all.label -width 53 -anchor e -font "$BOLDFONT" -text "ALL COMPONENTS" -foreground blue
+    label $base.components.all.label -anchor e -font "$BOLDFONT" -text "ALL COMPONENTS" -foreground blue
     pack $base.components.all.label -side left -fill x
     button $base.components.all.start -font "$BOLDFONT" -pady -3 -padx -7 -borderwidth 1 -text "start" -foreground blue -command "allcomponents_cmd start"
     button $base.components.all.stop -font "$BOLDFONT" -pady -3 -padx -7 -borderwidth 1 -text "stop" -foreground blue -command "allcomponents_cmd stop"
@@ -243,7 +261,7 @@ proc gui_tcl {} {
     foreach {g} "$groups" {
 	frame $base.components.group.named.$g -relief groove -borderwidth 1
 	pack $base.components.group.named.$g -side top -fill x
-	label $base.components.group.named.$g.label -width 35 -anchor e -font "$BOLDFONT" -text "$g" -foreground blue
+	label $base.components.group.named.$g.label -width 10 -anchor e -font "$BOLDFONT" -text "$g" -foreground blue
 	pack $base.components.group.named.$g.label -side left -fill x
 	button $base.components.group.named.$g.start -font "$BOLDFONT" -pady -3 -padx -3 -borderwidth 1 -text "start" -foreground blue -command "group_cmd start $g"
 	button $base.components.group.named.$g.stop -font "$BOLDFONT" -pady -3 -padx -3 -borderwidth 1 -text "stop" -foreground blue -command "group_cmd stop $g"
@@ -271,27 +289,31 @@ proc gui_tcl {} {
     pack $base.components -side top -fill both -expand yes 
 
     # logarea
-    label $base.logarea -font "$FONT" -textvariable LOGTEXT -width 80 -anchor nw -height 4 -justify left -relief sunken -background white -foreground darkgreen
+    label $base.logarea -font "$FONT" -textvariable LOGTEXT -width 50 -anchor nw -height 4 -justify left -relief sunken -background white -foreground darkgreen
     pack $base.logarea -side top -fill both
 
-    set hosts [lsort -unique [string tolower "$hosts"]]
+    set hosts [lsort -unique "$hosts"]
     frame $base.ssh 
     frame $base.clocks
     pack $base.ssh -side top -fill x
     label $base.ssh.label -font "$BOLDFONT"    -text "ssh to"
     pack $base.ssh.label -side left
     foreach {h} "$hosts" {
-	button $base.ssh.$h -pady -3 -padx -7 -borderwidth 1 -text "$h" -font "$BOLDFONT" -command "remote_xterm $h"
-	button $base.ssh.clocks_$h -pady -3 -padx -7 -borderwidth 1 -text "C" -font "$FONT" -command "remote_clock $h"
+	set lh [string tolower "$h"]
+	button $base.ssh.$lh -pady -3 -padx -7 -borderwidth 1 -text "$h" -font "$BOLDFONT" -command "remote_xterm $h"
+	button $base.ssh.clocks_$lh -pady -3 -padx -7 -borderwidth 1 -text "C" -font "$FONT" -command "remote_clock $h"
+	set SCREENED_SSH($h) 0
+	checkbutton  $base.ssh.screen_$lh -pady -3 -padx -7 -borderwidth 1 -text "" -font "$FONT" -command "screen_ssh_master $h" -variable SCREENED_SSH($h) -onvalue 1 -offvalue 0
 	#	button $base.ssh.$h -text "$h" -command "$h" -command "exec ssh -X $h xterm &"
-	pack $base.ssh.$h -side left -fill x
-	pack $base.ssh.clocks_$h -side left -fill x
+	pack $base.ssh.$lh -side left -fill x
+	pack $base.ssh.clocks_$lh -side left -fill x
+	pack $base.ssh.screen_$lh -side left -fill x
     }
 
 
 
 
-    button $base.exit -pady -3 -padx -7 -borderwidth 1 -text "exit" -font "$BOLDFONT" -command {exit}
+    button $base.exit -pady -3 -padx -7 -borderwidth 1 -text "exit" -font "$BOLDFONT" -command {finish}
     pack $base.exit -side bottom -fill x
 
 }
@@ -303,7 +325,8 @@ proc clearLogger {} {
 }
 
 proc init_logger {filename} {
-    if { [catch {open "|tail -n 5 -F $filename"} infile] } {
+    global mypid
+    if { [catch {open "|tail -n 5 --pid=$mypid -F $filename"} infile] } {
 	puts  "Could not open $filename for reading, quit."
 	exit 1
     }
@@ -339,15 +362,15 @@ proc intercept_component {comp} {
 }
 
 proc allcomponents_cmd {cmd} {
-    global HOST COMPONENTS ARGS TERMINAL USEX LOGTEXT  WAIT_READY NOAUTO LEVELS
+    global HOST COMPONENTS ARGS TERMINAL USEX LOGTEXT  WAIT_READY WAIT_BREAK NOAUTO LEVELS
     if {"$cmd" == "stop"} {
 	set WAIT_BREAK 1
 	foreach {level} "[lsort $LEVELS]" {
 	    level_cmd $cmd $level
 	}
     } else {
+	set WAIT_BREAK 0
 	foreach {level} "$LEVELS" {
-	    set WAIT_BREAK 0
 	    if {$WAIT_BREAK} {
 		break
 	    }
@@ -425,31 +448,33 @@ proc level_cmd {cmd level} {
 }
 
 proc checkXCFcomp {comp} {
-    global WAIT_PUBLISHER WAIT_SERVER XC_COMPNAME
-    if {[string length $WAIT_SERVER($comp)] > 0} {
-	puts "check XCF server $WAIT_SERVER($comp)"
-	if {[catch {exec xcfinfo -c -s $WAIT_SERVER($comp) 2>&1 } {XCFOUTPUT}]} {
-	    return 0
-	} else {
-	    return 1
-	}
-    }
-    if {[string length $XC_COMPNAME($comp)] > 0} {
-	puts "check XCF server $XC_COMPNAME($comp)"
-	if {[catch {exec xcfinfo -c -s $XC_COMPNAME($comp) 2>&1} {XCFOUTPUT}]} {
-	    return 0
-	} else {
-	    return 1
-	}
-    }
-    if {[string length $WAIT_PUBLISHER($comp)] > 0} {
-	puts "check XCF publisher $WAIT_PUBLISHER($comp)"
-	if {[catch {exec xcfinfo -c -p $WAIT_PUBLISHER($comp) 2>&1} {XCFOUTPUT}]} {
-	    return 0
-	} else {
-	    return 1
-	}
-    }
+	puts "checkXCF implementation disabled"
+#     global WAIT_PUBLISHER WAIT_SERVER XC_COMPNAME
+#     if {[string length $WAIT_SERVER($comp)] > 0} {
+# 	puts "check XCF server $WAIT_SERVER($comp)"
+# 	if {[catch {exec bash -c "@XCF_PREFIX@/bin/xcfinfo -c -s $WAIT_SERVER($comp) | grep -q Running 2>&1" } {XCFOUTPUT}]} {
+# 	    return 0
+# 	} else {
+# 	    return 1
+# 	}
+#     }
+#     if {[string length $XC_COMPNAME($comp)] > 0} {
+# 	puts "check XCF server $XC_COMPNAME($comp)"
+# 	if {[catch {exec bash -c "@XCF_PREFIX@/bin/xcfinfo -c -s $XC_COMPNAME($comp) | grep -q Running 2>&1" } {XCFOUTPUT}]} {
+# 	    puts $XCFOUTPUT
+# 	    return 0
+# 	} else {
+# 	    return 1
+# 	}
+#     }
+#     if {[string length $WAIT_PUBLISHER($comp)] > 0} {
+# 	puts "check XCF publisher $WAIT_PUBLISHER($comp)"
+# 	if {[catch {exec bash -c "@XCF_PREFIX@/bin/xcfinfo -c -p $WAIT_PUBLISHER($comp) | grep -q Running 2>&1" } {XCFOUTPUT}]} {
+# 	    return 0
+# 	} else {
+# 	    return 1
+# 	}
+#     }
     return 1
 }
 
@@ -485,51 +510,46 @@ proc wait_ready {comp} {
    
 proc remote_xterm {host} {
     global LOGTEXT env
-    set cmd_line "(cat $env(VDEMO_demoConfig) && echo 'xterm -title $host') | ssh -X $host 'bash --login'"
-
-    puts "will run '$cmd_line'"
-    if [catch {exec bash -c "$cmd_line 2>&1" &} LOGTEXT ] {
-	puts $LOGTEXT
-	set success 0
-    } else {}
+    set cmd_line "xterm -fg white -bg black -title $host -e \"export LD_LIBRARY_PATH=$env(LD_LIBRARY_PATH);bash\" &"
+    ssh_command "$cmd_line" $host
 }
 
 proc remote_clock {host} {
     global LOGTEXT env
-    set cmd_line "(cat $env(VDEMO_demoConfig) && echo 'xclock -geometry 250x30 -title $host -digital -update 1') | ssh -X $host 'bash --login'"
-
-    puts "will run '$cmd_line'"
-    if [catch {exec bash -c "$cmd_line 2>&1" &} LOGTEXT ] {
-	puts $LOGTEXT
-	set success 0
-    } else {}
+    set cmd_line "xclock -fg white -bg black -geometry 250x30 -title $host -digital -update 1 &"
+    ssh_command "$cmd_line" "$host"
 }
 
 proc component_cmd {comp cmd} {
-    global env HOST COMPONENTS ARGS TERMINAL USEX LOGTEXT WAIT_READY LOGGING WAIT_BREAK SCREENED DETACHTIME COMPWIDGET COMMAND
+    global env HOST COMPONENTS ARGS TERMINAL USEX LOGTEXT WAIT_READY LOGGING WAIT_BREAK SCREENED DETACHTIME COMPWIDGET COMMAND EXPORTS
     set cpath "$env(VDEMO_componentPath)"
     set component_script "$cpath/component_$COMMAND($comp)"
     set component_options ""
     if {$USEX($comp)} {
-	set component_options "$component_options -x"
+				set component_options "$component_options -x"
     }
     if {$LOGGING($comp)} {
-	set component_options "$component_options -l"
+				set component_options "$component_options -l"
     }
+	 set VARS "$EXPORTS($comp) "
 
     set success 1
     switch $cmd {
 	start {
-	    set cmd_line "(cat $env(VDEMO_demoConfig) && echo $component_script $component_options $cmd) | ssh -X $HOST($comp) 'bash --login'"
-	    puts "will START '$cmd_line'"
+       if {$DETACHTIME($comp) < 0} {
+           set component_options "$component_options --noiconic"
+       }
+	    set cmd_line "$VARS $component_script $component_options start"
 	    $COMPWIDGET.$comp.start flash
 	    set WAIT_BREAK 0
 	    set_status $comp unknown
 
-	    if [catch {exec bash -c "$cmd_line 2>&1" &} LOGTEXT ] {
-		puts $LOGTEXT
-		set success 0
-	    } else {}
+	    ssh_command "$cmd_line" "$HOST($comp)"
+
+# 	    if [catch {exec bash -c "$cmd_line 2>&1" &} LOGTEXT ] {
+# 		puts $LOGTEXT
+# 		set success 0
+# 	    } else {}
 	    set SCREENED($comp) 1
 	    wait_ready $comp
 	    # wait longer period of time when using X
@@ -544,51 +564,44 @@ proc component_cmd {comp cmd} {
 	    }
 	}
 	stop {
-	    set cmd_line "(cat $env(VDEMO_demoConfig) && echo $component_script $component_options $cmd) | ssh -x $HOST($comp) 'bash --login'"
-	    puts "will STOP  '$cmd_line'"
+	    set cmd_line "$VARS $component_script $component_options stop"
 	    $COMPWIDGET.$comp.stop flash
 	    set WAIT_BREAK 1
 	    set_status $comp unknown
-	    if [catch {exec bash -c "$cmd_line 2>&1"} LOGTEXT ] {
-		puts $LOGTEXT
-		set success 0
-	    }
+
+	    ssh_command "$cmd_line" "$HOST($comp)"
+
 	    set_status $comp 0
 	    set SCREENED($comp) 0
 	    after idle "component_cmd $comp check"
 	}
 	screen {
 	    if {$SCREENED($comp)} {
-		set cmd_line "(cat $env(VDEMO_demoConfig) && echo xterm -title \\\'$comp - detach by \[C-a d\], DO NOT HIT CLOSE BUTTON!\\\' -e $component_script $component_options $cmd) | ssh -X $HOST($comp) 'bash --login'"
-		if [catch {exec bash -c  "$cmd_line 2>&1" &} LOGTEXT ] {
-		    puts $LOGTEXT
-		    set success 0
-		    set SCREENED($comp) 0
-		}
+		set cmd_line "$VARS xterm -fg white -bg black -title \"$comp - detach by \[C-a d\], DO NOT HIT CLOSE BUTTON!\" -e $component_script $component_options screen &"
+		ssh_command "$cmd_line" "$HOST($comp)"
 	    } else {
-		set cmd_line "(cat $env(VDEMO_demoConfig) && echo $component_script $component_options detach) | ssh -x $HOST($comp) 'bash --login'"
-		if [catch {exec bash -c  "$cmd_line 2>&1" &} LOGTEXT ] {
-		    puts $LOGTEXT
-		    set success 0
-		}
+		set cmd_line "$VARS $component_script $component_options detach"
+		ssh_command "$cmd_line" "$HOST($comp)"
 	    }
 	}
 	detach {
-	    set cmd_line "(cat $env(VDEMO_demoConfig) && echo $component_script $component_options $cmd) | ssh -x $HOST($comp) 'bash --login'"
-	    if [catch {exec bash -c  "$cmd_line 2>&1" &} LOGTEXT ] {
-		puts $LOGTEXT
-		set success 0
-	    }
+	    set cmd_line "$VARS $component_script $component_options detach"
+	    ssh_command "$cmd_line" "$HOST($comp)"
 	    set SCREENED($comp) 0
-
+	}
+	showlog {
+	    set cmd_line "$VARS $component_script $component_options showlog"
+	    ssh_command "$cmd_line" "$HOST($comp)"
 	}
 
 	check {
-	    set cmd_line "(cat $env(VDEMO_demoConfig) && echo $component_script $component_options $cmd) | ssh -x $HOST($comp) 'bash --login'"
-	    puts "will CHECK '$cmd_line'"
+	    set cmd_line "$VARS $component_script $component_options check"
+
 	    set_status $comp unknown
+	    set res [ssh_command "$cmd_line" "$HOST($comp)"]
+
 	    set success 1
-	    if [catch {exec bash -c "$cmd_line 2>&1"} LOGTEXT ] {
+	    if {$res == 1} {
 		set SCREENED($comp) 0
 		set_status $comp 0
 	    } else {
@@ -621,25 +634,219 @@ proc set_status {comp status} {
 }
 
 
-proc start_component {comp} {
-    puts "start $comp"
-}
+# proc start_component {comp} {
+#     puts "start $comp"
+# }
 
-proc stop_component {comp} {
-    puts "stop $comp"
-}
+# proc stop_component {comp} {
+#     puts "stop $comp"
+# }
 
-proc screen_component {comp} {
-    puts "screen $comp"
-}
+# proc screen_component {comp} {
+#     puts "screen $comp"
+# }
 
-proc check_component {comp} {
-    global COMPWIDGET
-    puts "check $comp"
+# proc check_component {comp} {
+#     global COMPWIDGET
+#     puts "check $comp"
     
-    $COMPWIDGET.$comp.check configure -background red
+#     $COMPWIDGET.$comp.check configure -background red
+# }
+
+
+
+# {{{ ssh and command procs
+
+proc screen_ssh_master {h} {
+    global SCREENED_SSH
+    if {$SCREENED_SSH($h) == 1} {
+	exec  xterm -title "MASTER SSH CONNECTION TO $h. Do not close this window!" -e screen -d -r -S "vdemo-$h" &
+    } else {
+	exec  screen -d -S "vdemo-$h" 
+    }
 }
 
+proc ssh_command {cmd hostname} {
+    set f [get_fifo_name $hostname]
+    puts "run '$cmd' on host '$hostname'"
+
+    set res [exec bash -c "echo 'echo \"****************************************\" 1>&2; date 1>&2; echo \"*** RUN $cmd\" 1>&2; $cmd 1>&2; echo \$?' > $f.in; cat $f.out"]
+    return $res
+}
+
+proc get_fifo_name {hostname} {
+    global COMPONENTS HOST env
+    return "/tmp/vdemo-ssh-$env(USER)-$hostname"
+}
+
+proc connect_hosts {} {
+    global COMPONENTS env HOST
+    set fifos ""
+
+    label .vdemoinit -text "init VDemo - be patient..." -foreground darkgreen -font "-*-helvetica-bold-r-*-*-30-*-*-*-*-*-*-*"
+    label .vdemoinit2 -text "" -foreground darkred -font "-*-helvetica-bold-r-*-*-20-*-*-*-*-*-*-*"
+    pack .vdemoinit 
+    pack .vdemoinit2 
+    update
+
+    foreach {c} "$COMPONENTS" {
+	set fifo "[get_fifo_name $HOST($c)]"
+	set fifos "$fifos $fifo"
+	set fifo_host($fifo) "$HOST($c)"
+    }
+    set fifos [lsort -unique "$fifos"]
+
+    foreach {f} "$fifos" {
+	.vdemoinit2 configure -text "connect to $fifo_host($f)"
+	update
+	exec rm -f "$f.in"
+	exec rm -f "$f.out"
+	exec mkfifo "$f.in"
+	exec mkfifo "$f.out"
+
+	exec xterm -title "establish ssh connection to $f" -n "$f" -e screen -mS "vdemo-$fifo_host($f)" bash -c "tail -s 0.1 -n 10000 -f $f.in | ssh -X  $fifo_host($f) bash --login --rcfile /etc/profile | while read s; do echo \$s > $f.out; done" &
+
+	if {[info exists env(VDEMO_exports)]} {
+		 foreach {var} "$env(VDEMO_exports)" {
+			  if {[info exists env($var)]} {
+				  ssh_command "export $var=$env($var)" $fifo_host($f)
+			  }
+		 }
+	}
+	ssh_command "source $env(VDEMO_demoConfig)" $fifo_host($f)
+	exec screen -dS "vdemo-$fifo_host($f)"
+    }
+    destroy .vdemoinit
+    destroy .vdemoinit2
+}
+
+proc disconnect_hosts {} {
+    global COMPONENTS env HOST
+    set fifos ""
+    foreach {c} "$COMPONENTS" {
+	set fifo "[get_fifo_name $HOST($c)]"
+	set fifos "$fifos $fifo"
+	set fifo_host($fifo) "$HOST($c)"
+    }
+    set fifos [lsort -unique "$fifos"]
+
+    foreach {f} "$fifos" {
+	puts "exit $fifo_host($f)"
+	catch {exec bash -c "screen -list vdemo-$fifo_host($f) | grep vdemo | cut -d. -f1 | xargs kill 2>&1"}
+	exec rm -f "$f.in"
+	exec rm -f "$f.out"
+    }
+}
+
+proc finish {} {
+	 disconnect_hosts
+	 if {$::AUTO_SPREAD_CONF == 1} {
+		  puts "delete generated spread config"
+		  file delete $::env(SPREAD_CONFIG)
+	 }
+    exit	 
+}
+
+proc remove_duplicates {} {
+	 global COMPONENTS TITLE HOST
+
+    set _COMPONENTS {}
+	 foreach {c} "$COMPONENTS" {
+		  set cmdhost "$TITLE($c):$HOST($c)"
+		  if { ![info exists _HAVE($cmdhost)] } {
+					set _HAVE($cmdhost) "$cmdhost"
+					set _COMPONENTS "$_COMPONENTS $c"
+		  }
+    }
+	 set COMPONENTS $_COMPONENTS
+}
+
+proc create_spread_conf {} {
+    global COMPONENTS COMMAND HOST env
+	 set spread_hosts ""
+    foreach {c} "$COMPONENTS" {
+		  if {"$COMMAND($c)" == "spreaddaemon"} {
+		     set spread_hosts "$spread_hosts $HOST($c)"
+		  }
+    }
+	 set spread_hosts [lsort -unique "$spread_hosts"]
+	 if {[llength $spread_hosts] > 0} {
+		 set ::AUTO_SPREAD_CONF 1
+	 } else {
+		 return
+	 }
+
+	 set segments ""
+	 foreach {h} "$spread_hosts" {
+		  set ip [exec dig +search +short $h]
+		  if {"$ip" == ""} {
+			  set ip [exec ping -c1 $h | grep "bytes from" | cut -f2 -d "("  | cut -f1 -d ")"]
+		  }
+		  if {"$ip" == ""} {continue}
+
+		  set seg [exec echo $ip | cut -f 1,2,3 -d "."]
+		  set segments "$segments $seg"
+		  set IP($h) $ip
+		  if {![info exists hosts($seg)]} {
+					 set hosts($seg) "$h"
+		  } else {
+					 set hosts($seg) "$hosts($seg) $h"
+		  }
+	 }
+	 set segments [lsort -unique "$segments"]
+
+	 set filename "$env(VDEMO_demoRoot)/spread-$env(USER)-$env(VDEMO_demoId).conf"
+	 if {[catch {open $filename w 0664} fd]} {
+        # something went wrong 
+		# try local file again
+		set filename "/var/tmp/spread-$env(USER)-$env(VDEMO_demoId).conf"
+		 if {[catch {open $filename w 0664} fd]} {
+			error "Could not open auto-generated spread configuration $filename"
+	 	} 
+	 } 
+	 set ::env(SPREAD_CONFIG) $filename
+    if {![info exists hosts($seg)]} {set ::env(SPREAD_PORT) 4803}
+
+	 set num 1
+	 foreach {seg} "$segments" {
+		  if {$seg == "127.0.0"} {
+					 set sp_seg "127.0.0.255:$env(SPREAD_PORT)"
+		  } else {
+					 set sp_seg "225.42.65.$num:$env(SPREAD_PORT)"
+					 set num [expr $num + 1]
+		  }
+		  puts $fd "Spread_Segment $sp_seg {"
+		  foreach {h} $hosts($seg) {
+				puts $fd "\t $h \t $IP($h)"
+		  }
+		  puts $fd "}"
+		  puts $fd "SocketPortReuse = ON"
+		  puts $fd ""
+	 }
+
+	 close $fd
+}
+
+# }}}
+
+
+set mypid [pid]
+puts "My process id is $mypid" 
 
 parse_env_var
+remove_duplicates
+
+# auto-create spread config
+set ::AUTO_SPREAD_CONF 0
+if {![info exists ::env(SPREAD_CONFIG)]} {
+		  create_spread_conf
+}
+if {![info exists ::env(LD_LIBRARY_PATH)]} {set ::env(LD_LIBRARY_PATH) ""}
+
+# cleanup dangling connections first
+disconnect_hosts
+connect_hosts
+
+update
 gui_tcl
+update

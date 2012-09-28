@@ -1,56 +1,8 @@
 #!/bin/bash
-# ///
-# ///
-# /// @file	vdemo_component_memoryserver.sh
 # /// @author	Marc Hanheide (mhanheid@TechFak.Uni-Bielefeld.de)
 # /// @date	started at 2005/03/01
 # /// @version	$Id: vdemo_standard_component_suffix.sh,v 1.4 2007/08/17 15:28:47 mhanheid Exp $
-# ///
-# /// @brief       vdemo_component_memoryserver.sh not documented yet (read source yourself ;-) )
-# /// 
-# /// 
-# /// $Log: vdemo_standard_component_suffix.sh,v $
-# /// Revision 1.4  2007/08/17 15:28:47  mhanheid
-# /// some forgotten changes and xterm with better colors
-# ///
-# /// Revision 1.3  2006/11/07 16:39:22  mhanheid
-# /// *** empty log message ***
-# ///
-# /// Revision 1.2  2006/07/21 12:52:15  mhanheid
-# /// fixed bug in vdemo_component single start
-# ///
-# /// Revision 1.1  2005/11/24 15:59:05  mhanheid
-# /// initial
-# ///
-# /// Revision 1.7  2005/06/13 09:24:33  mhanheid
-# /// - better screening support
-# ///
-# /// Revision 1.6  2005/05/03 12:32:58  mhanheid
-# /// *** empty log message ***
-# ///
-# /// Revision 1.5  2005/05/03 12:28:58  mhanheid
-# /// *** empty log message ***
-# ///
-# /// Revision 1.4  2005/05/03 12:19:57  mhanheid
-# /// *** empty log message ***
-# ///
-# /// Revision 1.1  2005/04/06 11:08:23  mhanheid
-# /// Initial revision
-# ///
-# /// Revision 1.2  2005/03/09 14:47:17  mhanheid
-# /// small bugfixes and minor changes
-# ///
-# /// Revision 1.1  2005/03/03 17:37:32  mhanheid
-# /// init
-# ///
-# /// Revision 1.1  2005/01/05 10:47:16  mhanheid
-# /// Initial revision
-# ///
-# ///
-
-# ************************************* START *********************************
-#!/bin/bash
-
+#
 # THIS SCRIPT EXPECT THE FOLLOWING VARIABLES TO BE SET:
 #   component="$VDEMO_root/bin/memory_server $VDEMO_CASA_dbxml/vam.dbxml $VDEMO_perceptVamName"
 #   title=MemoryServer

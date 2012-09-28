@@ -6,15 +6,16 @@ if [ -z "$2" ]; then
     exit 1
 fi
 
-export VDEMO_demoConfig
-if [ -z "${VDEMO_root}" ]; then
-    VDEMO_root="@bindir@"
-    echo 'VDEMO_root=${VDEMO_root} (per default)' >&2
-fi
-VDEMO_demoConfig="$1"
+
+export VDEMO_root="@VDEMO_root@"
+export VDEMO_demoConfig="$1"
 comp="$2"
+VDEMO_demoId=$(basename "$VDEMO_demoConfig")
+export VDEMO_demoId="${VDEMO_demoId%.*}"
+
+if [[ "$1" != /* ]]; then VDEMO_demoConfig=$(pwd)/$1; fi
+export VDEMO_exports="SPREAD_CONFIG $VDEMO_exports"
+
 source "$VDEMO_demoConfig"
 
-$comp single
-
-
+"$comp" single
