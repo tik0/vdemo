@@ -401,11 +401,11 @@ proc wait_ready {comp} {
 	set WAIT_BREAK 0
 	if {[string is digit $WAIT_READY($comp)]} {
 		for {set x 0} {$x<$WAIT_READY($comp)} {incr x} {
+			sleep 1000
 			if {$CONT_CHECK($comp)} {
 				component_cmd $comp check
 			}
 			if {$COMPSTATUS($comp) == 1} {break}
-			sleep 1000
 		}
 	} 
 }
