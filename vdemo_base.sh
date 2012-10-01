@@ -1,5 +1,5 @@
 if [ -z "$VDEMO_logfile_prefix" ]; then
-	 VDEMO_logfile_prefix="/tmp/VDEMO_component_"
+	 VDEMO_logfile_prefix="/tmp/vdemo-$USER/component_"
 fi
 
 function start_Xserver {
@@ -14,25 +14,6 @@ function start_Xserver {
 		echo ":${i}"
 		return 0
 	    fi
-	else
-	    echo "found :${i} free, starting X server" >&2
-	    X $VDEMO_Xopts :${i} 1>&2 &
-	    echo "$!" > "${XPIDFILE}"
-	    echo "DeskTopSize 1x1" >  /tmp/dummy-fvwm2-config_${USER} 2>&1
-	    echo "X started, waiting before starting window manager" >&2
-	    # This waits until the server is ready
-	    while ! xsetroot -solid black -display ":${i}"; do sleep 1; done
-	    # start the fvwm window manager in default mode:
-	    echo "starting fvwm2" >&2
-	    fvwm2 -f /tmp/dummy-fvwm2-config_${USER} -display ":${i}" 1>&2 &
-	    echo "started fvwm2" >&2
-	    sleep 1
-	    # screen saver off
-	    xset -display ":${i}" s off
-	    xset -display ":${i}" -dpms
-	    xsetroot -solid black -display ":${i}"
-	    echo ":${i}"
-	    return 0
 	fi
 	echo  "X on :${i} locked, try next..." >&2
 	i=`expr $i + 1`
@@ -125,7 +106,6 @@ function vdemo_showlog {
 #   -n    title of the component (name to identify it by other functions, 
 #           needs not to be the program name)
 #   -d    use X11 DISPLAY to display the component
-#   -t    type of terminal to use: std, xterm, screen
 # remaining arguments are treated as command line of the component to start
 function vdemo_start_component {
     # give the component 8 seconds to startup and set up the X11 connection
@@ -146,8 +126,10 @@ function vdemo_start_component {
 		;;
 	    "-l"|"--logging")
 		VDEMO_logfile="${VDEMO_logfile_prefix}${VDEMO_title}_${USER}.log"
+		logfiledir="${VDEMO_logfile%/*}"
+		if [ ! -d "$logfiledir" ]; then mkdir -p "$logfiledir"; fi
 		echo "logging to ${VDEMO_logfile}" >&2
-		VDEMO_logging="2>&1 | tee ${VDEMO_logfile}"
+		VDEMO_logging=" | tee ${VDEMO_logfile}"
 		;;
 	    --)
 		break
@@ -173,10 +155,6 @@ function vdemo_start_component {
     fi
     VDEMO_component="$1"
     
-    if  [ -z $VDEMO_title ]; then
-	VDEMO_title=`basename VDEMO_component`
-    fi
-
     cmd="LD_LIBRARY_PATH=${LD_LIBRARY_PATH} DISPLAY=${VDEMO_componentDisplay} $* 2>&1 ${VDEMO_logging}"
 
     echo "starting $VDEMO_title as '$cmd' " >&2

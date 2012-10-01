@@ -3,18 +3,14 @@
 # /// @date	started at 2005/03/01
 # /// @version	$Id: vdemo_standard_component_suffix.sh,v 1.4 2007/08/17 15:28:47 mhanheid Exp $
 #
-# THIS SCRIPT EXPECT THE FOLLOWING VARIABLES TO BE SET:
-#   component="$VDEMO_root/bin/memory_server $VDEMO_CASA_dbxml/vam.dbxml $VDEMO_perceptVamName"
-#   title=MemoryServer
-#   SCRIPTNAME=`basename $0`
-# and the following function
-#   clean_component
+# THIS SCRIPT EXPECTS THE FOLLOWING VARIABLES TO BE SET:
+#   component="$prefix/bin/some_binary args"
+#   title=MemoryServer # only if not sourced from another bash script
 
+vdemo_component_scriptname="${BASH_SOURCE[${#BASH_SOURCE[@]}-1]##*/}"
 
 HELP="\
-usage: $SCRIPTNAME [options] start|stop|check
-
-start $title
+usage: $vdemo_component_scriptname [options] start|stop|check
 
  options:
   -h  --help               this help text
@@ -27,6 +23,7 @@ start $title
 vdemo_start_XSERVER=""
 vdemo_start_LOGGING=""
 vdemo_start_ICONIC=""
+title="${vdemo_component_scriptname#component_}"
 
 while [ $# -gt 0 ]; do
     case $1 in
@@ -40,6 +37,14 @@ while [ $# -gt 0 ]; do
 	"-x"|"--xserver")
 	    vdemo_start_XSERVER="YES"
 	    ;;
+	"-t"|"--title")
+		shift
+		if [ -z "$title" ]; then
+			title="$1"
+		else
+			title="$title.$1"
+		fi
+		;;
 	"--noiconic")
 	    vdemo_start_ICONIC="--noiconic"
 	    ;;
@@ -63,13 +68,8 @@ fi
 
 # This MUST be the absolut path to the used vdemo scripts (this script)
 if [ -z "$VDEMO_root" ]; then
-    echo '$VDEMO_root ist not set. Set it to absolut path of the used vdemo installation' >&2
+    echo '$VDEMO_root is not set. Set it to absolut path of the used vdemo installation' >&2
     exit 1
-fi
-
-if [ -z "$title" ]; then
-	echo '$title is not set. A good default is the name of the process' >&2
-	exit 1
 fi
 
 # run the 
@@ -159,8 +159,3 @@ case "$1" in
 	exit 1
 	;;
 esac
-
-
-
-# ******************************** EOF vdemo_component_memoryserver.sh *********************************
-
