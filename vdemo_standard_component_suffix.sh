@@ -119,8 +119,7 @@ case "$1" in
 	call_if_exists on_stop
 	;;
     check)
-	call_if_exists on_check || true
-	vdemo_check_component $title
+	call_if_exists on_check && vdemo_check_component $title
 	exit $?
 	;;
     screen)

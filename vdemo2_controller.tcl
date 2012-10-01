@@ -517,7 +517,7 @@ proc set_status {comp status} {
     if {$status == 1} {
 	$COMPWIDGET.$comp.check configure -background darkgreen -activebackground green
     } elseif {$status == 0} {
-	$COMPWIDGET.$comp.check configure -background darkred -activebackground red
+	$COMPWIDGET.$comp.check configure -background red2 -activebackground red
     } else {
 	$COMPWIDGET.$comp.check configure -background grey -activebackground grey
     }    
