@@ -6,10 +6,11 @@ package require Iwidgets 4.0
 set SSHCMD "ssh -oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -oPasswordAuthentication=no -oConnectTimeout=15"
 
 proc parse_options {comp} {
-    global env HOST COMPONENTS ARGS USEX TERMINAL WAIT_READY NOAUTO LOGGING GROUP DETACHTIME COMP_LEVEL EXPORTS TITLE
+    global env HOST COMPONENTS ARGS USEX TERMINAL WAIT_READY NOAUTO LOGGING GROUP DETACHTIME COMP_LEVEL EXPORTS TITLE CONT_CHECK
     set NEWARGS [list]
     set USEX($comp) 0
     set WAIT_READY($comp) 0
+	set CONT_CHECK($comp) 0
     set GROUP($comp) ""
     set DETACHTIME($comp) 10
     set NOAUTO($comp) 0
@@ -24,6 +25,9 @@ proc parse_options {comp} {
 	    -w {
 		set WAIT_READY($comp) "$val"
 		incr i
+	    }
+	    -c {
+		set CONT_CHECK($comp) 1
 	    }
 	    -d {
 		set DETACHTIME($comp) "$val"
@@ -391,14 +395,17 @@ proc level_cmd {cmd level} {
 }
 
 proc wait_ready {comp} {
-	global WAIT_READY WAIT_BREAK COMPSTATUS
+	global WAIT_READY WAIT_BREAK COMPSTATUS CONT_CHECK
 	puts "waiting for process to be ready"
 	update
 	set WAIT_BREAK 0
 	if {[string is digit $WAIT_READY($comp)]} {
 		for {set x 0} {$x<$WAIT_READY($comp)} {incr x} {
-			sleep 1000
+			if {$CONT_CHECK($comp)} {
+				component_cmd $comp check
+			}
 			if {$COMPSTATUS($comp) == 1} {break}
+			sleep 1000
 		}
 	} 
 }
