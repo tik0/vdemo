@@ -104,7 +104,7 @@ proc parse_env_var {} {
 }
 
 proc gui_tcl {} {
-    global HOST SCREENED_SSH COMPONENTS ARGS TERMINAL USEX LOGTEXT env NOAUTO LOGGING  GROUP SCREENED  COMP_LEVEL COMPWIDGET WATCHFILE COMMAND LEVELS TITLE
+    global HOST SCREENED_SSH COMPONENTS ARGS TERMINAL USEX LOGTEXT env NOAUTO LOGGING  GROUP SCREENED  COMP_LEVEL COMPWIDGET WATCHFILE COMMAND LEVELS TITLE TIMERDETACH ISSTARTING
     set BOLDFONT "-*-helvetica-bold-r-*-*-10-*-*-*-*-*-*-*"
     set FONT "-*-helvetica-medium-r-*-*-10-*-*-*-*-*-*-*"
     set root "."
@@ -130,6 +130,8 @@ proc gui_tcl {} {
 	set hosts "$hosts $HOST($c)"
 	set groups "$groups $GROUP($c)"
 	set LEVELS "$LEVELS $COMP_LEVEL($c)"
+	set TIMERDETACH($c) 0
+	set ISSTARTING 0
 	#reliefs: flat, groove, raised, ridge, solid, or sunken
 	frame $COMPWIDGET.$c -relief groove -borderwidth 1
 	pack $COMPWIDGET.$c -side top -fill both 
@@ -395,19 +397,23 @@ proc level_cmd {cmd level} {
 }
 
 proc wait_ready {comp} {
-	global WAIT_READY WAIT_BREAK COMPSTATUS CONT_CHECK
+	global WAIT_READY WAIT_BREAK COMPSTATUS CONT_CHECK WAIT_BREAK
 	puts "waiting for process to be ready"
-	update
 	set WAIT_BREAK 0
-	if {[string is digit $WAIT_READY($comp)]} {
+	if {[string is digit $WAIT_READY($comp)] && $WAIT_READY($comp) > 0} {
 		for {set x 0} {$x<$WAIT_READY($comp)} {incr x} {
 			sleep 1000
 			if {$CONT_CHECK($comp)} {
 				component_cmd $comp check
 			}
-			if {$COMPSTATUS($comp) == 1} {break}
+			if {$COMPSTATUS($comp) == 1 || $WAIT_BREAK} {
+				break
+			}
 		}
-	} 
+		component_cmd $comp check
+	} else {
+		after 1000 "component_cmd $comp check"
+	}
 }
    
 proc remote_xterm {host} {
@@ -422,8 +428,14 @@ proc remote_clock {host} {
     ssh_command "$cmd_line" "$host"
 }
 
+proc cancel_detach_timer {comp} {
+	global TIMERDETACH
+	after cancel $TIMERDETACH($comp)
+	set TIMERDETACH($comp) 0
+}
+
 proc component_cmd {comp cmd} {
-	global env HOST COMPONENTS ARGS TERMINAL USEX LOGTEXT WAIT_READY LOGGING WAIT_BREAK SCREENED DETACHTIME COMPWIDGET COMMAND EXPORTS TITLE COMPSTATUS
+	global env HOST COMPONENTS ARGS TERMINAL USEX LOGTEXT WAIT_READY LOGGING WAIT_BREAK SCREENED DETACHTIME COMPWIDGET COMMAND EXPORTS TITLE COMPSTATUS TIMERDETACH ISSTARTING
 	set cpath "$env(VDEMO_componentPath)"
 	set component_script "$cpath/component_$COMMAND($comp)"
 	set component_options "-t $TITLE($comp)"
@@ -438,23 +450,27 @@ proc component_cmd {comp cmd} {
 	set success 1
 	switch $cmd {
 	start {
-	if {$DETACHTIME($comp) < 0} {
-		set component_options "$component_options --noiconic"
-	}
+		if { $ISSTARTING } { return }
+		set ISSTARTING 1
+		if {$DETACHTIME($comp) < 0} {
+			set component_options "$component_options --noiconic"
+		}
 		set cmd_line "$VARS $component_script $component_options start"
 		$COMPWIDGET.$comp.start flash
 		set WAIT_BREAK 0
 		set_status $comp unknown
+		cancel_detach_timer $comp
 
 		ssh_command "$cmd_line" "$HOST($comp)"
 
 		set SCREENED($comp) 1
 		wait_ready $comp
-		after 1000 "component_cmd $comp check"
 		if {$DETACHTIME($comp) >= 0} {
-		set detach_after [expr $DETACHTIME($comp) * 1000]
-		after $detach_after "component_cmd $comp detach"
+			cancel_detach_timer $comp
+			set detach_after [expr $DETACHTIME($comp) * 1000]
+			set TIMERDETACH($comp) [after $detach_after "component_cmd $comp detach"]
 		}
+		set ISSTARTING 0
 	}
 	stop {
 		set cmd_line "$VARS $component_script $component_options stop"
@@ -464,12 +480,14 @@ proc component_cmd {comp cmd} {
 
 		ssh_command "$cmd_line" "$HOST($comp)"
 		set SCREENED($comp) 0
+		cancel_detach_timer $comp
 		update
 		if {$COMPSTATUS($comp) != 0} {
 			after idle "component_cmd $comp check"
 		}
 	}
 	screen {
+		cancel_detach_timer $comp
 		if {$SCREENED($comp)} {
 		set cmd_line "$VARS xterm -fg white -bg black -title \"$comp - detach by \[C-a d\]\" -e $component_script $component_options screen &"
 		ssh_command "$cmd_line" "$HOST($comp)"
@@ -711,6 +729,7 @@ proc handle_screenmonitoring {chan} {
 			if {$HOST($comp) == $MONITORCHAN_HOST($chan) && [string match "*.$COMMAND($comp).$TITLE($comp)_" "$line"]} {
 				puts "screen closed for component $COMMAND($comp) on $MONITORCHAN_HOST($chan), checking..."
 				component_cmd $comp check
+				cancel_detach_timer $comp
 			}
 		}
     }
@@ -764,9 +783,11 @@ remove_duplicates
 # auto-create spread config
 set ::AUTO_SPREAD_CONF 0
 if {![info exists ::env(SPREAD_CONFIG)]} {
-		  create_spread_conf
+	create_spread_conf
 }
-if {![info exists ::env(LD_LIBRARY_PATH)]} {set ::env(LD_LIBRARY_PATH) ""}
+if {![info exists ::env(LD_LIBRARY_PATH)]} {
+	set ::env(LD_LIBRARY_PATH) ""
+}
 
 # cleanup dangling connections first
 disconnect_hosts

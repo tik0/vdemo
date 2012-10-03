@@ -102,7 +102,7 @@ case "$1" in
 	call_if_exists on_start
 
 	if [ "${vdemo_start_XSERVER}" ]; then
-	    comp_display=`start_Xserver`
+	    comp_display=$(start_Xserver)
 	    echo "DISPLAY: $comp_display" >&2 
 	    vdemo_start_component -d $comp_display -n $title $vdemo_start_ICONIC $vdemo_start_LOGGING \
 		$component
@@ -113,9 +113,6 @@ case "$1" in
 	;;
     stop)
 	vdemo_stop_component $title
-	if [ "${vdemo_start_XSERVER}" ]; then
-	    stop_Xserver
-	fi
 	call_if_exists on_stop
 	;;
     check)

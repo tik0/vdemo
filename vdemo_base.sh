@@ -16,18 +16,10 @@ function start_Xserver {
 	    fi
 	fi
 	echo  "X on :${i} locked, try next..." >&2
-	i=`expr $i + 1`
+	i=$(expr $i + 1)
     done
     echo "couldn't find a free display for the xserver. exiting" >&2
     exit 2
-}
-
-function stop_Xserver {
-    XPIDFILE=/tmp/VDEMO_xserver_${VDEMO_title}_${USER}.pid
-    PID=`cat ${XPIDFILE}`
-    kill $PID > /dev/null 2>&1
-    (sleep 2; kill -9 $PID > /dev/null 2>&1) &
-    rm -f ${XPIDFILE}
 }
 
 function vdemo_pidFromScreen {
@@ -40,23 +32,18 @@ function vdemo_pidFromScreen {
 # $1:   title of the component
 function vdemo_check_component {
     VDEMO_title="$1"
-    VDEMO_pid=`vdemo_pidFromScreen ${VDEMO_title}`
-
-    VDEMO_pidfile=/tmp/VDEMO_component_${VDEMO_title}_${USER}.pid
+    VDEMO_pid=$(vdemo_pidFromScreen ${VDEMO_title})
     if [ "$VDEMO_pid" ]; then
-	echo "checking $VDEMO_title" >&2
-	if ps ax | grep "^ *${VDEMO_pid}" ; then
-	    echo "running" >&2
-	    echo "$VDEMO_pid" > $VDEMO_pidfile 
-	    return 0
-	else
-	    echo "not running" >&2
-	    rm -f "$VDEMO_pidfile"
-	    return 2
-	fi
+		echo "checking $VDEMO_title" >&2
+		if ps --no-headers -fp "${VDEMO_pid}"; then
+			echo "running" >&2
+			return 0
+		else
+			echo "not running" >&2
+			return 2
+		fi
     else
 	echo "no screen registered" >&2
-	rm -f "$VDEMO_pidfile"
 	return 1
     fi
 }
@@ -64,35 +51,24 @@ function vdemo_check_component {
 # reattach to a running "screened" component
 # $1:   title of the component
 function vdemo_reattach_screen {
-    VDEMO_pid=`vdemo_pidFromScreen $1`
-	 
-	 if [ -n "$VDEMO_pid" ] ; then
-		  screen -d -r "$VDEMO_pid"
-		  failure=$?
-	 else
-		  echo "no screen for $1:"
-		  screen -ls
-		  failure=1
-	 fi
-
-	 if [ $failure == 1 ] ; then
-		  # change title of xterm
-		  echo -ne "\033]0;${1}@${HOSTNAME}\007"
-		  file="/tmp/VDEMO_component_${1}_${USER}.log"
-		  if [ -f $file ] ; then
-				less $file
-		  else
-				sleep 2
-		  fi
-	 fi
-	 return $failure
+	VDEMO_pid=$(vdemo_pidFromScreen $1)
+	if [ -n "$VDEMO_pid" ] ; then
+		screen -d -r "$VDEMO_pid"
+		failure=$?
+	else
+		echo "no screen for $1:"
+		screen -ls
+		sleep 2
+		failure=1
+	fi
+	return $failure
 }
 
 # detach a  "screened" component
 # $1:   title of the component
 function vdemo_detach_screen {
-	 VDEMO_pid=`vdemo_pidFromScreen $1`
-    screen -d "$VDEMO_pid"
+	VDEMO_pid=$(vdemo_pidFromScreen $1)
+	screen -d "$VDEMO_pid"
 }
 
 # show log output of a component
@@ -161,7 +137,7 @@ function vdemo_start_component {
     
     xterm -fg green -bg black $ICONIC -title "starting $VDEMO_title" -e \
 	screen -t "$VDEMO_title" -S "${VDEMO_title}_" \
-	/bin/bash -i -c "$cmd" &
+	bash -i -c "$cmd" &
 }
 
 # get all direct and indirect children of a process
@@ -170,7 +146,7 @@ function all_children {
     CHILDREN=""
     for P in $PIDS; do
 	echo -n " $P"
-	curr_children=`/bin/ps --ppid $P -o pid --no-headers`
+	curr_children=$(ps --ppid $P -o pid --no-headers)
 	if [ "$curr_children" ]; then
 	    all_children "$curr_children"
 	fi
@@ -181,10 +157,10 @@ function all_children {
 # $1: titl of the component
 function vdemo_stop_component {
     VDEMO_title="$1"
-    VDEMO_pid=`vdemo_pidFromScreen ${VDEMO_title}`
+    VDEMO_pid=$(vdemo_pidFromScreen ${VDEMO_title})
 
     if [ "$VDEMO_pid" ]; then
-	PIDS=`all_children "$VDEMO_pid"`
+	PIDS=$(all_children "$VDEMO_pid")
 	echo "stopping $VDEMO_title (PIDs $PIDS)" >&2
 	kill $VDEMO_pid $PIDS > /dev/null 2>&1
 	sleep 1
