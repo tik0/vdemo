@@ -131,7 +131,7 @@ proc gui_tcl {} {
 	set groups "$groups $GROUP($c)"
 	set LEVELS "$LEVELS $COMP_LEVEL($c)"
 	set TIMERDETACH($c) 0
-	set ISSTARTING 0
+	set ISSTARTING($c) 0
 	#reliefs: flat, groove, raised, ridge, solid, or sunken
 	frame $COMPWIDGET.$c -relief groove -borderwidth 1
 	pack $COMPWIDGET.$c -side top -fill both 
@@ -397,14 +397,17 @@ proc level_cmd {cmd level} {
 }
 
 proc wait_ready {comp} {
-	global WAIT_READY WAIT_BREAK COMPSTATUS CONT_CHECK WAIT_BREAK
-	puts "waiting for process to be ready"
+	global WAIT_READY WAIT_BREAK COMPSTATUS CONT_CHECK WAIT_BREAK TITLE
+	puts "$TITLE($comp): waiting for the process to be ready"
 	set WAIT_BREAK 0
 	if {[string is digit $WAIT_READY($comp)] && $WAIT_READY($comp) > 0} {
-		for {set x 0} {$x<$WAIT_READY($comp)} {incr x} {
-			sleep 1000
-			if {$CONT_CHECK($comp)} {
+		set endtime [expr [clock milliseconds] + $WAIT_READY($comp) * 1000]
+		set checktime [expr [clock milliseconds] + 1000]
+		while {$endtime > [clock milliseconds]} {
+			sleep 100
+			if {$CONT_CHECK($comp) && $checktime < [clock milliseconds]} {
 				component_cmd $comp check
+				set checktime [expr [clock milliseconds] + 1000]
 			}
 			if {$COMPSTATUS($comp) == 1 || $WAIT_BREAK} {
 				break
@@ -450,8 +453,11 @@ proc component_cmd {comp cmd} {
 	set success 1
 	switch $cmd {
 	start {
-		if { $ISSTARTING } { return }
-		set ISSTARTING 1
+		if { $ISSTARTING($comp) } {
+			puts "$TITLE($comp): not ready, still waiting for the process"
+			return
+		}
+		set ISSTARTING($comp) 1
 		if {$DETACHTIME($comp) < 0} {
 			set component_options "$component_options --noiconic"
 		}
@@ -470,7 +476,7 @@ proc component_cmd {comp cmd} {
 			set detach_after [expr $DETACHTIME($comp) * 1000]
 			set TIMERDETACH($comp) [after $detach_after "component_cmd $comp detach"]
 		}
-		set ISSTARTING 0
+		set ISSTARTING($comp) 0
 	}
 	stop {
 		set cmd_line "$VARS $component_script $component_options stop"
@@ -727,7 +733,7 @@ proc handle_screenmonitoring {chan} {
 	if {[gets $chan line] >= 0} {
 		foreach {comp} "$COMPONENTS" {
 			if {$HOST($comp) == $MONITORCHAN_HOST($chan) && [string match "*.$COMMAND($comp).$TITLE($comp)_" "$line"]} {
-				puts "screen closed for component $COMMAND($comp) on $MONITORCHAN_HOST($chan), checking..."
+				puts "$TITLE($comp): screen closed on $MONITORCHAN_HOST($chan), checking..."
 				component_cmd $comp check
 				cancel_detach_timer $comp
 			}
