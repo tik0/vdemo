@@ -1,7 +1,3 @@
-if [ -z "$VDEMO_logfile_prefix" ]; then
-	 VDEMO_logfile_prefix="/tmp/vdemo-$USER/component_"
-fi
-
 function start_Xserver {
     XPIDFILE=/tmp/VDEMO_xserver_${VDEMO_title}_${USER}.pid
     i=0;

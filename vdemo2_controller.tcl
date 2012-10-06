@@ -68,7 +68,8 @@ proc parse_options {comp} {
 
 
 proc parse_env_var {} {
-	global env HOST COMPONENTS ARGS USEX WATCHFILE COMMAND TITLE
+	global env HOST COMPONENTS ARGS USEX WATCHFILE COMMAND TITLE VDEMOID
+	set VDEMOID [file tail [file rootname $env(VDEMO_demoConfig)]]
 	set components_list "$env(VDEMO_components)"
 	set comp [split "$components_list" ":"]
 	set nCompos [llength "$comp"]
@@ -235,8 +236,6 @@ proc gui_tcl {} {
     }
     
     # LOGGER area (WATCHFILE)
-
-
     frame $base.components.group.log -borderwidth 0
     text $base.components.group.log.text -yscrollcommand "$base.components.group.log.sb set" \
 	-height 12 -font "$FONT" -background white 
@@ -273,9 +272,6 @@ proc gui_tcl {} {
 	pack $base.ssh.screen_$lh -side left -fill x
     }
 
-
-
-
     button $base.exit -pady -3 -padx -7 -borderwidth 1 -text "exit" -font "$BOLDFONT" -command {finish}
     pack $base.exit -side bottom -fill x
 
@@ -290,10 +286,9 @@ proc clearLogger {} {
 proc init_logger {filename} {
     global mypid
     if { [catch {open "|tail -n 5 --pid=$mypid -F $filename"} infile] } {
-	puts  "Could not open $filename for reading, quit."
-	exit 1
+		puts  "Could not open $filename for reading, quit."
+		exit 1
     }
-    
     fconfigure $infile -blocking no -buffering line 
     fileevent $infile readable [list insertLog $infile]
 }
@@ -398,9 +393,9 @@ proc level_cmd {cmd level} {
 
 proc wait_ready {comp} {
 	global WAIT_READY WAIT_BREAK COMPSTATUS CONT_CHECK WAIT_BREAK TITLE
-	puts "$TITLE($comp): waiting for the process to be ready"
 	set WAIT_BREAK 0
 	if {[string is digit $WAIT_READY($comp)] && $WAIT_READY($comp) > 0} {
+		puts "$TITLE($comp): waiting for the process to be ready"
 		set endtime [expr [clock milliseconds] + $WAIT_READY($comp) * 1000]
 		set checktime [expr [clock milliseconds] + 1000]
 		while {$endtime > [clock milliseconds]} {
@@ -414,7 +409,9 @@ proc wait_ready {comp} {
 			}
 		}
 		component_cmd $comp check
+		puts "$TITLE($comp): finished waiting"
 	} else {
+		puts "$TITLE($comp): not waiting for the process to be ready"
 		after 1000 "component_cmd $comp check"
 	}
 }
@@ -552,30 +549,36 @@ proc set_status {comp status} {
 # {{{ ssh and command procs
 
 proc screen_ssh_master {h} {
-    global SCREENED_SSH
-    if {$SCREENED_SSH($h) == 1} {
-	exec  xterm -title "MASTER SSH CONNECTION TO $h." -e screen -d -r -S "vdemo-$h" &
-    } else {
-	catch {exec  screen -d -S "vdemo-$h"}
-    }
+	global SCREENED_SSH
+	set screenid [get_master_screen_name $h]
+	if {$SCREENED_SSH($h) == 1} {
+		exec  xterm -title "MASTER SSH CONNECTION TO $h." -e screen -d -r -S $screenid &
+	} else {
+		catch {exec  screen -d -S $screenid}
+	}
 }
 
 proc ssh_command {cmd hostname} {
     set f [get_fifo_name $hostname]
+    set cmd [string trim "$cmd"]
     puts "run '$cmd' on host '$hostname'"
 
     set res [exec bash -c "echo 'echo \"****************************************\" 1>&2; date 1>&2; echo \"*** RUN $cmd\" 1>&2; $cmd 1>&2; echo \$?' > $f.in; cat $f.out"]
     return $res
 }
 
+proc get_master_screen_name { hostname } {
+	global VDEMOID
+	return "vdemo-$VDEMOID-$hostname"
+}
+
 proc get_fifo_name {hostname} {
-    global COMPONENTS HOST env
-    return "/tmp/vdemo-ssh-$env(USER)-$hostname"
+    global COMPONENTS HOST TEMPDIR VDEMOID env
+    return "$TEMPDIR/vdemo-$VDEMOID-ssh-$env(USER)-$hostname"
 }
 
 proc connect_hosts {} {
     global COMPONENTS env HOST SSHCMD
-    set fifos ""
 
     label .vdemoinit -text "init VDemo - be patient..." -foreground darkgreen -font "-*-helvetica-bold-r-*-*-30-*-*-*-*-*-*-*"
     label .vdemoinit2 -text "" -foreground darkred -font "-*-helvetica-bold-r-*-*-20-*-*-*-*-*-*-*"
@@ -583,12 +586,13 @@ proc connect_hosts {} {
     pack .vdemoinit2 
     update
 
-    foreach {c} "$COMPONENTS" {
-	set fifo "[get_fifo_name $HOST($c)]"
-	set fifos "$fifos $fifo"
-	set fifo_host($fifo) "$HOST($c)"
-    }
-    set fifos [lsort -unique "$fifos"]
+	set fifos ""
+	foreach {c} "$COMPONENTS" {
+		set fifo "[get_fifo_name $HOST($c)]"
+		set fifos "$fifos $fifo"
+		set fifo_host($fifo) "$HOST($c)"
+	}
+	set fifos [lsort -unique "$fifos"]
 
     foreach {f} "$fifos" {
 	.vdemoinit2 configure -text "connect to $fifo_host($f)"
@@ -598,7 +602,8 @@ proc connect_hosts {} {
 	exec mkfifo "$f.in"
 	exec mkfifo "$f.out"
 
-	exec xterm -title "establish ssh connection to $f" -n "$f" -e screen -mS "vdemo-$fifo_host($f)" bash -c "tail -s 0.1 -n 10000 -f $f.in | $SSHCMD -X  $fifo_host($f) bash --login --rcfile /etc/profile | while read s; do echo \$s > $f.out; done" &
+	set screenid [get_master_screen_name $fifo_host($f)]
+	exec xterm -title "establish ssh connection to $f" -n "$f" -e screen -mS $screenid bash -c "tail -s 0.1 -n 10000 -f $f.in | $SSHCMD -X  $fifo_host($f) bash --login --rcfile /etc/profile | while read s; do echo \$s > $f.out; done" &
 
 	if {[info exists env(VDEMO_exports)]} {
 		 foreach {var} "$env(VDEMO_exports)" {
@@ -608,33 +613,33 @@ proc connect_hosts {} {
 		 }
 	}
 	ssh_command "source $env(VDEMO_demoConfig)" $fifo_host($f)
-	exec screen -dS "vdemo-$fifo_host($f)"
+	exec screen -dS $screenid
     }
     destroy .vdemoinit
     destroy .vdemoinit2
 }
 
 proc disconnect_hosts {} {
-    global COMPONENTS env HOST
-    set fifos ""
-    foreach {c} "$COMPONENTS" {
-	set fifo "[get_fifo_name $HOST($c)]"
-	set fifos "$fifos $fifo"
-	set fifo_host($fifo) "$HOST($c)"
-    }
-    set fifos [lsort -unique "$fifos"]
+	global COMPONENTS env HOST
+	set fifos ""
+	foreach {c} "$COMPONENTS" {
+		set fifo "[get_fifo_name $HOST($c)]"
+		set fifos "$fifos $fifo"
+		set fifo_host($fifo) "$HOST($c)"
+	}
+	set fifos [lsort -unique "$fifos"]
 
-    foreach {f} "$fifos" {
-	puts "terminating control channel session on $fifo_host($f)"
-	catch {exec bash -c "screen -list vdemo-$fifo_host($f) | grep vdemo | cut -d. -f1 | xargs kill 2>&1"}
-	exec rm -f "$f.in"
-	exec rm -f "$f.out"
-    }
-
+	foreach {f} "$fifos" {
+		puts "terminating control channel session on $fifo_host($f)"
+		set screenid [get_master_screen_name $fifo_host($f)]
+		catch {exec bash -c "screen -list $screenid | grep vdemo | cut -d. -f1 | xargs kill 2>&1"}
+		exec rm -f "$f.in"
+		exec rm -f "$f.out"
+	}
 }
 
 proc finish {} {
-	global MONITORCHAN_HOST
+	global MONITORCHAN_HOST TEMPDIR
 	disconnect_hosts
 	if {$::AUTO_SPREAD_CONF == 1} {
 		  puts "deleting generated spread config"
@@ -645,6 +650,7 @@ proc finish {} {
 			exec kill -HUP [lindex [pid $ch] 0]
 		}
 	}
+	exec rmdir "$TEMPDIR"
     exit
 }
 
@@ -663,7 +669,7 @@ proc remove_duplicates {} {
 }
 
 proc create_spread_conf {} {
-    global COMPONENTS COMMAND HOST env
+    global COMPONENTS COMMAND HOST VDEMOID env
 	 set spread_hosts ""
     foreach {c} "$COMPONENTS" {
 		  if {"$COMMAND($c)" == "spreaddaemon"} {
@@ -695,12 +701,11 @@ proc create_spread_conf {} {
 		  }
 	 }
 	 set segments [lsort -unique "$segments"]
-	 set demoid [file tail [file rootname $env(VDEMO_demoConfig)]]
-	 set filename "$env(VDEMO_demoRoot)/spread-$env(USER)-$demoid.conf"
+	 set filename "$env(VDEMO_demoRoot)/spread-$env(USER)-$VDEMOID.conf"
 	 if {[catch {open $filename w 0664} fd]} {
         # something went wrong 
 		# try local file again
-		set filename "/var/tmp/spread-$env(USER)-$demoid.conf"
+		set filename "/tmp/spread-$env(USER)-$VDEMOID.conf"
 		 if {[catch {open $filename w 0664} fd]} {
 			error "Could not open auto-generated spread configuration $filename"
 	 	} 
@@ -729,13 +734,16 @@ proc create_spread_conf {} {
 }
 
 proc handle_screenmonitoring {chan} {
-	global MONITORCHAN_HOST COMPONENTS HOST COMMAND TITLE
+	global MONITORCHAN_HOST COMPONENTS HOST COMMAND TITLE COMPSTATUS WAIT_BREAK
 	if {[gets $chan line] >= 0} {
 		foreach {comp} "$COMPONENTS" {
 			if {$HOST($comp) == $MONITORCHAN_HOST($chan) && [string match "*.$COMMAND($comp).$TITLE($comp)_" "$line"]} {
 				puts "$TITLE($comp): screen closed on $MONITORCHAN_HOST($chan), checking..."
 				component_cmd $comp check
 				cancel_detach_timer $comp
+				if { $COMPSTATUS($comp) != 1 } {
+					set WAIT_BREAK 1
+				}
 			}
 		}
     }
@@ -780,9 +788,15 @@ proc sleep { ms } {
     unset ::__sleep__tmp__$uniq
 }
 
+proc setup_temp_dir { } {
+	global TEMPDIR
+	set TEMPDIR [exec mktemp -d /tmp/vdemo.XXXXXXXXXX]
+}
+
 set mypid [pid]
 puts "My process id is $mypid" 
 
+setup_temp_dir
 parse_env_var
 remove_duplicates
 

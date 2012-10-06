@@ -72,6 +72,10 @@ if [ -z "$VDEMO_root" ]; then
     exit 1
 fi
 
+if [ -z "$VDEMO_logfile_prefix" ]; then
+	export VDEMO_logfile_prefix="/tmp/vdemo-$USER/component_"
+fi
+
 # run the 
 test -f "$VDEMO_sysConfig" && source "$VDEMO_sysConfig" $VDEMO_sysConfigOptions
 source "$VDEMO_root/vdemo_base.sh"
