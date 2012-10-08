@@ -159,7 +159,10 @@ function vdemo_stop_component {
 	PIDS=$(all_children "$VDEMO_pid")
 	echo "stopping $VDEMO_title (PIDs $PIDS)" >&2
 	kill $VDEMO_pid $PIDS > /dev/null 2>&1
-	sleep 1
+	for i in {1..20}; do
+		kill -0 $VDEMO_pid $PIDS > /dev/null 2>&1 || break
+		sleep 0.1
+	done
 	kill -9 $VDEMO_pid $PIDS > /dev/null 2>&1
     fi
 }

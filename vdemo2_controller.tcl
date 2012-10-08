@@ -6,10 +6,11 @@ package require Iwidgets 4.0
 set SSHCMD "ssh -oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -oPasswordAuthentication=no -oConnectTimeout=15"
 
 proc parse_options {comp} {
-    global env HOST COMPONENTS ARGS USEX TERMINAL WAIT_READY NOAUTO LOGGING GROUP DETACHTIME COMP_LEVEL EXPORTS TITLE CONT_CHECK
+    global env HOST COMPONENTS ARGS USEX TERMINAL WAIT_READY NOAUTO LOGGING GROUP DETACHTIME COMP_LEVEL EXPORTS TITLE CONT_CHECK CHECKNOWAIT_TIME
     set NEWARGS [list]
     set USEX($comp) 0
     set WAIT_READY($comp) 0
+    set CHECKNOWAIT_TIME($comp) 1
 	set CONT_CHECK($comp) 0
     set GROUP($comp) ""
     set DETACHTIME($comp) 10
@@ -24,6 +25,10 @@ proc parse_options {comp} {
         switch -glob -- $arg {
 	    -w {
 		set WAIT_READY($comp) "$val"
+		incr i
+	    }
+	    -W {
+		set CHECKNOWAIT_TIME($comp) "$val"
 		incr i
 	    }
 	    -c {
@@ -392,7 +397,7 @@ proc level_cmd {cmd level} {
 }
 
 proc wait_ready {comp} {
-	global WAIT_READY WAIT_BREAK COMPSTATUS CONT_CHECK WAIT_BREAK TITLE
+	global WAIT_READY WAIT_BREAK COMPSTATUS CONT_CHECK WAIT_BREAK TITLE CHECKNOWAIT_TIME
 	set WAIT_BREAK 0
 	if {[string is digit $WAIT_READY($comp)] && $WAIT_READY($comp) > 0} {
 		puts "$TITLE($comp): waiting for the process to be ready"
@@ -412,7 +417,7 @@ proc wait_ready {comp} {
 		puts "$TITLE($comp): finished waiting"
 	} else {
 		puts "$TITLE($comp): not waiting for the process to be ready"
-		after 1000 "component_cmd $comp check"
+		after [expr $CHECKNOWAIT_TIME($comp) * 1000] "component_cmd $comp check"
 	}
 }
    
