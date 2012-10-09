@@ -146,12 +146,12 @@ proc gui_tcl {} {
 
 	label $COMPWIDGET.$c.group -anchor e -foreground blue -font "$FONT" -width 10 -text "$GROUP($c)" 
 	label $COMPWIDGET.$c.label -font "$BOLDFONT" -width 25 -anchor e -text "$TITLE($c)@" 
-	entry $COMPWIDGET.$c.host -borderwidth 1 -font "$FONT" -width 10 -textvariable HOST($c)
+	entry $COMPWIDGET.$c.host -borderwidth 1 -highlightthickness 0 -font "$FONT" -width 10 -textvariable HOST($c)
 	pack $COMPWIDGET.$c.label -side left -fill x
 	pack $COMPWIDGET.$c.host -side left
 	pack $COMPWIDGET.$c.group -side left -fill x
-	button $COMPWIDGET.$c.start -activebackground white -pady -3 -padx -7 -borderwidth 1 -font "$BOLDFONT" -text "start" -command "component_cmd $c start"
-	button $COMPWIDGET.$c.stop -activebackground white -pady -3 -padx -7 -borderwidth 1 -font "$BOLDFONT" -text "stop" -command "component_cmd $c stop"
+	button $COMPWIDGET.$c.start -activebackground gray95 -pady -3 -padx -7 -borderwidth 1 -font "$BOLDFONT" -text "start" -command "component_cmd $c start"
+	button $COMPWIDGET.$c.stop -activebackground gray95 -pady -3 -padx -7 -borderwidth 1 -font "$BOLDFONT" -text "stop" -command "component_cmd $c stop"
 	button $COMPWIDGET.$c.check -pady -3 -padx -7 -borderwidth 1 -font "$BOLDFONT" -text "check" -command "component_cmd $c check"
 	checkbutton $COMPWIDGET.$c.noauto -font "$BOLDFONT" -borderwidth 1 -text "no auto" -variable NOAUTO($c) -foreground blue
 	checkbutton $COMPWIDGET.$c.ownx -font "$BOLDFONT" -borderwidth 1 -text "own X" -variable USEX($c)
