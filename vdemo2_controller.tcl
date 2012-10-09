@@ -156,7 +156,7 @@ proc gui_tcl {} {
 	checkbutton $COMPWIDGET.$c.noauto -font "$BOLDFONT" -borderwidth 1 -text "no auto" -variable NOAUTO($c) -foreground blue
 	checkbutton $COMPWIDGET.$c.ownx -font "$BOLDFONT" -borderwidth 1 -text "own X" -variable USEX($c)
 	checkbutton $COMPWIDGET.$c.logging -font "$BOLDFONT" -borderwidth 1 -text "logging" -variable LOGGING($c)
-	button $COMPWIDGET.$c.logoutput -font "$BOLDFONT" -pady -3 -padx -7 -borderwidth 1 -text "view log" -command "component_cmd $c showlog"
+	button $COMPWIDGET.$c.logoutput -activebackground gray95 -font "$BOLDFONT" -pady -3 -padx -7 -borderwidth 1 -text "view log" -command "component_cmd $c showlog"
 	frame $COMPWIDGET.$c.terminal
 	set SCREENED($c) 0
 	checkbutton $COMPWIDGET.$c.terminal.screen -pady -3 -padx -7 -font "$BOLDFONT" -borderwidth 1 -text "show term" -command "component_cmd $c screen" -variable SCREENED($c) -onvalue 1 -offvalue 0
