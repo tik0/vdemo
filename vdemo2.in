@@ -58,4 +58,4 @@ source "$VDEMO_demoConfig"
 
 export VDEMO_exports="SPREAD_CONFIG $VDEMO_exports"
 
-$VDEMO_root/vdemo2_controller.tcl
+exec $VDEMO_root/vdemo2_controller.tcl

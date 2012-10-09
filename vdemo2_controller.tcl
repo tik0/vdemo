@@ -243,7 +243,7 @@ proc gui_tcl {} {
     # LOGGER area (WATCHFILE)
     frame $base.components.group.log -borderwidth 0
     text $base.components.group.log.text -yscrollcommand "$base.components.group.log.sb set" \
-	-height 12 -font "$FONT" -background white 
+	-height 12 -font "$FONT" -background white
 
     scrollbar $base.components.group.log.sb -command "$base.components.group.log.text yview" 
     pack $base.components.group.log -side left -fill both -expand 1
@@ -256,14 +256,14 @@ proc gui_tcl {} {
     pack $base.components -side top -fill both -expand yes 
 
     # logarea
-    label $base.logarea -font "$FONT" -textvariable LOGTEXT -width 50 -anchor nw -height 4 -justify left -relief sunken -background white -foreground darkgreen
+    label $base.logarea -font "$FONT" -textvariable LOGTEXT -width 50 -anchor e -height 1 -justify left -relief sunken -foreground gray30
     pack $base.logarea -side top -fill both
 
     set hosts [lsort -unique "$hosts"]
     frame $base.ssh 
     frame $base.clocks
     pack $base.ssh -side top -fill x
-    label $base.ssh.label -font "$BOLDFONT"    -text "ssh to"
+    label $base.ssh.label -font "$BOLDFONT" -text "ssh to"
     pack $base.ssh.label -side left
     foreach {h} "$hosts" {
 	set lh [string tolower "$h"]
@@ -311,7 +311,7 @@ proc insertLog {infile} {
 
 
 proc allcomponents_cmd {cmd} {
-    global HOST COMPONENTS ARGS TERMINAL USEX LOGTEXT WAIT_READY WAIT_BREAK NOAUTO LEVELS
+    global HOST COMPONENTS ARGS TERMINAL USEX WAIT_READY WAIT_BREAK NOAUTO LEVELS
     if {"$cmd" == "stop"} {
 	set WAIT_BREAK 1
 	foreach {level} "[lsort $LEVELS]" {
@@ -329,7 +329,7 @@ proc allcomponents_cmd {cmd} {
 }
 
 proc group_cmd {cmd grp} {
-    global HOST COMPONENTS ARGS GROUP TERMINAL USEX LOGTEXT  WAIT_READY NOAUTO WAIT_BREAK
+    global HOST COMPONENTS ARGS GROUP TERMINAL USEX WAIT_READY NOAUTO WAIT_BREAK
     if {"$cmd" == "stop"} {
 	set WAIT_BREAK 1
 	foreach {comp} "$COMPONENTS" {
@@ -363,7 +363,7 @@ proc group_cmd {cmd grp} {
 }
 
 proc level_cmd {cmd level} {
-    global HOST COMPONENTS ARGS GROUP TERMINAL USEX LOGTEXT  WAIT_READY NOAUTO WAIT_BREAK COMP_LEVEL
+    global HOST COMPONENTS ARGS GROUP TERMINAL USEX WAIT_READY NOAUTO WAIT_BREAK COMP_LEVEL
     if {"$cmd" == "stop"} {
 	set WAIT_BREAK 1
 	foreach {comp} "$COMPONENTS" {
@@ -422,13 +422,13 @@ proc wait_ready {comp} {
 }
    
 proc remote_xterm {host} {
-    global LOGTEXT env
+    global env
     set cmd_line "xterm -fg white -bg black -title $host -e \"LD_LIBRARY_PATH=$env(LD_LIBRARY_PATH) bash\" &"
     ssh_command "$cmd_line" $host
 }
 
 proc remote_clock {host} {
-    global LOGTEXT env
+    global env
     set cmd_line "xclock -fg white -bg black -geometry 250x30 -title $host -digital -update 1 &"
     ssh_command "$cmd_line" "$host"
 }
@@ -440,7 +440,7 @@ proc cancel_detach_timer {comp} {
 }
 
 proc component_cmd {comp cmd} {
-	global env HOST COMPONENTS ARGS TERMINAL USEX LOGTEXT WAIT_READY LOGGING WAIT_BREAK SCREENED DETACHTIME COMPWIDGET COMMAND EXPORTS TITLE COMPSTATUS TIMERDETACH ISSTARTING
+	global env HOST COMPONENTS ARGS TERMINAL USEX WAIT_READY LOGGING WAIT_BREAK SCREENED DETACHTIME COMPWIDGET COMMAND EXPORTS TITLE COMPSTATUS TIMERDETACH ISSTARTING
 	set cpath "$env(VDEMO_componentPath)"
 	set component_script "$cpath/component_$COMMAND($comp)"
 	set component_options "-t $TITLE($comp)"
@@ -452,7 +452,6 @@ proc component_cmd {comp cmd} {
 	}
 	set VARS "$EXPORTS($comp) "
 
-	set success 1
 	switch $cmd {
 	start {
 		$COMPWIDGET.$comp.start configure -state disabled
@@ -528,7 +527,6 @@ proc component_cmd {comp cmd} {
 		set_status $comp unknown
 		set res [ssh_command "$cmd_line" "$HOST($comp)"]
 
-		set success 1
 		if {$res == 0} {
 			set_status $comp 1
 		} else {
@@ -537,19 +535,14 @@ proc component_cmd {comp cmd} {
 		}
 	}
 	}
-	if $success {
-	.logarea configure -background white
-	} else {
-	.logarea configure -background red
-	}
 	update
-} 
+}
 
 proc set_status {comp status} {
     global COMPWIDGET COMPSTATUS
     set COMPSTATUS($comp) $status
     if {$status == 1} {
-	$COMPWIDGET.$comp.check configure -background darkgreen -activebackground green
+	$COMPWIDGET.$comp.check configure -background green3 -activebackground green2
     } elseif {$status == 0} {
 	$COMPWIDGET.$comp.check configure -background red2 -activebackground red
     } else {
