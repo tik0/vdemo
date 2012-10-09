@@ -243,7 +243,7 @@ proc gui_tcl {} {
     # LOGGER area (WATCHFILE)
     frame $base.components.group.log -borderwidth 0
     text $base.components.group.log.text -yscrollcommand "$base.components.group.log.sb set" \
-	-height 12 -font "$FONT" -background white
+	-height 12 -font "$FONT" -background white -highlightthickness 0
 
     scrollbar $base.components.group.log.sb -command "$base.components.group.log.text yview" 
     pack $base.components.group.log -side left -fill both -expand 1
