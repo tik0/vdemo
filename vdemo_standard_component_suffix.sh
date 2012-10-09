@@ -97,9 +97,8 @@ function call_if_exists {
 case "$1" in
     start)
 	if vdemo_check_component $title; then
- 	    echo "$title already running, stopping first">&2
- 	    vdemo_stop_component $title
-	    sleep 1
+	    echo "$title already running">&2
+		exit 1
 	fi
 
 	call_if_exists clean_component

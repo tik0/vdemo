@@ -455,20 +455,27 @@ proc component_cmd {comp cmd} {
 	set success 1
 	switch $cmd {
 	start {
+		$COMPWIDGET.$comp.start configure -state disabled
 		if { $ISSTARTING($comp) } {
 			puts "$TITLE($comp): not ready, still waiting for the process"
 			return
 		}
 		set ISSTARTING($comp) 1
-		if {$DETACHTIME($comp) < 0} {
-			set component_options "$component_options --noiconic"
+		update
+		set res [ssh_command "screen -wipe | grep -q \\.$COMMAND($comp)\\.$TITLE($comp)_" "$HOST($comp)"]
+		if {$res == 0} {
+			puts "$TITLE($comp): already running, stopping first..."
+			component_cmd $comp stop
 		}
-		set cmd_line "$VARS $component_script $component_options start"
-		$COMPWIDGET.$comp.start flash
+
 		set WAIT_BREAK 0
 		set_status $comp unknown
 		cancel_detach_timer $comp
 
+		if {$DETACHTIME($comp) < 0} {
+			set component_options "$component_options --noiconic"
+		}
+		set cmd_line "$VARS $component_script $component_options start"
 		ssh_command "$cmd_line" "$HOST($comp)"
 
 		set SCREENED($comp) 1
@@ -479,6 +486,7 @@ proc component_cmd {comp cmd} {
 			set TIMERDETACH($comp) [after $detach_after "component_cmd $comp detach"]
 		}
 		set ISSTARTING($comp) 0
+		$COMPWIDGET.$comp.start configure -state normal
 	}
 	stop {
 		set cmd_line "$VARS $component_script $component_options stop"
