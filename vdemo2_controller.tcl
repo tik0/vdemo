@@ -2,6 +2,8 @@
 # the next line restarts using wish \
 exec wish8.5 "$0" "$@"
 package require Iwidgets 4.0
+package require try
+package require Tclx
 
 set SSHCMD "ssh -oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -oPasswordAuthentication=no -oConnectTimeout=15"
 
@@ -454,6 +456,7 @@ proc component_cmd {comp cmd} {
 
 	switch $cmd {
 	start {
+		try {
 		$COMPWIDGET.$comp.start configure -state disabled
 		if { $ISSTARTING($comp) } {
 			puts "$TITLE($comp): not ready, still waiting for the process"
@@ -484,8 +487,10 @@ proc component_cmd {comp cmd} {
 			set detach_after [expr $DETACHTIME($comp) * 1000]
 			set TIMERDETACH($comp) [after $detach_after "component_cmd $comp detach"]
 		}
-		set ISSTARTING($comp) 0
-		$COMPWIDGET.$comp.start configure -state normal
+		} finally {
+			set ISSTARTING($comp) 0
+			$COMPWIDGET.$comp.start configure -state normal
+		}
 	}
 	stop {
 		set cmd_line "$VARS $component_script $component_options stop"
@@ -566,9 +571,12 @@ proc screen_ssh_master {h} {
 
 proc ssh_command {cmd hostname} {
     set f [get_fifo_name $hostname]
+    if {[file exists "$f.in"] == 0} {
+		error "no control connection to '$hostname'"
+		return 1
+    }
     set cmd [string trim "$cmd"]
     puts "run '$cmd' on host '$hostname'"
-
     set res [exec bash -c "echo 'echo \"****************************************\" 1>&2; date 1>&2; echo \"*** RUN $cmd\" 1>&2; $cmd 1>&2; echo \$?' > $f.in; cat $f.out"]
     return $res
 }
@@ -656,7 +664,7 @@ proc finish {} {
 			exec kill -HUP [lindex [pid $ch] 0]
 		}
 	}
-	exec rmdir "$TEMPDIR"
+	catch {exec rmdir "$TEMPDIR"}
     exit
 }
 
@@ -802,6 +810,8 @@ proc setup_temp_dir { } {
 set mypid [pid]
 puts "My process id is $mypid" 
 
+signal trap SIGINT finish
+signal trap SIGHUP finish
 setup_temp_dir
 parse_env_var
 remove_duplicates
