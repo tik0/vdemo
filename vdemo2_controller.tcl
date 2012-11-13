@@ -316,7 +316,7 @@ proc allcomponents_cmd {cmd} {
     global HOST COMPONENTS ARGS TERMINAL USEX WAIT_READY WAIT_BREAK NOAUTO LEVELS
     if {"$cmd" == "stop"} {
 	set WAIT_BREAK 1
-	foreach {level} "[lsort $LEVELS]" {
+	foreach {level} "[lreverse [lsort $LEVELS]]" {
 	    level_cmd $cmd $level
 	}
     } else {
@@ -334,7 +334,7 @@ proc group_cmd {cmd grp} {
     global HOST COMPONENTS ARGS GROUP TERMINAL USEX WAIT_READY NOAUTO WAIT_BREAK
     if {"$cmd" == "stop"} {
 	set WAIT_BREAK 1
-	foreach {comp} "$COMPONENTS" {
+	foreach {comp} "[lreverse $COMPONENTS]" {
 	    if {$GROUP($comp) == $grp} {
 		if {! $NOAUTO($comp)} {
 		    after idle "component_cmd $comp $cmd"
@@ -368,7 +368,7 @@ proc level_cmd {cmd level} {
     global HOST COMPONENTS ARGS GROUP TERMINAL USEX WAIT_READY NOAUTO WAIT_BREAK COMP_LEVEL
     if {"$cmd" == "stop"} {
 	set WAIT_BREAK 1
-	foreach {comp} "$COMPONENTS" {
+	foreach {comp} "[lreverse $COMPONENTS]" {
 	    if {$COMP_LEVEL($comp) == $level} {
 		if {! $NOAUTO($comp)} {
 		    after idle "component_cmd $comp $cmd"
@@ -471,7 +471,7 @@ proc component_cmd {comp cmd} {
 		}
 
 		set WAIT_BREAK 0
-		set_status $comp unknown
+		set_status $comp 2
 		cancel_detach_timer $comp
 
 		if {$DETACHTIME($comp) < 0} {
@@ -490,6 +490,9 @@ proc component_cmd {comp cmd} {
 		} finally {
 			set ISSTARTING($comp) 0
 			$COMPWIDGET.$comp.start configure -state normal
+			if {$COMPSTATUS($comp) == 2} {
+				set_status $comp 0
+			}
 		}
 	}
 	stop {
@@ -534,6 +537,8 @@ proc component_cmd {comp cmd} {
 
 		if {$res == 0} {
 			set_status $comp 1
+		} elseif { $ISSTARTING($comp) } {
+			set_status $comp 2
 		} else {
 			set SCREENED($comp) 0
 			set_status $comp 0
@@ -550,7 +555,9 @@ proc set_status {comp status} {
 	$COMPWIDGET.$comp.check configure -background green3 -activebackground green2
     } elseif {$status == 0} {
 	$COMPWIDGET.$comp.check configure -background red2 -activebackground red
-    } else {
+    } elseif {$status == 2} {
+	$COMPWIDGET.$comp.check configure -background yellow2 -activebackground yellow
+	} else {
 	$COMPWIDGET.$comp.check configure -background grey -activebackground grey
     }    
     update
@@ -573,7 +580,6 @@ proc ssh_command {cmd hostname} {
     set f [get_fifo_name $hostname]
     if {[file exists "$f.in"] == 0} {
 		error "no control connection to '$hostname'"
-		return 1
     }
     set cmd [string trim "$cmd"]
     puts "run '$cmd' on host '$hostname'"
