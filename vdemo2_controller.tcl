@@ -337,15 +337,7 @@ proc group_cmd {cmd grp} {
 	foreach {comp} "[lreverse $COMPONENTS]" {
 	    if {$GROUP($comp) == $grp} {
 		if {! $NOAUTO($comp)} {
-		    after idle "component_cmd $comp $cmd"
-		}
-	    }
-	}
-    } elseif {"$cmd" == "check"} {
-	foreach {comp} "$COMPONENTS" {
-	    if {$GROUP($comp) == $grp} {
-		if {! $NOAUTO($comp)} {
-		    after idle "component_cmd $comp check"
+		    component_cmd $comp $cmd
 		}
 	    }
 	}
@@ -371,15 +363,7 @@ proc level_cmd {cmd level} {
 	foreach {comp} "[lreverse $COMPONENTS]" {
 	    if {$COMP_LEVEL($comp) == $level} {
 		if {! $NOAUTO($comp)} {
-		    after idle "component_cmd $comp $cmd"
-		}
-	    }
-	}
-    } elseif {"$cmd" == "check"} {
-	foreach {comp} "$COMPONENTS" {
-	    if {$COMP_LEVEL($comp) == $level} {
-		if {! $NOAUTO($comp)} {
-		    after idle "component_cmd $comp check"
+		    component_cmd $comp $cmd
 		}
 	    }
 	}
