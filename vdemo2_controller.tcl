@@ -279,7 +279,7 @@ proc gui_tcl {} {
 	pack $base.ssh.screen_$lh -side left -fill x
     }
 
-    button $base.exit -pady -3 -padx -7 -borderwidth 1 -text "exit" -font "$BOLDFONT" -command {finish}
+    button $base.exit -pady -3 -padx -7 -borderwidth 1 -text "exit" -font "$BOLDFONT" -command {gui_exit}
     pack $base.exit -side bottom -fill x
 
 }
@@ -789,8 +789,23 @@ proc connect_screenmonitoring {} {
 	}
 }
 
+
+proc gui_exit {} {
+	global COMPONENTS COMPSTATUS
+	set quickexit 1
+	foreach {comp} "$COMPONENTS" {
+		if { $COMPSTATUS($comp) == 1 || $COMPSTATUS($comp) == 2} {
+			set quickexit 0
+			break
+		}
+	}
+	if {$quickexit || [tk_messageBox -message "Really quit?" -type yesno -icon question] == yes} {
+		finish
+	}
+}
+
 wm protocol . WM_DELETE_WINDOW {
-	finish
+	gui_exit
 }
 
 # event-handling sleep, see http://www2.tcl.tk/933
