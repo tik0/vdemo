@@ -492,6 +492,7 @@ proc component_cmd {comp cmd} {
 			$COMPWIDGET.$comp.start configure -state normal
 			if {$COMPSTATUS($comp) == 2} {
 				set_status $comp 0
+				set SCREENED($comp) 0
 			}
 		}
 	}
