@@ -88,7 +88,7 @@ proc parse_env_var {} {
 	for {set i 0} { $i < $nCompos } {incr i} {
 	set thisComp [split [lindex "$comp" $i] ","]
 	if {[llength "$thisComp"] == 3} {
-		set component_name [string tolower [lindex "$thisComp" 0]]
+		set component_name [lindex "$thisComp" 0]
 		set component_name [string map "{ } {}" $component_name]
 		set thisCommand "$component_name"
 		set host [lindex "$thisComp" 1]
