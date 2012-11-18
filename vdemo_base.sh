@@ -71,7 +71,7 @@ function vdemo_detach_screen {
 # $1:   title of the component
 function vdemo_showlog {
 	 xterm -fg white -bg darkblue -title "log of ${1}@${HOSTNAME}" -e \
-		  less "$VDEMO_logfile_prefix${1}_${USER}.log" &
+		  less "$VDEMO_logfile_prefix${1}.log" &
 }
 
 # start a component. This function has the following options:
@@ -97,7 +97,7 @@ function vdemo_start_component {
 		VDEMO_componentDisplay="$1"
 		;;
 	    "-l"|"--logging")
-		VDEMO_logfile="${VDEMO_logfile_prefix}${VDEMO_title}_${USER}.log"
+		VDEMO_logfile="${VDEMO_logfile_prefix}${VDEMO_title}.log"
 		logfiledir="${VDEMO_logfile%/*}"
 		if [ ! -d "$logfiledir" ]; then mkdir -p "$logfiledir"; fi
 		echo "logging to ${VDEMO_logfile}" >&2
@@ -125,15 +125,11 @@ function vdemo_start_component {
 	echo "obligatory arguments missing." >&2 
 	return 1
     fi
-    VDEMO_component="$1"
-    
-    cmd="LD_LIBRARY_PATH=${LD_LIBRARY_PATH} DISPLAY=${VDEMO_componentDisplay} $* 2>&1 ${VDEMO_logging}"
-
+    cmd="LD_LIBRARY_PATH=${LD_LIBRARY_PATH} DISPLAY=${VDEMO_componentDisplay} $1 2>&1 ${VDEMO_logging}"
     echo "starting $VDEMO_title as '$cmd' " >&2
-    
     xterm -fg green -bg black $ICONIC -title "starting $VDEMO_title" -e \
 	screen -t "$VDEMO_title" -S "${VDEMO_title}_" \
-	bash -i -c "$cmd" &
+	bash -i -c "$cmd" "$VDEMO_title" &
 }
 
 # get all direct and indirect children of a process

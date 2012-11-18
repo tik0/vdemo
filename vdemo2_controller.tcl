@@ -87,7 +87,7 @@ proc parse_env_var {} {
     puts "VDEMO_watchfile = $WATCHFILE"
     puts "COMPONENTS: "
     for {set i 0} { $i < $nCompos } {incr i} {
-        set thisComp [split [lindex "$comp" $i] ","]
+        set thisComp [split [string trim [lindex "$comp" $i]] ","]
         if {[llength "$thisComp"] == 3} {
             set component_name [lindex "$thisComp" 0]
             set component_name [string map "{ } {}" $component_name]
@@ -101,8 +101,7 @@ proc parse_env_var {} {
             set HOST($component_name) $host
             set ARGS($component_name) [lindex $thisComp 2]
             # do not simply tokenize at spaces, but allow quoted strings ("" or '')
-            set ARGS($component_name) [regexp -all -inline {\S+|[^ =]+=(?:\S+|"[^"]+"|'[^']+')} $ARGS($component_name)]
-            # '"
+            set ARGS($component_name) [regexp -all -inline -- "\\S+|\[^ =\]+=(?:\\S+|\"\[^\"]+\"|'\[^'\]+')" $ARGS($component_name)]
             puts "$component_name\tHOST: $HOST($component_name)\tARGS: $ARGS($component_name)"
             # parse options known by the script and remove them from them the list
             parse_options "$component_name"
@@ -475,7 +474,7 @@ proc component_cmd {comp cmd} {
             } finally {
                 set ISSTARTING($comp) 0
                 $COMPWIDGET.$comp.start configure -state normal
-                if {$COMPSTATUS($comp) == 2} {
+                if {$COMPSTATUS($comp) == 2 && $WAIT_READY($comp) > 0} {
                     set_status $comp 0
                     set SCREENED($comp) 0
                 }

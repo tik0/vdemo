@@ -108,10 +108,10 @@ case "$1" in
 	    comp_display=$(start_Xserver)
 	    echo "DISPLAY: $comp_display" >&2 
 	    vdemo_start_component -d $comp_display -n $title $vdemo_start_ICONIC $vdemo_start_LOGGING \
-		$component
+		"$component"
 	else
 	    vdemo_start_component -n $title $vdemo_start_LOGGING $vdemo_start_ICONIC \
-		$component
+		"$component"
 	fi
 	;;
     stop)
