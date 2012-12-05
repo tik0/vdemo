@@ -121,12 +121,9 @@ function vdemo_start_component {
 	shift
     done
 
-    if [ $# -lt 1 ]; then
-	echo "obligatory arguments missing." >&2 
-	return 1
-    fi
-    cmd="LD_LIBRARY_PATH=${LD_LIBRARY_PATH} DISPLAY=${VDEMO_componentDisplay} $1 2>&1 ${VDEMO_logging}"
-    echo "starting $VDEMO_title as '$cmd' " >&2
+	export -f component
+    cmd="LD_LIBRARY_PATH=${LD_LIBRARY_PATH} DISPLAY=${VDEMO_componentDisplay} component 2>&1 ${VDEMO_logging}"
+    echo "starting $VDEMO_title with component function:"$'\n'"$(declare -f component)" >&2
     xterm -fg green -bg black $ICONIC -title "starting $VDEMO_title" -e \
 	screen -t "$VDEMO_title" -S "${VDEMO_title}_" \
 	bash -i -c "$cmd" "$VDEMO_title" &

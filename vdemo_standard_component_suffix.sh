@@ -76,6 +76,11 @@ if [ -z "$VDEMO_logfile_prefix" ]; then
 	export VDEMO_logfile_prefix="/tmp/vdemo-$USER/component_"
 fi
 
+if ! declare -f "component" >/dev/null; then
+	echo 'function "component" is not declared or declared as variable'
+	exit 1
+fi
+
 # run the 
 test -f "$VDEMO_sysConfig" && source "$VDEMO_sysConfig" $VDEMO_sysConfigOptions
 source "$VDEMO_root/vdemo_base.sh"
@@ -107,11 +112,9 @@ case "$1" in
 	if [ "${vdemo_start_XSERVER}" ]; then
 	    comp_display=$(start_Xserver)
 	    echo "DISPLAY: $comp_display" >&2 
-	    vdemo_start_component -d $comp_display -n $title $vdemo_start_ICONIC $vdemo_start_LOGGING \
-		"$component"
+	    vdemo_start_component -d $comp_display -n $title $vdemo_start_ICONIC $vdemo_start_LOGGING
 	else
-	    vdemo_start_component -n $title $vdemo_start_LOGGING $vdemo_start_ICONIC \
-		"$component"
+	    vdemo_start_component -n $title $vdemo_start_LOGGING $vdemo_start_ICONIC
 	fi
 	;;
     stop)
