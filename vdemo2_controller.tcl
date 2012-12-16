@@ -3,7 +3,6 @@
 # the next line restarts using wish \
 exec wish8.5 "$0" "$@"
 package require Iwidgets 4.0
-package require try
 package require Tclx
 
 set SSHCMD "ssh -oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -oPasswordAuthentication=no -oConnectTimeout=15"
@@ -440,7 +439,7 @@ proc component_cmd {comp cmd} {
     
     switch $cmd {
         start {
-            try {
+            try_eval {
                 $COMPWIDGET.$comp.start configure -state disabled
                 if { $ISSTARTING($comp) } {
                     puts "$TITLE($comp): not ready, still waiting for the process"
@@ -471,7 +470,8 @@ proc component_cmd {comp cmd} {
                     set detach_after [expr $DETACHTIME($comp) * 1000]
                     set TIMERDETACH($comp) [after $detach_after "component_cmd $comp detach"]
                 }
-            } finally {
+            } {} {
+                #finally
                 set ISSTARTING($comp) 0
                 $COMPWIDGET.$comp.start configure -state normal
                 if {$COMPSTATUS($comp) == 2 && $WAIT_READY($comp) > 0} {
