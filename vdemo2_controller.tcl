@@ -687,16 +687,23 @@ proc create_spread_conf {} {
     } else {
         return
     }
-    
+    # list of adapter ips to find best local ip
+    set local_addr [exec ip -o -4 addr | sed {s/.*inet \(\([0-9]\{1,3\}\.\)\{3\}[0-9]\{1,3\}\).*/\1/g}]
     set segments ""
     foreach {h} "$spread_hosts" {
-        set ip [exec dig +search +short $h]
-        if {"$ip" == ""} {
-            set ip [exec ping -c1 $h | grep "bytes from" | cut -f2 -d "("  | cut -f1 -d ")"]
+        set ip [exec ping -c1 $h | grep "bytes from" | egrep -o {([0-9]{1,3}\.){3}[0-9]{1,3}}]
+        # if address is localhost and we have a config with multiple hosts
+        if {[string match "127.*" $ip] && [llength "$spread_hosts"] > 1} {
+            # try to find alternatives the host resolves to
+            set ips [exec getent ahostsv4 $h | grep "STREAM" | cut -d " " -f1 | sort | uniq]
+            foreach {lip} "$ips" {
+                if {[lsearch -exact $local_addr $lip] > -1} {
+                    set ip $lip
+                }
+            }
         }
         if {"$ip" == ""} {continue}
-        
-        set seg [exec echo $ip | cut -f 1,2,3 -d "."]
+        set seg [join [lrange [split $ip .] 0 2] .]
         set segments "$segments $seg"
         set IP($h) $ip
         if {![info exists hosts($seg)]} {
@@ -720,8 +727,8 @@ proc create_spread_conf {} {
     
     set num 1
     foreach {seg} "$segments" {
-        if {$seg == "127.0.0"} {
-            set sp_seg "127.0.0.255:$env(SPREAD_PORT)"
+        if {[string match "127.*" $seg]} {
+            set sp_seg "$seg.255:$env(SPREAD_PORT)"
         } else {
             set sp_seg "225.42.65.$num:$env(SPREAD_PORT)"
             set num [expr $num + 1]
