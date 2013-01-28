@@ -110,6 +110,16 @@ proc parse_env_var {} {
     
 }
 
+proc bind_wheel_sf {comp} {
+    set can [$comp component canvas]
+    set vsb [$comp component vertsb]
+    set wid [$comp childsite]
+    foreach w_ [list $can $vsb $wid] {
+        bind $w_ <4> [list $can yview scroll -1 units]
+        bind $w_ <5> [list $can yview scroll +1 units]
+    }
+}
+
 proc gui_tcl {} {
     global HOST SCREENED_SSH COMPONENTS ARGS TERMINAL USEX LOGTEXT env NOAUTO LOGGING  GROUP SCREENED  COMP_LEVEL COMPWIDGET WATCHFILE COMMAND LEVELS TITLE TIMERDETACH ISSTARTING
     set BOLDFONT "-*-helvetica-bold-r-*-*-10-*-*-*-*-*-*-*"
@@ -126,10 +136,9 @@ proc gui_tcl {} {
     
     frame $base.components
     frame $base.components.singles
-    iwidgets::scrolledframe $base.components.singles.comp 	-vscrollmode dynamic -hscrollmode dynamic
-    
+    iwidgets::scrolledframe $base.components.singles.comp -vscrollmode dynamic -hscrollmode dynamic
+    bind_wheel_sf $base.components.singles.comp
     set COMPWIDGET [$base.components.singles.comp childsite]
-    
     pack $base.components.singles -side top -fill both -expand yes
     pack $base.components.singles.comp -side left -expand yes -fill both
     
@@ -280,7 +289,6 @@ proc gui_tcl {} {
     
     button $base.exit -pady -3 -padx -7 -borderwidth 1 -text "exit" -font "$BOLDFONT" -command {gui_exit}
     pack $base.exit -side bottom -fill x
-    
 }
 
 proc clearLogger {} {
