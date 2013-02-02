@@ -104,6 +104,8 @@ proc parse_env_var {} {
             puts "$component_name\tHOST: $HOST($component_name)\tARGS: $ARGS($component_name)"
             # parse options known by the script and remove them from them the list
             parse_options "$component_name"
+        } elseif {[string length [string trim [lindex "$comp" $i]]] != 0} {
+            error "component $i: exepected three comma separated groups in '[string trim [lindex "$comp" $i]]'"
         }
     }
     puts ""
@@ -676,6 +678,8 @@ proc remove_duplicates {} {
         if { ![info exists _HAVE($cmdhost)] } {
             set _HAVE($cmdhost) "$cmdhost"
             set _COMPONENTS "$_COMPONENTS $c"
+        } else {
+            error "duplicate component title: $TITLE($c):$HOST($c)"
         }
     }
     set COMPONENTS $_COMPONENTS
