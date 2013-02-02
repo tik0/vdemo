@@ -86,6 +86,7 @@ function vdemo_start_component {
     VDEMO_componentDisplay="${DISPLAY}"
     VDEMO_logging=""
     ICONIC="-iconic"
+	COLOR="green"
     while [ $# -gt 0 ]; do
 	case $1 in
 	    "-n"|"--name")
@@ -106,8 +107,9 @@ function vdemo_start_component {
 	    --)
 		break
 		;;
-	    "--noiconic")
-      ICONIC=""
+		"--noiconic")
+		ICONIC=""
+		COLOR=white
 		;;
 	    -*)
 		echo "illegal option $1" >& 2
@@ -124,7 +126,7 @@ function vdemo_start_component {
 	export -f component
     cmd="${VDEMO_logging}LD_LIBRARY_PATH=${LD_LIBRARY_PATH} DISPLAY=${VDEMO_componentDisplay} component"
     echo "starting $VDEMO_title with component function:"$'\n'"$(declare -f component)" >&2
-    xterm -fg green -bg black $ICONIC -title "starting $VDEMO_title" -e \
+    xterm -fg $COLOR -bg black $ICONIC -title "starting $VDEMO_title" -e \
 	screen -t "$VDEMO_title" -S "${VDEMO_title}_" \
 	bash -i -c "$cmd" "$VDEMO_title" &
 }

@@ -122,6 +122,15 @@ proc bind_wheel_sf {comp} {
     }
 }
 
+proc set_group_noauto {grp} {
+    global COMPONENTS GROUP NOAUTO GNOAUTO
+    foreach {comp} "$COMPONENTS" {
+        if {$GROUP($comp) == $grp} {
+            set NOAUTO($comp) $GNOAUTO($grp)
+        }
+    }
+}
+
 proc gui_tcl {} {
     global HOST SCREENED_SSH COMPONENTS ARGS TERMINAL USEX LOGTEXT env NOAUTO LOGGING  GROUP SCREENED  COMP_LEVEL COMPWIDGET WATCHFILE COMMAND LEVELS TITLE TIMERDETACH ISSTARTING
     set BOLDFONT "-*-helvetica-bold-r-*-*-10-*-*-*-*-*-*-*"
@@ -153,10 +162,10 @@ proc gui_tcl {} {
         #reliefs: flat, groove, raised, ridge, solid, or sunken
         frame $COMPWIDGET.$c -relief groove -borderwidth 1
         pack $COMPWIDGET.$c -side top -fill both
-        label $COMPWIDGET.$c.level -foreground blue -width 1 -text "$COMP_LEVEL($c)" -activebackground white -pady -3 -padx -7 -borderwidth 1 -font "$BOLDFONT"
+        label $COMPWIDGET.$c.level -foreground darkblue -width 1 -text "$COMP_LEVEL($c)" -activebackground white -pady -3 -padx -7 -borderwidth 1 -font "$BOLDFONT"
         pack $COMPWIDGET.$c.level -side left
         
-        label $COMPWIDGET.$c.group -anchor e -foreground blue -font "$FONT" -width 10 -text "$GROUP($c)"
+        label $COMPWIDGET.$c.group -anchor e -foreground darkblue -font "$FONT" -width 10 -text "$GROUP($c)"
         label $COMPWIDGET.$c.label -font "$BOLDFONT" -width 25 -anchor e -text "$TITLE($c)@"
         entry $COMPWIDGET.$c.host -borderwidth 1 -highlightthickness 0 -font "$FONT" -width 10 -textvariable HOST($c)
         pack $COMPWIDGET.$c.label -side left -fill x
@@ -165,7 +174,7 @@ proc gui_tcl {} {
         button $COMPWIDGET.$c.start -activebackground gray95 -pady -3 -padx -7 -borderwidth 1 -font "$BOLDFONT" -text "start" -command "component_cmd $c start"
         button $COMPWIDGET.$c.stop -activebackground gray95 -pady -3 -padx -7 -borderwidth 1 -font "$BOLDFONT" -text "stop" -command "component_cmd $c stop"
         button $COMPWIDGET.$c.check -pady -3 -padx -7 -borderwidth 1 -font "$BOLDFONT" -text "check" -command "component_cmd $c check"
-        checkbutton $COMPWIDGET.$c.noauto -font "$BOLDFONT" -borderwidth 1 -text "no auto" -variable NOAUTO($c) -foreground blue
+        checkbutton $COMPWIDGET.$c.noauto -font "$BOLDFONT" -borderwidth 1 -text "no auto" -variable NOAUTO($c) -foreground darkblue
         checkbutton $COMPWIDGET.$c.ownx -font "$BOLDFONT" -borderwidth 1 -text "own X" -variable USEX($c)
         checkbutton $COMPWIDGET.$c.logging -font "$BOLDFONT" -borderwidth 1 -text "logging" -variable LOGGING($c)
         button $COMPWIDGET.$c.logoutput -activebackground gray95 -font "$BOLDFONT" -pady -3 -padx -7 -borderwidth 1 -text "view log" -command "component_cmd $c showlog"
@@ -203,11 +212,11 @@ proc gui_tcl {} {
     # button to control ALL components
     frame $base.components.all -relief groove -borderwidth 1
     pack $base.components.all -side top -fill both
-    label $base.components.all.label -anchor e -font "$BOLDFONT" -text "ALL COMPONENTS" -foreground blue
+    label $base.components.all.label -anchor e -font "$BOLDFONT" -text "ALL COMPONENTS" -foreground darkblue
     pack $base.components.all.label -side left -fill x
-    button $base.components.all.start -font "$BOLDFONT" -pady -3 -padx -7 -borderwidth 1 -text "start" -foreground blue -command "allcomponents_cmd start"
-    button $base.components.all.stop -font "$BOLDFONT" -pady -3 -padx -7 -borderwidth 1 -text "stop" -foreground blue -command "allcomponents_cmd stop"
-    button $base.components.all.check -font "$BOLDFONT" -pady -3 -padx -7 -borderwidth 1 -text "check" -foreground blue -command "allcomponents_cmd check"
+    button $base.components.all.start -font "$BOLDFONT" -pady -3 -padx -7 -borderwidth 1 -text "start" -foreground darkblue -command "allcomponents_cmd start"
+    button $base.components.all.stop -font "$BOLDFONT" -pady -3 -padx -7 -borderwidth 1 -text "stop" -foreground darkblue -command "allcomponents_cmd stop"
+    button $base.components.all.check -font "$BOLDFONT" -pady -3 -padx -7 -borderwidth 1 -text "check" -foreground darkblue -command "allcomponents_cmd check"
     pack $base.components.all.start -side left
     pack $base.components.all.stop -side left
     pack $base.components.all.check -side left
@@ -226,10 +235,10 @@ proc gui_tcl {} {
     foreach {g} "$LEVELS" {
         frame $base.components.group.level.$g -relief groove -borderwidth 1
         pack $base.components.group.level.$g -side top -fill x
-        label $base.components.group.level.$g.label -anchor w -font "$BOLDFONT" -text "$g" -foreground blue
-        button $base.components.group.level.$g.start -font "$BOLDFONT" -pady -3 -padx -3 -borderwidth 1 -text "start" -foreground blue -command "level_cmd start $g"
-        button $base.components.group.level.$g.stop -font "$BOLDFONT" -pady -3 -padx -3 -borderwidth 1 -text "stop" -foreground blue -command "level_cmd stop $g"
-        button $base.components.group.level.$g.check -font "$BOLDFONT" -pady -3 -padx -3 -borderwidth 1 -text "check" -foreground blue -command "level_cmd check $g"
+        label $base.components.group.level.$g.label -anchor w -font "$BOLDFONT" -text "$g" -foreground darkblue
+        button $base.components.group.level.$g.start -font "$BOLDFONT" -pady -3 -padx -3 -borderwidth 1 -text "start" -foreground darkblue -command "level_cmd start $g"
+        button $base.components.group.level.$g.stop -font "$BOLDFONT" -pady -3 -padx -3 -borderwidth 1 -text "stop" -foreground darkblue -command "level_cmd stop $g"
+        button $base.components.group.level.$g.check -font "$BOLDFONT" -pady -3 -padx -3 -borderwidth 1 -text "check" -foreground darkblue -command "level_cmd check $g"
         pack $base.components.group.level.$g.check -side right
         pack $base.components.group.level.$g.stop -side right
         pack $base.components.group.level.$g.start -side right
@@ -242,14 +251,17 @@ proc gui_tcl {} {
     foreach {g} "$groups" {
         frame $base.components.group.named.$g -relief groove -borderwidth 1
         pack $base.components.group.named.$g -side top -fill x
-        label $base.components.group.named.$g.label -width 10 -anchor e -font "$BOLDFONT" -text "$g" -foreground blue
+        label $base.components.group.named.$g.label -width 10 -anchor e -font "$BOLDFONT" -text "$g" -foreground darkblue
         pack $base.components.group.named.$g.label -side left -fill x
-        button $base.components.group.named.$g.start -font "$BOLDFONT" -pady -3 -padx -3 -borderwidth 1 -text "start" -foreground blue -command "group_cmd start $g"
-        button $base.components.group.named.$g.stop -font "$BOLDFONT" -pady -3 -padx -3 -borderwidth 1 -text "stop" -foreground blue -command "group_cmd stop $g"
-        button $base.components.group.named.$g.check -font "$BOLDFONT" -pady -3 -padx -3 -borderwidth 1 -text "check" -foreground blue -command "group_cmd check $g"
+        button $base.components.group.named.$g.start -font "$BOLDFONT" -pady -3 -padx -3 -borderwidth 1 -text "start" -foreground darkblue -command "group_cmd start $g"
+        button $base.components.group.named.$g.stop -font "$BOLDFONT" -pady -3 -padx -3 -borderwidth 1 -text "stop" -foreground darkblue -command "group_cmd stop $g"
+        button $base.components.group.named.$g.check -font "$BOLDFONT" -pady -3 -padx -3 -borderwidth 1 -text "check" -foreground darkblue -command "group_cmd check $g"
+        checkbutton $base.components.group.named.$g.noauto -pady -3 -padx -3 -font "$BOLDFONT" -borderwidth 1 -text "no auto" -command "set_group_noauto $g" -variable GNOAUTO($g) -onvalue 1 -offvalue 0 -foreground darkblue
+
         pack $base.components.group.named.$g.start -side left
         pack $base.components.group.named.$g.stop -side left
         pack $base.components.group.named.$g.check -side left
+        pack $base.components.group.named.$g.noauto -side left
     }
     
     # LOGGER area (WATCHFILE)
@@ -515,6 +527,7 @@ proc component_cmd {comp cmd} {
             }
         }
         detach {
+            cancel_detach_timer $comp
             set cmd_line "$VARS $component_script $component_options detach"
             ssh_command "$cmd_line" "$HOST($comp)"
             set SCREENED($comp) 0
@@ -618,7 +631,7 @@ proc connect_hosts {} {
         exec mkfifo "$f.out"
         
         set screenid [get_master_screen_name $fifo_host($f)]
-        exec xterm -title "establish ssh connection to $f" -n "$f" -e screen -mS $screenid bash -c "tail -s 0.1 -n 10000 -f $f.in | $SSHCMD -X  $fifo_host($f) bash --login --rcfile /etc/profile | while read s; do echo \$s > $f.out; done" &
+        exec xterm -title "establish ssh connection to $f" -n "$f" -e screen -mS $screenid bash -c "tail -s 0.1 -n 10000 -f $f.in | $SSHCMD -Y $fifo_host($f) bash --login --rcfile /etc/profile | while read s; do echo \$s > $f.out; done" &
         
         if {[info exists env(VDEMO_exports)]} {
             foreach {var} "$env(VDEMO_exports)" {
