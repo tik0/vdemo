@@ -101,7 +101,7 @@ function vdemo_start_component {
 		logfiledir="${VDEMO_logfile%/*}"
 		if [ ! -d "$logfiledir" ]; then mkdir -p "$logfiledir"; fi
 		echo "logging to ${VDEMO_logfile}" >&2
-		VDEMO_logging=" | tee ${VDEMO_logfile}"
+		VDEMO_logging="exec > >(tee \"${VDEMO_logfile}\"); exec 2>&1; "
 		;;
 	    --)
 		break
@@ -122,7 +122,7 @@ function vdemo_start_component {
     done
 
 	export -f component
-    cmd="LD_LIBRARY_PATH=${LD_LIBRARY_PATH} DISPLAY=${VDEMO_componentDisplay} component 2>&1 ${VDEMO_logging}"
+    cmd="${VDEMO_logging}LD_LIBRARY_PATH=${LD_LIBRARY_PATH} DISPLAY=${VDEMO_componentDisplay} component"
     echo "starting $VDEMO_title with component function:"$'\n'"$(declare -f component)" >&2
     xterm -fg green -bg black $ICONIC -title "starting $VDEMO_title" -e \
 	screen -t "$VDEMO_title" -S "${VDEMO_title}_" \
