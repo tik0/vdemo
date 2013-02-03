@@ -181,24 +181,12 @@ proc gui_tcl {} {
         frame $COMPWIDGET.$c.terminal
         set SCREENED($c) 0
         checkbutton $COMPWIDGET.$c.terminal.screen -pady -3 -padx -7 -font "$BOLDFONT" -borderwidth 1 -text "show term" -command "component_cmd $c screen" -variable SCREENED($c) -onvalue 1 -offvalue 0
-        # 	if {[isXCFComp $c]} {
-        # 	    if {[string length $WAIT_SERVER($c)] > 0} {
-        # 		set button_text "SERV. $WAIT_SERVER($c)"
-        # 	    }
-        # 	    if {[string length $WAIT_PUBLISHER($c)] > 0} {
-        # 		set button_text "PUBL. $WAIT_PUBLISHER($c)"
-        # 	    }
-        # 	    set intercept_disabled "normal"
-        # 	} else {
-        # 	    set intercept_disabled "disabled"
-        # 	    set button_text "not interceptable"
-        # 	}
-        # 	button $COMPWIDGET.$c.intercept -pady -3 -padx -7 -font "$BOLDFONT" -activebackground white -borderwidth 1 -state $intercept_disabled -text "$button_text" -width 20 -command "intercept_component $c"
+        button $COMPWIDGET.$c.inspect -pady -3 -padx -7 -font "$BOLDFONT" -activebackground gray95 -borderwidth 1 -text "inspect" -command "component_cmd $c inspect"
         
         pack $COMPWIDGET.$c.ownx -side right
+        pack $COMPWIDGET.$c.inspect -side right
         pack $COMPWIDGET.$c.logoutput -side right
         pack $COMPWIDGET.$c.logging -side right
-        # 	pack $COMPWIDGET.$c.intercept -side right
         pack $COMPWIDGET.$c.terminal -side right
         pack $COMPWIDGET.$c.terminal.screen -side right
         
@@ -536,7 +524,6 @@ proc component_cmd {comp cmd} {
             set cmd_line "$VARS $component_script $component_options showlog"
             ssh_command "$cmd_line" "$HOST($comp)"
         }
-        
         check {
             set cmd_line "$VARS $component_script $component_options check"
             
@@ -551,6 +538,10 @@ proc component_cmd {comp cmd} {
                 set SCREENED($comp) 0
                 set_status $comp 0
             }
+        }
+        inspect {
+            set cmd_line "$VARS $component_script $component_options inspect"
+            ssh_command "$cmd_line" "$HOST($comp)"
         }
     }
     update

@@ -137,6 +137,9 @@ case "$1" in
 	vdemo_showlog $title
 	exit $?
 	;;
+    inspect)
+	vdemo_inspect $title
+	;;
     clean)
 	if vdemo_check_component; then
 	    echo "$title is running, stopping before cleaning">&2
@@ -153,7 +156,8 @@ case "$1" in
 	fi
 	call_if_exists clean_component
 	call_if_exists on_start
-	bash -c "$component"
+	export -f component
+	bash -c "component"
 	call_if_exists on_stop
 	;;
     *)

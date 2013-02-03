@@ -74,6 +74,11 @@ function vdemo_showlog {
 		  less -R "$VDEMO_logfile_prefix${1}.log" &
 }
 
+function vdemo_inspect {
+	 xterm -fg white -bg black -title "inspect ${1}@${HOSTNAME}" -e \
+		  vdemo_inspect_cmd &
+}
+
 # start a component. This function has the following options:
 #   -n    title of the component (name to identify it by other functions, 
 #           needs not to be the program name)
