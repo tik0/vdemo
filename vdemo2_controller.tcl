@@ -430,8 +430,10 @@ proc remote_clock {host} {
 
 proc cancel_detach_timer {comp} {
     global TIMERDETACH
-    after cancel $TIMERDETACH($comp)
-    set TIMERDETACH($comp) 0
+    if {$TIMERDETACH($comp) != 0} {
+        after cancel $TIMERDETACH($comp)
+        set TIMERDETACH($comp) 0
+    }
 }
 
 proc component_cmd {comp cmd} {
@@ -474,12 +476,12 @@ proc component_cmd {comp cmd} {
                 ssh_command "$cmd_line" "$HOST($comp)"
                 
                 set SCREENED($comp) 1
-                wait_ready $comp
                 if {$DETACHTIME($comp) >= 0} {
                     cancel_detach_timer $comp
                     set detach_after [expr $DETACHTIME($comp) * 1000]
                     set TIMERDETACH($comp) [after $detach_after "component_cmd $comp detach"]
                 }
+                wait_ready $comp
             } {} {
                 #finally
                 set ISSTARTING($comp) 0
