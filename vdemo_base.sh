@@ -149,19 +149,35 @@ function all_children {
     done
 }
 
+# get pid of actual component
+function vdemo_pidFromComponent {
+    pppid=$(ps --ppid "$(vdemo_pidFromScreen ${VDEMO_title} | tr -d '\n')" -o pid --no-headers)
+    ppid=$(ps --ppid "$(echo $pppid | tr -d '\n')" -o pid --no-headers)
+
+    ps --ppid "$(echo $ppid | tr -d '\n')" -o pid --no-headers | tr -d '\n'
+}
+
 # stop a component
 # $1: titl of the component
 function vdemo_stop_component {
     VDEMO_title="$1"
     VDEMO_pid=$(vdemo_pidFromScreen ${VDEMO_title})
-
+    VDEMO_compo_pid=$(vdemo_pidFromComponent ${VDEMO_title})
+    
     if [ "$VDEMO_pid" ]; then
+	echo "stopping $VDEMO_title" >&2
+	kill -2 $VDEMO_compo_pid > /dev/null 2>&1
+	for i in {1..50}; do
+		sleep 0.1
+		kill -0 $VDEMO_compo_pid > /dev/null 2>&1 || break
+	done
+	
+	
 	PIDS=$(all_children "$VDEMO_pid")
-	echo "stopping $VDEMO_title (PIDs $PIDS)" >&2
 	kill $VDEMO_pid $PIDS > /dev/null 2>&1
 	for i in {1..20}; do
-		kill -0 $VDEMO_pid $PIDS > /dev/null 2>&1 || break
 		sleep 0.1
+		kill -0 $VDEMO_pid $PIDS > /dev/null 2>&1 || break
 	done
 	kill -9 $VDEMO_pid $PIDS > /dev/null 2>&1
     fi

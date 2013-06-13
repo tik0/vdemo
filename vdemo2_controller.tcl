@@ -288,9 +288,17 @@ proc gui_tcl {} {
         pack $base.ssh.clocks_$lh -side left -fill x
         pack $base.ssh.screen_$lh -side left -fill x
     }
-    
+
     button $base.exit -pady -3 -padx -7 -borderwidth 1 -text "exit" -font "$BOLDFONT" -command {gui_exit}
-    pack $base.exit -side bottom -fill x
+    pack $base.exit -side left
+  
+    if {[info exists ::env(VDEMO_alert_string)]} {
+        label $base.orlabel -font "$BOLDFONT" -text "$env(VDEMO_alert_string)" -foreground blue -background yellow
+        pack $base.orlabel -fill x
+    } elseif {[info exists ::env(VDEMO_info_string)]} {
+ 	    label $base.orlabel -font "$BOLDFONT" -text "no robot config loaded" -foreground blue
+     	pack $base.orlabel -fill x 	
+    }
 }
 
 proc clearLogger {} {
@@ -548,6 +556,12 @@ proc component_cmd {comp cmd} {
     }
     update
 }
+
+proc wheelEvent { x y delta } {
+    .components.singles.comp yview scroll $delta units
+}
+bind all <4> "+wheelEvent %X %Y -5"
+bind all <5> "+wheelEvent %X %Y  5"
 
 proc set_status {comp status} {
     global COMPWIDGET COMPSTATUS
