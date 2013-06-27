@@ -89,7 +89,7 @@ function vdemo_start_component {
     VDEMO_wait=20
     VDEMO_title=""
     VDEMO_componentDisplay="${DISPLAY}"
-    VDEMO_logging=""
+    VDEMO_logging=" | tee /dev/null"
     ICONIC="-iconic"
 	COLOR="green"
     while [ $# -gt 0 ]; do
@@ -167,7 +167,7 @@ function vdemo_stop_component {
     if [ "$VDEMO_pid" ]; then
 	echo "stopping $VDEMO_title" >&2
 	kill -2 $VDEMO_compo_pid > /dev/null 2>&1
-	for i in {1..50}; do
+	for i in {1..150}; do
 		sleep 0.1
 		kill -0 $VDEMO_compo_pid > /dev/null 2>&1 || break
 	done
