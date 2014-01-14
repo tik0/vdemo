@@ -89,7 +89,7 @@ function vdemo_start_component {
     VDEMO_wait=20
     VDEMO_title=""
     VDEMO_componentDisplay="${DISPLAY}"
-    VDEMO_logging=" | tee /dev/null"
+    VDEMO_logging=""
     ICONIC="-iconic"
 	COLOR="green"
     while [ $# -gt 0 ]; do
@@ -133,7 +133,7 @@ function vdemo_start_component {
     echo "starting $VDEMO_title with component function:"$'\n'"$(declare -f component)" >&2
     xterm -fg $COLOR -bg black $ICONIC -title "starting $VDEMO_title" -e \
 	screen -t "$VDEMO_title" -S "${VDEMO_title}_" \
-	bash -i -c "$cmd" "$VDEMO_title" &
+	stdbuf -oL bash -i -c "$cmd" "$VDEMO_title" &
 }
 
 # get all direct and indirect children of a process
