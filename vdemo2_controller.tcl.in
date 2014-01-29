@@ -235,6 +235,10 @@ proc gui_tcl {} {
     button $base.components.all.clearLogger -font "$BOLDFONT" -pady -3 -padx -7 -borderwidth 1 -text "clear logger" \
 	-command "clearLogger"
     pack $base.components.all.clearLogger -side right
+    # reset logger button
+    button $base.components.all.resetLogger -font "$BOLDFONT" -pady -3 -padx -7 -borderwidth 1 -text "reset logger" \
+	-command "resetLogger"
+    pack $base.components.all.resetLogger -side right
 
     frame $base.components.group 
     pack $base.components.group -side top -fill x
@@ -321,6 +325,10 @@ proc clearLogger {} {
     global WATCHFILE
     .components.group.log.text delete 1.0 end
     exec echo -n "" > "$WATCHFILE"
+}
+proc resetLogger {} {
+    global WATCHFILE
+	 if {"$WATCHFILE" != ""} {init_logger "$WATCHFILE"}
 }
 
 proc init_logger {filename} {
@@ -508,8 +516,10 @@ proc wait_ready {comp} {
    
 proc remote_xterm {host} {
     global LOGTEXT env
-    set cmd_line "xterm -fg white -bg black -title $host -e \"export LD_LIBRARY_PATH=$env(LD_LIBRARY_PATH);bash\" &"
-    ssh_command "$cmd_line" $host
+	 set CMD ""
+    catch {set CMD "-e \"export LD_LIBRARY_PATH=$env(LD_LIBRARY_PATH);bash\""}
+	 set cmd_line "xterm -fg white -bg black -title $host $CMD &"
+	 ssh_command "$cmd_line" $host
 }
 
 proc remote_clock {host} {
@@ -544,12 +554,10 @@ proc component_cmd {comp cmd} {
 
 	    ssh_command "$cmd_line" "$HOST($comp)"
 
-# 	    if [catch {exec bash -c "$cmd_line 2>&1" &} LOGTEXT ] {
-# 		puts $LOGTEXT
-# 		set success 0
-# 	    } else {}
 	    set SCREENED($comp) 1
 	    wait_ready $comp
+		 after 1000 "component_cmd $comp check"
+		 # check again after a while
 	    # wait longer period of time when using X
 	    if {$USEX($comp)} {
 		after 20000 "component_cmd $comp check"
@@ -569,14 +577,18 @@ proc component_cmd {comp cmd} {
 
 	    ssh_command "$cmd_line" "$HOST($comp)"
 
-	    set_status $comp 0
-	    set SCREENED($comp) 0
+#	    set_status $comp 0
+#	    set SCREENED($comp) 0
 	    after idle "component_cmd $comp check"
 	}
 	screen {
+		 # cancel a previous delayed detach command (from component start)
+		 after cancel "component_cmd $comp detach"
+
 	    if {$SCREENED($comp)} {
 		set cmd_line "$VARS xterm -fg white -bg black -title \"$comp - detach by \[C-a d\], DO NOT HIT CLOSE BUTTON!\" -e $component_script $component_options screen &"
 		ssh_command "$cmd_line" "$HOST($comp)"
+		after idle "component_cmd $comp check"
 	    } else {
 		set cmd_line "$VARS $component_script $component_options detach"
 		ssh_command "$cmd_line" "$HOST($comp)"
@@ -599,7 +611,8 @@ proc component_cmd {comp cmd} {
 	    set res [ssh_command "$cmd_line" "$HOST($comp)"]
 
 	    set success 1
-	    if {$res == 1} {
+	    if {$res != 0} {
+		after cancel "component_cmd $comp check"
 		set SCREENED($comp) 0
 		set_status $comp 0
 	    } else {
@@ -611,6 +624,7 @@ proc component_cmd {comp cmd} {
 	    }
 	}
     }
+
     if $success {
 	.logarea configure -background white
     } else {
@@ -702,13 +716,11 @@ proc connect_hosts {} {
 	exec mkfifo "$f.in"
 	exec mkfifo "$f.out"
 
-	exec xterm -title "establish ssh connection to $f" -n "$f" -e screen -mS "vdemo-$fifo_host($f)" bash -c "tail -s 0.1 -n 10000 -f $f.in | ssh -X  $fifo_host($f) bash --login --rcfile /etc/profile | while read s; do echo \$s > $f.out; done" &
+	exec xterm -title "establish ssh connection to $f" -n "$f" -e screen -mS "vdemo-$fifo_host($f)" bash -c "tail -s 0.1 -n 10000 -f $f.in | ssh -X  $fifo_host($f) bash | while read s; do echo \$s > $f.out; done" &
 
 	if {[info exists env(VDEMO_exports)]} {
 		 foreach {var} "$env(VDEMO_exports)" {
-			  if {[info exists env($var)]} {
-				  ssh_command "export $var=$env($var)" $fifo_host($f)
-			  }
+			  catch {ssh_command "export $var=$env($var)" $fifo_host($f)}
 		 }
 	}
 	ssh_command "source $env(VDEMO_demoConfig)" $fifo_host($f)
@@ -839,7 +851,6 @@ set ::AUTO_SPREAD_CONF 0
 if {![info exists ::env(SPREAD_CONFIG)]} {
 		  create_spread_conf
 }
-if {![info exists ::env(LD_LIBRARY_PATH)]} {set ::env(LD_LIBRARY_PATH) ""}
 
 # cleanup dangling connections first
 disconnect_hosts

@@ -111,7 +111,7 @@ fi
 
 # This MUST be the absolut path to the used vdemo scripts (this script)
 if [ -z "$VDEMO_root" ]; then
-    echo '$VDEMO_root ist not set. Set it to absolut path of the used vdemo installation' >&2
+    echo '$VDEMO_root is not set. Set it to absolut path of the used vdemo installation' >&2
     exit 1
 fi
 
