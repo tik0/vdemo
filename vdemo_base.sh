@@ -147,7 +147,7 @@ function vdemo_start_component {
 	    "-l"|"--logging")
 		VDEMO_logfile="${VDEMO_logfile_prefix}${VDEMO_title}_${USER}.log"
 		echo "logging to ${VDEMO_logfile}" >&2
-		VDEMO_logging="2>&1 | tee ${VDEMO_logfile}"
+		VDEMO_logging=" | tee ${VDEMO_logfile}"
 		;;
 	    --)
 		break
