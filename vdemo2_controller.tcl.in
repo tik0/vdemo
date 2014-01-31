@@ -11,7 +11,7 @@ package require Iwidgets 4.0
 # namespace import ::scrolledframe::scrolledframe
 
 proc parse_options {comp} {
-    global env HOST COMPONENTS ARGS USEX TERMINAL WAIT_READY NOAUTO LOGGING WAIT_SERVER WAIT_PUBLISHER GROUP DETACHTIME XC_COMPNAME COMP_LEVEL EXPORTS TITLE
+    global env HOST COMPONENTS ARGS USEX TERMINAL WAIT_READY NOAUTO LOGGING ICONIC WAIT_SERVER WAIT_PUBLISHER GROUP DETACHTIME XC_COMPNAME COMP_LEVEL EXPORTS TITLE
     set NEWARGS [list]
     set USEX($comp) 0
     set WAIT_READY($comp) 0
@@ -22,6 +22,7 @@ proc parse_options {comp} {
     set NOAUTO($comp) 0
     set TERMINAL($comp) "screen"
     set LOGGING($comp) 0
+    set ICONIC($comp) ""
     set COMP_LEVEL($comp) ""
     set XC_COMPNAME($comp) ""
     set EXPORTS($comp) ""
@@ -43,7 +44,7 @@ proc parse_options {comp} {
 	    }
 	    -d {
 		set DETACHTIME($comp) "$val"
-		incr i
+		set ICONIC($comp) "--noiconic"
 	    }
 	    -p {
 		set WAIT_PUBLISHER($comp) "$val"
@@ -485,16 +486,18 @@ proc checkXCFcomp {comp} {
 }
 
 proc wait_ready {comp} {
-    global WAIT_READY WAIT_PUBLISHER WAIT_SERVER WAIT_BREAK XC_COMPNAME COMPWIDGET
+    global LOGTEXT WAIT_READY WAIT_PUBLISHER WAIT_SERVER WAIT_BREAK XC_COMPNAME COMPWIDGET
     puts "waiting for process to be ready"
     update
     # wait a minimum of 4 seconds to check for the process ID
     #exec sleep 4
     set WAIT_BREAK 0
-    if {([string length $WAIT_SERVER($comp)] > 0) || ([string length $WAIT_PUBLISHER($comp)] > 0)|| ([string length $XC_COMPNAME($comp)] > 0)} {
+    if {([string length $WAIT_SERVER($comp)] > 0) || \
+		  ([string length $WAIT_PUBLISHER($comp)] > 0) || \
+		  ([string length $XC_COMPNAME($comp)] > 0)} {
 	puts "WAIT FOR XCF COMPONENT"
 	while {![checkXCFcomp $comp]} {
-	    set LOGTEXT "still waiting for the component to register"
+	    set LOGTEXT "still waiting for the component $comp to register"
 	    update
 	    $COMPWIDGET.$comp.intercept flash
 	    after 1000
@@ -517,7 +520,7 @@ proc wait_ready {comp} {
 proc remote_xterm {host} {
     global LOGTEXT env
 	 set CMD ""
-    catch {set CMD "-e \"export LD_LIBRARY_PATH=$env(LD_LIBRARY_PATH);bash\""}
+    catch {set CMD "-e \"LD_LIBRARY_PATH=$env(LD_LIBRARY_PATH) bash\""}
 	 set cmd_line "xterm -fg white -bg black -title $host $CMD &"
 	 ssh_command "$cmd_line" $host
 }
@@ -529,10 +532,10 @@ proc remote_clock {host} {
 }
 
 proc component_cmd {comp cmd} {
-    global env HOST COMPONENTS ARGS TERMINAL USEX LOGTEXT WAIT_READY LOGGING WAIT_BREAK SCREENED DETACHTIME COMPWIDGET COMMAND EXPORTS
+    global env HOST COMPONENTS ARGS TERMINAL USEX LOGTEXT WAIT_READY LOGGING ICONIC WAIT_BREAK SCREENED DETACHTIME COMPWIDGET COMMAND EXPORTS
     set cpath "$env(VDEMO_componentPath)"
     set component_script "$cpath/component_$COMMAND($comp)"
-    set component_options ""
+    set component_options "$ICONIC($comp)"
     if {$USEX($comp)} {
 				set component_options "$component_options -x"
     }
@@ -544,9 +547,6 @@ proc component_cmd {comp cmd} {
     set success 1
     switch $cmd {
 	start {
-       if {$DETACHTIME($comp) < 0} {
-           set component_options "$component_options --noiconic"
-       }
 	    set cmd_line "$VARS $component_script $component_options start"
 	    $COMPWIDGET.$comp.start flash
 	    set WAIT_BREAK 0
@@ -556,7 +556,6 @@ proc component_cmd {comp cmd} {
 
 	    set SCREENED($comp) 1
 	    wait_ready $comp
-		 after 1000 "component_cmd $comp check"
 		 # check again after a while
 	    # wait longer period of time when using X
 	    if {$USEX($comp)} {
