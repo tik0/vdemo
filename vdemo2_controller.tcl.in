@@ -372,19 +372,17 @@ proc intercept_component {comp} {
 proc allcomponents_cmd {cmd} {
     global HOST COMPONENTS ARGS TERMINAL USEX LOGTEXT  WAIT_READY WAIT_BREAK NOAUTO LEVELS
     if {"$cmd" == "stop"} {
-	set WAIT_BREAK 1
-	foreach {level} "[lsort $LEVELS]" {
-	    level_cmd $cmd $level
-	}
-    } else {
-	set WAIT_BREAK 0
-	foreach {level} "$LEVELS" {
-	    if {$WAIT_BREAK} {
-		break
-	    }
-	    level_cmd $cmd $level
-	}
-    }
+				set WAIT_BREAK 1
+				foreach {level} "[lsort $LEVELS]" {
+					 level_cmd $cmd $level
+				}
+	 } else {
+				set WAIT_BREAK 0
+				foreach {level} "$LEVELS" {
+					 if {$WAIT_BREAK} {break}
+					 level_cmd $cmd $level
+				}
+	 }
 }
 
 proc group_cmd {cmd grp} {
@@ -393,17 +391,13 @@ proc group_cmd {cmd grp} {
 	set WAIT_BREAK 1
 	foreach {comp} "$COMPONENTS" {
 	    if {$GROUP($comp) == $grp} {
-		if {! $NOAUTO($comp)} {
 		    after idle "component_cmd $comp $cmd"
-		}
 	    }
 	}
     } elseif {"$cmd" == "check"} {
 	foreach {comp} "$COMPONENTS" {
 	    if {$GROUP($comp) == $grp} {
-		if {! $NOAUTO($comp)} {
 		    after idle "component_cmd $comp check"
-		}
 	    }
 	}
     } else {
@@ -427,17 +421,13 @@ proc level_cmd {cmd level} {
 	set WAIT_BREAK 1
 	foreach {comp} "$COMPONENTS" {
 	    if {$COMP_LEVEL($comp) == $level} {
-		if {! $NOAUTO($comp)} {
 		    after idle "component_cmd $comp $cmd"
-		}
 	    }
 	}
     } elseif {"$cmd" == "check"} {
 	foreach {comp} "$COMPONENTS" {
 	    if {$COMP_LEVEL($comp) == $level} {
-		if {! $NOAUTO($comp)} {
 		    after idle "component_cmd $comp check"
-		}
 	    }
 	}
     } else {
@@ -556,6 +546,7 @@ proc component_cmd {comp cmd} {
 
 	    set SCREENED($comp) 1
 	    wait_ready $comp
+		 after 1000 "component_cmd $comp check"
 		 # check again after a while
 	    # wait longer period of time when using X
 	    if {$USEX($comp)} {
