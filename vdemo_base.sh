@@ -97,7 +97,7 @@ function vdemo_reattach_screen {
 	 if [ $failure == 1 ] ; then
 		  # change title of xterm
 		  echo -ne "\033]0;${1}@${HOSTNAME}\007"
-		  file="/tmp/VDEMO_component_${1}_${USER}.log"
+		  file="$VDEMO_logfile_prefix${1}_${USER}.log"
 		  if [ -f $file ] ; then
 				less $file
 		  else
@@ -145,9 +145,7 @@ function vdemo_start_component {
 					 VDEMO_componentDisplay="$1"
 					 ;;
 				"-l"|"--logging")
-					 VDEMO_logfile="${VDEMO_logfile_prefix}${VDEMO_title}_${USER}.log"
-					 echo "logging to ${VDEMO_logfile}" >&2
-					 VDEMO_logging=" | tee ${VDEMO_logfile}"
+					 VDEMO_logging=" | tee "
 					 ;;
 				--)
 					 break
@@ -177,6 +175,14 @@ function vdemo_start_component {
 		  VDEMO_title=`basename VDEMO_component`
     fi
 
+	 # only here VDEMO_title is finally defined
+	 VDEMO_logfile="${VDEMO_logfile_prefix}${VDEMO_title}_${USER}.log"
+	 if [ -n "${VDEMO_logging}" ] ; then 
+		  VDEMO_logging="${VDEMO_logging} ${VDEMO_logfile}"
+		  echo "logging to ${VDEMO_logfile}" >&2
+	 fi
+
+	 rm -f ${VDEMO_logfile} # remove any old log file
     cmd="LD_LIBRARY_PATH=${LD_LIBRARY_PATH} DISPLAY=${VDEMO_componentDisplay} $* 2>&1 ${VDEMO_logging}"
 
     echo "starting $VDEMO_title as '$cmd' " >&2
