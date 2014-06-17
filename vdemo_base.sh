@@ -151,10 +151,19 @@ function all_children {
 
 # get pid of actual component
 function vdemo_pidFromComponent {
-    pppid=$(ps --ppid "$(vdemo_pidFromScreen ${VDEMO_title} | tr -d '\n')" -o pid --no-headers)
-    ppid=$(ps --ppid "$(echo $pppid | tr -d '\n')" -o pid --no-headers)
-
-    ps --ppid "$(echo $ppid | tr -d '\n')" -o pid --no-headers | tr -d '\n'
+    ppid=$(ps --ppid "$(vdemo_pidFromScreen ${VDEMO_title} | tr -d '\n')" -o pid --no-headers)
+    children=$(ps --ppid "$(echo -n $ppid)" -o pid --no-headers)
+    # exclude the parallel logging child process
+    for pid in $children
+    do
+        grep VDEMO_component "/proc/$pid/cmdline" > /dev/null 2> /dev/null
+        result=$?
+        if [ $result -ne 0 ]
+        then
+            echo $pid
+            break
+        fi
+    done
 }
 
 # stop a component
