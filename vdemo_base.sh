@@ -19,7 +19,7 @@ function start_Xserver {
 }
 
 function vdemo_pidFromScreen {
-	 # we append underscore to distinguish between components with same prefix
+    # we append underscore to distinguish between components with same prefix
     VDEMO_title="$1_"
     screen -ls | grep ${VDEMO_title} | cut -f1 -d. | tr -d "\t "
 }
@@ -121,7 +121,7 @@ function vdemo_start_component {
 		echo "$USAGE" >& 2
 		exit 1
 		;;
-	    *)	    
+	    *)
 		break
 		;;
 	esac
@@ -172,16 +172,15 @@ function vdemo_stop_component {
     VDEMO_title="$1"
     VDEMO_pid=$(vdemo_pidFromScreen ${VDEMO_title})
     VDEMO_compo_pid=$(vdemo_pidFromComponent ${VDEMO_title})
-    
+
     if [ "$VDEMO_pid" ]; then
-	echo "stopping $VDEMO_title" >&2
+	echo "stopping $VDEMO_title (VDEMO_pid: ${VDEMO_pid}, VDEMO_compo_pid: ${VDEMO_compo_pid})" >&2
 	kill -2 $VDEMO_compo_pid > /dev/null 2>&1
 	for i in {1..150}; do
 		sleep 0.1
 		kill -0 $VDEMO_compo_pid > /dev/null 2>&1 || break
 	done
-	
-	
+
 	PIDS=$(all_children "$VDEMO_pid")
 	kill $VDEMO_pid $PIDS > /dev/null 2>&1
 	for i in {1..20}; do
