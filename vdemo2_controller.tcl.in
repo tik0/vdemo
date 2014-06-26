@@ -778,7 +778,8 @@ proc create_spread_conf {} {
 
 	 set segments ""
 	 foreach {h} "$spread_hosts" {
-		  set ip [exec dig +search +short $h]
+		  set ip ""
+		  catch {set ip [exec dig +search +short $h]}
 		  if {"$ip" == ""} {
 			  set ip [exec ping -c1 $h | grep "bytes from" | cut -f2 -d "("  | cut -f1 -d ")"]
 		  }
