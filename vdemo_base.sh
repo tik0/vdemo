@@ -175,7 +175,11 @@ function vdemo_stop_component {
     if [ "$VDEMO_pid" ]; then
 	echo "stopping $VDEMO_title (VDEMO_pid: ${VDEMO_pid}, VDEMO_compo_pids: ${VDEMO_compo_pids})" >&2
 
-	for pid in $VDEMO_compo_pids; do
+        # iterate the pids in reverse order to first kill the real child process
+        # and afterwards potential additional processes
+        pid_array=($pids)
+        for ((i=${#pid_array[@]}-1; i>=0; i--)); do
+            pid=${pid_array[$i]}
             echo "killing child process $pid"
             kill -2 $pid > /dev/null 2>&1
             for i in {1..150}; do
