@@ -17,6 +17,7 @@ vdemo starter
 
  options:
   -h  --help         this help text
+  -a  --auto         automatically start all components
 
  author: Marc Hanheide ($RCS_ID)
 "
@@ -31,6 +32,10 @@ while [ $# -gt 0 ]; do
 	    echo "$HELP" >& 2
 	    exit 0
 	    ;;
+    "-a"|"--auto")
+        echo "Automatically starting all components"
+        export VDEMO_autostart="true"
+        ;;
 	-*)
 	    echo "illegal option $1" >& 2
 	    echo "$USAGE" >& 2

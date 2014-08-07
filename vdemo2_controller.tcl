@@ -877,3 +877,8 @@ connect_screenmonitoring
 update
 gui_tcl
 update
+# autostart
+if {[info exists env(VDEMO_autostart)] && $env(VDEMO_autostart) == "true"} {
+    puts "Starting all components due to autostart request"
+    allcomponents_cmd "start"
+}
