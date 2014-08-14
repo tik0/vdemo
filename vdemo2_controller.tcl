@@ -699,7 +699,7 @@ proc remove_duplicates {} {
             set _HAVE($cmdhost) "$cmdhost"
             set _COMPONENTS "$_COMPONENTS $c"
         } else {
-            error "duplicate component title: $TITLE($c):$HOST($c)"
+            puts "duplicate component title: $TITLE($c):$HOST($c)"
         }
     }
     set COMPONENTS $_COMPONENTS
