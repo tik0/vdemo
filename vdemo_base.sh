@@ -74,7 +74,7 @@ function vdemo_reattach_screen {
 # $1:   title of the component
 function vdemo_detach_screen {
 	VDEMO_pid=$(vdemo_pidFromScreen $1)
-	screen -d "$VDEMO_pid"
+	test -n "$VDEMO_pid" && screen -d "$VDEMO_pid"
 }
 
 # show log output of a component
