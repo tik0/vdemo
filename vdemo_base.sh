@@ -3,16 +3,16 @@ function start_Xserver {
     i=0;
     echo "trying to find an X display" >&2
     while [ $i -lt 10 ]; do
-	if [ -e "/tmp/.X${i}-lock" ]; then
-	    echo "X running on :${i}, try to use it" >&2
-	    if xwininfo -display :${i} -root 1>&2; then
-		echo "found accessible X :${i}, reusing it" >&2
-		echo ":${i}"
-		return 0
-	    fi
-	fi
-	echo  "X on :${i} locked, try next..." >&2
-	i=$(expr $i + 1)
+        if [ -e "/tmp/.X${i}-lock" ]; then
+            echo "X running on :${i}, try to use it" >&2
+            if xwininfo -display :${i} -root 1>&2; then
+                echo "found accessible X :${i}, reusing it" >&2
+                echo ":${i}"
+                return 0
+            fi
+        fi
+        echo  "X on :${i} locked, try next..." >&2
+        i=$(expr $i + 1)
     done
     echo "couldn't find a free display for the xserver. exiting" >&2
     exit 2
@@ -30,17 +30,17 @@ function vdemo_check_component {
     VDEMO_title="$1"
     VDEMO_pid=$(vdemo_pidFromScreen ${VDEMO_title})
     if [ "$VDEMO_pid" ]; then
-		echo "checking $VDEMO_title" >&2
-		if ps --no-headers -fp "${VDEMO_pid}"; then
-			echo "running" >&2
-			return 0
-		else
-			echo "not running" >&2
-			return 2
-		fi
+        echo "checking $VDEMO_title" >&2
+        if ps --no-headers -fp "${VDEMO_pid}"; then
+            echo "running" >&2
+            return 0
+        else
+            echo "not running" >&2
+            return 2
+        fi
     else
-	echo "no screen registered" >&2
-	return 1
+    echo "no screen registered" >&2
+    return 1
     fi
 }
 
@@ -80,13 +80,13 @@ function vdemo_detach_screen {
 # show log output of a component
 # $1:   title of the component
 function vdemo_showlog {
-	 xterm -fg white -bg darkblue -title "log of ${1}@${HOSTNAME}" -e \
-		  less -R "$VDEMO_logfile_prefix${1}.log" &
+     xterm -fg white -bg darkblue -title "log of ${1}@${HOSTNAME}" -e \
+          less -R "$VDEMO_logfile_prefix${1}.log" &
 }
 
 function vdemo_inspect {
-	 xterm -fg white -bg black -title "inspect ${1}@${HOSTNAME}" -e \
-		  vdemo_inspect_cmd &
+     xterm -fg white -bg black -title "inspect ${1}@${HOSTNAME}" -e \
+          vdemo_inspect_cmd &
 }
 
 # start a component. This function has the following options:
@@ -101,41 +101,41 @@ function vdemo_start_component {
     VDEMO_componentDisplay="${DISPLAY}"
     VDEMO_logging=""
     ICONIC="-iconic"
-	COLOR="green"
+    COLOR="green"
     while [ $# -gt 0 ]; do
-	case $1 in
-	    "-n"|"--name")
-		shift
-		VDEMO_title="$1"
-		;;
-	    "-d"|"--display")
-		shift
-		VDEMO_componentDisplay="$1"
-		;;
-	    "-l"|"--logging")
-		VDEMO_logfile="${VDEMO_logfile_prefix}${VDEMO_title}.log"
-		logfiledir="${VDEMO_logfile%/*}"
-		if [ ! -d "$logfiledir" ]; then mkdir -p "$logfiledir"; fi
-		echo "logging to ${VDEMO_logfile}" >&2
-		VDEMO_logging="exec > >(tee \"${VDEMO_logfile}\"); exec 2>&1; "
-		;;
-	    --)
-		break
-		;;
-		"--noiconic")
-		ICONIC=""
-		COLOR=white
-		;;
-	    -*)
-		echo "illegal option $1" >& 2
-		echo "$USAGE" >& 2
-		exit 1
-		;;
-	    *)
-		break
-		;;
-	esac
-	shift
+    case $1 in
+        "-n"|"--name")
+        shift
+        VDEMO_title="$1"
+        ;;
+        "-d"|"--display")
+        shift
+        VDEMO_componentDisplay="$1"
+        ;;
+        "-l"|"--logging")
+        VDEMO_logfile="${VDEMO_logfile_prefix}${VDEMO_title}.log"
+        logfiledir="${VDEMO_logfile%/*}"
+        if [ ! -d "$logfiledir" ]; then mkdir -p "$logfiledir"; fi
+        echo "logging to ${VDEMO_logfile}" >&2
+        VDEMO_logging="exec > >(tee \"${VDEMO_logfile}\"); exec 2>&1; "
+        ;;
+        --)
+        break
+        ;;
+        "--noiconic")
+        ICONIC=""
+        COLOR=white
+        ;;
+        -*)
+        echo "illegal option $1" >& 2
+        echo "$USAGE" >& 2
+        exit 1
+        ;;
+        *)
+        break
+        ;;
+    esac
+    shift
     done
 
 	export -f component
