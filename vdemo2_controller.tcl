@@ -210,8 +210,7 @@ proc gui_tcl {} {
     pack $base.components.all.check -side left
     
     # clear logger button
-    button $base.components.all.clearLogger -font "$BOLDFONT" -pady -3 -padx -7 -borderwidth 1 -text "clear logger" \
-            -command "clearLogger"
+    button $base.components.all.clearLogger -font "$BOLDFONT" -pady -3 -padx -7 -borderwidth 1 -text "clear logger" -command "clearLogger"
     pack $base.components.all.clearLogger -side right
     
     frame $base.components.group
@@ -273,8 +272,7 @@ proc gui_tcl {} {
     
     set hosts [lsort -unique "$hosts"]
     frame $base.ssh
-    frame $base.clocks
-    pack $base.ssh -side top -fill x
+    pack $base.ssh -side left -fill x
     label $base.ssh.label -font "$BOLDFONT" -text "ssh to"
     pack $base.ssh.label -side left
     foreach {h} "$hosts" {
@@ -290,7 +288,7 @@ proc gui_tcl {} {
     }
 
     button $base.exit -pady -3 -padx -7 -borderwidth 1 -text "exit" -font "$BOLDFONT" -command {gui_exit}
-    pack $base.exit -side left
+    pack $base.exit -side right
   
     if {[info exists ::env(VDEMO_alert_string)]} {
         label $base.orlabel -font "$BOLDFONT" -text "$env(VDEMO_alert_string)" -foreground blue -background yellow
