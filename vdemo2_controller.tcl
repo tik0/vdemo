@@ -353,11 +353,15 @@ proc group_cmd {cmd grp} {
         set WAIT_BREAK 1
         foreach {comp} "[lreverse $COMPONENTS]" {
             if {$GROUP($comp) == $grp} {
-                if {! $NOAUTO($comp)} {
-                    component_cmd $comp $cmd
-                }
+                component_cmd $comp $cmd
             }
         }
+	} elseif {"$cmd" == "check"} {
+        foreach {comp} "$COMPONENTS" {
+			if {$GROUP($comp) == $grp} {
+				component_cmd $comp $cmd
+			}
+		}
     } else {
         set WAIT_BREAK 0
         foreach {comp} "$COMPONENTS" {
@@ -379,11 +383,15 @@ proc level_cmd {cmd level} {
         set WAIT_BREAK 1
         foreach {comp} "[lreverse $COMPONENTS]" {
             if {$COMP_LEVEL($comp) == $level} {
-                if {! $NOAUTO($comp)} {
-                    component_cmd $comp $cmd
-                }
+                component_cmd $comp $cmd
             }
         }
+	} elseif {"$cmd" == "check"} {
+        foreach {comp} "$COMPONENTS" {
+			if {$COMP_LEVEL($comp) == $level} {
+				component_cmd $comp $cmd
+			}
+		}
     } else {
         set WAIT_BREAK 0
         foreach {comp} "$COMPONENTS" {
