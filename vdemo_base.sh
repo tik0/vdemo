@@ -151,7 +151,12 @@ function all_children {
 
 # get pids of actual user components
 function vdemo_pidsFromComponent {
-    ppid=$(ps --ppid "$(vdemo_pidFromScreen ${VDEMO_title} | tr -d '\n')" -o pid --no-headers)
+	# get the screen pid
+	VDEMO_pid=$(vdemo_pidFromScreen ${VDEMO_title} | tr -d '\n')
+	if ! [ "$VDEMO_pid" ]; then exit; fi
+	# pid of bash cmd inside screen
+    ppid=$(ps --ppid "$VDEMO_pid" -o pid --no-headers)
+	# pids of actual children
     children=$(ps --ppid "$(echo -n $ppid)" -o pid --no-headers)
     # exclude the parallel logging child process
     for pid in $children
@@ -160,7 +165,7 @@ function vdemo_pidsFromComponent {
         result=$?
         if [ $result -ne 0 ]
         then
-            echo $pid
+            echo -n "$pid "
         fi
     done
 }
@@ -170,26 +175,27 @@ function vdemo_pidsFromComponent {
 function vdemo_stop_component {
     VDEMO_title="$1"
     VDEMO_pid=$(vdemo_pidFromScreen ${VDEMO_title})
-    VDEMO_compo_pids=$(vdemo_pidsFromComponent ${VDEMO_title})
-
     if [ "$VDEMO_pid" ]; then
-	echo "stopping $VDEMO_title (VDEMO_pid: ${VDEMO_pid}, VDEMO_compo_pids: ${VDEMO_compo_pids})" >&2
+		VDEMO_compo_pids=$(vdemo_pidsFromComponent ${VDEMO_title})
 
-	for pid in $VDEMO_compo_pids; do
+		echo "stopping $VDEMO_title (VDEMO_pid: ${VDEMO_pid}, VDEMO_compo_pids: ${VDEMO_compo_pids})" >&2
+
+		for pid in $VDEMO_compo_pids; do
             echo "killing child process $pid"
-            kill -2 $pid > /dev/null 2>&1
+            kill -SIGINT $pid > /dev/null 2>&1
+			# wait for process to be finished
             for i in {1..150}; do
                 sleep 0.1
                 kill -0 $pid > /dev/null 2>&1 || break
             done
-	done
+		done
 
         PIDS=$(all_children "$VDEMO_pid")
         kill $VDEMO_pid $PIDS > /dev/null 2>&1
         for i in {1..20}; do
             sleep 0.1
             kill -0 $VDEMO_pid $PIDS > /dev/null 2>&1 || break
-	done
+		done
         kill -9 $VDEMO_pid $PIDS > /dev/null 2>&1
     fi
 }
