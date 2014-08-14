@@ -144,69 +144,63 @@ function vdemo_start_component {
 	echo "starting $VDEMO_title with component function:"$'\n'"$(declare -f component)" >&2
 	xterm -fg $COLOR -bg black $ICONIC -title "starting $VDEMO_title" -e \
 		screen -t "$VDEMO_title" -S "${VDEMO_title}_" \
-	stdbuf -oL bash -i -c "$cmd" "$VDEMO_title" &
+		stdbuf -oL bash -i -c "$cmd" "$VDEMO_title" &
 }
 
-# get all direct and indirect children of a process
+# get all direct and indirect children of a process (including process itself)
+# --filter <filter> filters out processes whos cmdline contains given filter as argument
 function all_children {
-    PIDS="$*"
-    CHILDREN=""
-    for P in $PIDS; do
-	echo -n " $P"
-	curr_children=$(ps --ppid $P -o pid --no-headers)
-	if [ "$curr_children" ]; then
-	    all_children "$curr_children"
+	if [ "$1" == "--filter" ]; then
+		local FILTER=$2
+		local FILTER_ARGS="--filter $FILTER"
+		shift
+		shift
 	fi
-    done
-}
 
-# get pids of actual user components
-function vdemo_pidsFromComponent {
-	# get the screen pid
-	VDEMO_pid=$(vdemo_pidFromScreen ${VDEMO_title} | tr -d '\n')
-	if ! [ "$VDEMO_pid" ]; then exit; fi
-	# pid of bash cmd inside screen
-    ppid=$(ps --ppid "$VDEMO_pid" -o pid --no-headers)
-	# pids of actual children
-    children=$(ps --ppid "$(echo -n $ppid)" -o pid --no-headers)
-    # exclude the parallel logging child process
-    for pid in $children
-    do
-        grep VDEMO_component "/proc/$pid/cmdline" > /dev/null 2> /dev/null
-        result=$?
-        if [ $result -ne 0 ]
-        then
-            echo -n "$pid "
-        fi
-    done
+	# ensure that all variables stay function-local
+	local PIDS="$*"
+	local P
+	for P in $PIDS; do
+		# depth-first search, children ordered by start_time and pid in reverse order
+		local CHILDREN=$(ps --ppid $P -o pid --no-headers --sort -start_time,-pid)
+		if [ "$CHILDREN" ]; then
+			all_children $FILTER_ARGS $CHILDREN
+		fi
+		# filter out $FILTER (literally) and bash at beginning of command line
+		if (test -z "$FILTER") || \
+			(! fgrep -q "$FILTER" /proc/$P/cmdline 2> /dev/null && \
+			! egrep -q ^bash /proc/$P/cmdline 2> /dev/null); then
+			echo -n " $P"
+		fi
+	done
 }
 
 # stop a component
-# $1: titl of the component
+# $1: title of the component
 function vdemo_stop_component {
-    VDEMO_title="$1"
-    VDEMO_pid=$(vdemo_pidFromScreen ${VDEMO_title})
-    if [ "$VDEMO_pid" ]; then
-		VDEMO_compo_pids=$(vdemo_pidsFromComponent ${VDEMO_title})
+	VDEMO_title="$1"
+	VDEMO_pid=$(vdemo_pidFromScreen ${VDEMO_title})
+	if [ "$VDEMO_pid" ]; then
+		VDEMO_compo_pids=$(all_children --filter ${VDEMO_title} "$VDEMO_pid")
 
-		echo "stopping $VDEMO_title (VDEMO_pid: ${VDEMO_pid}, VDEMO_compo_pids: ${VDEMO_compo_pids})" >&2
+		echo "stopping $VDEMO_title:: VDEMO_pid: ${VDEMO_pid} VDEMO_compo_pids: ${VDEMO_compo_pids}" >&2
 
 		for pid in $VDEMO_compo_pids; do
-            echo "killing child process $pid"
-            kill -SIGINT $pid > /dev/null 2>&1
+			echo "killing child process $pid: $(ps -p $pid -o comm=)"
+			kill -SIGINT $pid > /dev/null 2>&1
 			# wait for process to be finished
-            for i in {1..150}; do
-                sleep 0.1
-                kill -0 $pid > /dev/null 2>&1 || break
-            done
+			for i in {1..30}; do
+				sleep 0.1
+				kill -0 $pid > /dev/null 2>&1 || break
+			done
 		done
 
-        PIDS=$(all_children "$VDEMO_pid")
-        kill $VDEMO_pid $PIDS > /dev/null 2>&1
-        for i in {1..20}; do
-            sleep 0.1
-            kill -0 $VDEMO_pid $PIDS > /dev/null 2>&1 || break
+		PIDS=$(all_children "$VDEMO_pid")
+		kill $PIDS > /dev/null 2>&1
+		for i in {1..20}; do
+			sleep 0.1
+			kill -0 $PIDS > /dev/null 2>&1 || break
 		done
-        kill -9 $VDEMO_pid $PIDS > /dev/null 2>&1
-    fi
+		kill -9 $PIDS > /dev/null 2>&1
+	fi
 }
