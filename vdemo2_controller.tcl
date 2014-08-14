@@ -519,6 +519,7 @@ proc component_cmd {comp cmd} {
             if {$SCREENED($comp)} {
                 set cmd_line "$VARS xterm -fg white -bg black -title \"$comp - detach by \[C-a d\]\" -e $component_script $component_options screen &"
                 ssh_command "$cmd_line" "$HOST($comp)"
+                after idle "component_cmd $comp check"
             } else {
                 set cmd_line "$VARS $component_script $component_options detach"
                 ssh_command "$cmd_line" "$HOST($comp)"
