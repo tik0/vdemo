@@ -139,10 +139,11 @@ function vdemo_start_component {
     done
 
 	export -f component
-    cmd="${VDEMO_logging}LD_LIBRARY_PATH=${LD_LIBRARY_PATH} DISPLAY=${VDEMO_componentDisplay} component"
-    echo "starting $VDEMO_title with component function:"$'\n'"$(declare -f component)" >&2
-    xterm -fg $COLOR -bg black $ICONIC -title "starting $VDEMO_title" -e \
-	screen -t "$VDEMO_title" -S "${VDEMO_title}_" \
+	rm -f ${VDEMO_logfile} # remove any old log file
+	cmd="${VDEMO_logging} LD_LIBRARY_PATH=${LD_LIBRARY_PATH} DISPLAY=${VDEMO_componentDisplay} component"
+	echo "starting $VDEMO_title with component function:"$'\n'"$(declare -f component)" >&2
+	xterm -fg $COLOR -bg black $ICONIC -title "starting $VDEMO_title" -e \
+		screen -t "$VDEMO_title" -S "${VDEMO_title}_" \
 	stdbuf -oL bash -i -c "$cmd" "$VDEMO_title" &
 }
 
