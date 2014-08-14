@@ -302,17 +302,17 @@ proc gui_tcl {} {
 proc clearLogger {} {
     global WATCHFILE
     .components.group.log.text delete 1.0 end
-    exec echo -n "" > "$WATCHFILE"
+    exec echo -n "" >> "$WATCHFILE"
 }
 
 proc init_logger {filename} {
     global mypid
     if { [catch {open "|tail -n 5 --pid=$mypid -F $filename"} infile] } {
-        puts  "Could not open $filename for reading, quit."
-        exit 1
+        puts  "Could not open $filename for reading."
+    } else {
+        fconfigure $infile -blocking no -buffering line
+        fileevent $infile readable [list insertLog $infile]
     }
-    fconfigure $infile -blocking no -buffering line
-    fileevent $infile readable [list insertLog $infile]
 }
 
 proc insertLog {infile} {
