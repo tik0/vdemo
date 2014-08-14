@@ -276,15 +276,7 @@ proc gui_tcl {} {
     label $base.ssh.label -font "$BOLDFONT" -text "ssh to"
     pack $base.ssh.label -side left
     foreach {h} "$hosts" {
-        set lh [string tolower "$h"]
-        button $base.ssh.$lh -pady -3 -padx -7 -borderwidth 1 -text "$h" -font "$BOLDFONT" -command "remote_xterm $h"
-        button $base.ssh.clocks_$lh -pady -3 -padx -7 -borderwidth 1 -text "C" -font "$FONT" -command "remote_clock $h"
-        set SCREENED_SSH($h) 0
-        checkbutton  $base.ssh.screen_$lh -pady -3 -padx -7 -borderwidth 1 -text "" -font "$FONT" -command "screen_ssh_master $h" -variable SCREENED_SSH($h) -onvalue 1 -offvalue 0
-        #	button $base.ssh.$h -text "$h" -command "$h" -command "exec ssh -X $h xterm &"
-        pack $base.ssh.$lh -side left -fill x
-        pack $base.ssh.clocks_$lh -side left -fill x
-        pack $base.ssh.screen_$lh -side left -fill x
+		add_host $h
     }
 
     button $base.exit -pady -3 -padx 20 -borderwidth 1 -text "exit" -font "$BOLDFONT" -command {gui_exit}
@@ -297,6 +289,23 @@ proc gui_tcl {} {
  	    label $base.orlabel -font "$BOLDFONT" -text "no robot config loaded" -foreground blue
      	pack $base.orlabel -fill x 	
     }
+}
+
+proc add_host {host} {
+	global HOST SCREENED_SSH
+	set BOLDFONT "-*-helvetica-bold-r-*-*-10-*-*-*-*-*-*-*"
+    set FONT "-*-helvetica-medium-r-*-*-10-*-*-*-*-*-*-*"
+	set base ""
+	set lh [string tolower "$host"]
+
+	button $base.ssh.$lh -pady -3 -padx -7 -borderwidth 1 -text "$host" -font "$BOLDFONT" -command "remote_xterm $host"
+	button $base.ssh.clocks_$lh -pady -3 -padx -7 -borderwidth 1 -text "C" -font "$FONT" -command "remote_clock $host"
+	set SCREENED_SSH($host) 0
+	checkbutton  $base.ssh.screen_$lh -pady -3 -padx -7 -borderwidth 1 -text "" -font "$FONT" -command "screen_ssh_master $host" -variable SCREENED_SSH($host) -onvalue 1 -offvalue 0
+
+	pack $base.ssh.$lh -side left -fill x
+	pack $base.ssh.clocks_$lh -side left -fill x
+	pack $base.ssh.screen_$lh -side left -fill x
 }
 
 proc clearLogger {} {
@@ -473,8 +482,11 @@ proc component_cmd {comp cmd} {
                 }
                 set ISSTARTING($comp) 1
                 update
-                set res [ssh_command "screen -wipe | grep -q \\.$COMMAND($comp)\\.$TITLE($comp)_" "$HOST($comp)"]
-                if {$res == 0} {
+                set res [ssh_command "screen -wipe | fgrep -q .$COMMAND($comp).$TITLE($comp)_" "$HOST($comp)"]
+                if {$res == 10} {
+					puts "no connection to $HOST($comp)"
+					return
+                } elseif {$res == 0} {
                     puts "$TITLE($comp): already running, stopping first..."
                     component_cmd $comp stop
                 }
@@ -602,7 +614,13 @@ proc screen_ssh_master {h} {
 proc ssh_command {cmd hostname} {
     set f [get_fifo_name $hostname]
     if {[file exists "$f.in"] == 0} {
-        error "no control connection to '$hostname'"
+		if { [tk_messageBox -message "Establish connection to $hostname?" -type yesno -icon question] == yes} {
+			connect_host $f $hostname
+			add_host $hostname
+			update
+		} else {
+			return 10
+		}
     }
     set cmd [string trim "$cmd"]
     puts "run '$cmd' on host '$hostname'"
@@ -620,8 +638,29 @@ proc get_fifo_name {hostname} {
     return "$TEMPDIR/vdemo-$VDEMOID-ssh-$env(USER)-$hostname"
 }
 
+proc connect_host {fifo host} {
+	global env SSHCMD
+	exec rm -f "$fifo.in"
+	exec rm -f "$fifo.out"
+	exec mkfifo "$fifo.in"
+	exec mkfifo "$fifo.out"
+
+	set screenid [get_master_screen_name $host]
+	exec xterm -title "establish ssh connection to $fifo" -n "$fifo" -e screen -mS $screenid bash -c "tail -s 0.1 -n 10000 -f $fifo.in | $SSHCMD -Y $host bash --login --rcfile /etc/profile | while read s; do echo \$s > $fifo.out; done" &
+
+	if {[info exists env(VDEMO_exports)]} {
+		foreach {var} "$env(VDEMO_exports)" {
+			if {[info exists env($var)]} {
+				ssh_command "export $var=$env($var)" $host
+			}
+		}
+	}
+	ssh_command "source $env(VDEMO_demoConfig)" $host
+	exec screen -dS $screenid
+}
+
 proc connect_hosts {} {
-    global COMPONENTS env HOST SSHCMD
+    global COMPONENTS HOST
     
     label .vdemoinit -text "init VDemo - be patient..." -foreground darkgreen -font "-*-helvetica-bold-r-*-*-30-*-*-*-*-*-*-*"
     label .vdemoinit2 -text "" -foreground darkred -font "-*-helvetica-bold-r-*-*-20-*-*-*-*-*-*-*"
@@ -640,23 +679,7 @@ proc connect_hosts {} {
     foreach {f} "$fifos" {
         .vdemoinit2 configure -text "connect to $fifo_host($f)"
         update
-        exec rm -f "$f.in"
-        exec rm -f "$f.out"
-        exec mkfifo "$f.in"
-        exec mkfifo "$f.out"
-        
-        set screenid [get_master_screen_name $fifo_host($f)]
-        exec xterm -title "establish ssh connection to $f" -n "$f" -e screen -mS $screenid bash -c "tail -s 0.1 -n 10000 -f $f.in | $SSHCMD -Y $fifo_host($f) bash --login --rcfile /etc/profile | while read s; do echo \$s > $f.out; done" &
-        
-        if {[info exists env(VDEMO_exports)]} {
-            foreach {var} "$env(VDEMO_exports)" {
-                if {[info exists env($var)]} {
-                    ssh_command "export $var=$env($var)" $fifo_host($f)
-                }
-            }
-        }
-        ssh_command "source $env(VDEMO_demoConfig)" $fifo_host($f)
-        exec screen -dS $screenid
+		connect_host $f $fifo_host($f)
     }
     destroy .vdemoinit
     destroy .vdemoinit2
