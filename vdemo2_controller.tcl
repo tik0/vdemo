@@ -546,6 +546,7 @@ proc component_cmd {comp cmd} {
             } elseif { $ISSTARTING($comp) } {
                 set_status $comp 2
             } else {
+                cancel_detach_timer $comp
                 set SCREENED($comp) 0
                 set_status $comp 0
             }
