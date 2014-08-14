@@ -646,7 +646,7 @@ proc connect_host {fifo host} {
 	exec mkfifo "$fifo.out"
 
 	set screenid [get_master_screen_name $host]
-	exec xterm -title "establish ssh connection to $fifo" -n "$fifo" -e screen -mS $screenid bash -c "tail -s 0.1 -n 10000 -f $fifo.in | $SSHCMD -Y $host bash --login --rcfile /etc/profile | while read s; do echo \$s > $fifo.out; done" &
+	exec xterm -title "establish ssh connection to $fifo" -n "$fifo" -e screen -mS $screenid bash -c "tail -s 0.1 -n 10000 -f $fifo.in | $SSHCMD -Y $host bash | while read s; do echo \$s > $fifo.out; done" &
 
 	if {[info exists env(VDEMO_exports)]} {
 		foreach {var} "$env(VDEMO_exports)" {
