@@ -54,8 +54,18 @@ function vdemo_reattach_screen {
 	else
 		echo "no screen for $1:"
 		screen -ls
-		sleep 2
 		failure=1
+	fi
+
+	if [ $failure == 1 ] ; then
+		# change title of xterm
+		echo -ne "\033]0;${1}@${HOSTNAME}\007"
+		file="$VDEMO_logfile_prefix${1}.log"
+		if [ -f $file ] ; then
+			less $file
+		else
+			sleep 2
+		fi
 	fi
 	return $failure
 }
