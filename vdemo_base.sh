@@ -180,10 +180,11 @@ function vdemo_pidsFromComponent {
 
     # exclude the logging process (tee)
     for pid in $children; do
-        if [ "$(ps -p $pid -o comm=)" != "tee" ]; then
-            echo -n " $pid"
-        fi
-    done
+		if [[ ! "$(ps -p $pid -o cmd=)" =~ \
+			"bash -i -c exec > >(tee \"/tmp/vdemo-" ]]; then
+			echo -n " $pid"
+		fi
+	done
 }
 
 # stop a component
@@ -221,7 +222,7 @@ function vdemo_stop_signal_children {
 	local SIGNAL=${2:-SIGINT}
 	local TIMEOUT=$((10*${3:-2}))
 	for pid in $VDEMO_compo_pids; do
-		echo -n "sending signal $SIGNAL to child process $pid: $(ps -p $pid -o comm=) "
+		echo -n "${SIGNAL}ing $pid: $(ps -p $pid -o comm=) "
 		kill -$SIGNAL $pid > /dev/null 2>&1
 		# wait for process to be finished
 		for i in $(seq $TIMEOUT); do
