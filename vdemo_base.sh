@@ -167,9 +167,7 @@ function all_children {
 			all_children $FILTER_ARGS $CHILDREN
 		fi
 		# filter out $FILTER (literally) and bash at beginning of command line
-		if (test -z "$FILTER") || \
-			(! fgrep -q "$FILTER" /proc/$P/cmdline 2> /dev/null && \
-			! egrep -q ^bash /proc/$P/cmdline 2> /dev/null); then
+		if [[ -z "$FILTER" ]] || [[ ! $(ps -p $P -o comm=) =~ $FILTER ]]; then
 			echo -n " $P"
 		fi
 	done
@@ -200,7 +198,7 @@ function vdemo_stop_component {
 			echo "calling stop_component"
 			stop_component $1
 		else
-			# by default we first kill children process with SIGINT (2s timeout)
+			# by default we first kill children processes with SIGINT (2s timeout)
 			vdemo_stop_signal_children $1
 		fi
 		# kill the screen and all its children (if there are still processes)
