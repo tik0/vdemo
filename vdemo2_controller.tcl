@@ -751,6 +751,10 @@ proc connect_host {fifo host {doMonitor 1}} {
 	exec screen -dS $screenid
 
 	if $doMonitor {connect_screenmonitoring $host}
+
+	if {"$host" != [info hostname]} {
+		exec bash -c "scp -q $::env(SPREAD_CONFIG) $host:/tmp"
+	}
 }
 
 proc connect_hosts {} {
@@ -792,6 +796,12 @@ proc disconnect_hosts {} {
     foreach {f} "$fifos" {
         puts "terminating master-ssh-connection to $fifo_host($f)"
         set screenid [get_master_screen_name $fifo_host($f)]
+        set screenPID [exec bash -c "screen -list $screenid | grep vdemo | cut -d. -f1"]
+		if {$::AUTO_SPREAD_CONF == 1 && "$screenPID" != "" && [file exists "$f.in"]} {
+			# send ssh command, but do not wait for result
+			set cmd "rm -f $env(SPREAD_CONFIG)"
+			exec bash -c "echo 'echo \"*** RUN $cmd\" 1>&2; $cmd 1>&2; echo \$?' > $f.in"
+		}
         catch {exec bash -c "screen -list $screenid | grep vdemo | cut -d. -f1 | xargs kill 2>&1"}
         exec rm -f "$f.in"
         exec rm -f "$f.out"
@@ -800,11 +810,6 @@ proc disconnect_hosts {} {
 
 proc finish {} {
     global MONITORCHAN_HOST TEMPDIR
-    if {$::AUTO_SPREAD_CONF == 1} {
-        puts "deleting generated spread config"
-        file delete $::env(SPREAD_CONFIG)
-    }
-
     foreach ch [chan names] {
         if { [info exists MONITORCHAN_HOST($ch)] } {
             exec kill -HUP [lindex [pid $ch] 0]
@@ -831,8 +836,18 @@ proc remove_duplicates {} {
     set COMPONENTS $_COMPONENTS
 }
 
+proc compute_spread_segment {seg num} {
+	global env
+	return "225.42.65.$num:$env(SPREAD_PORT)"
+}
+
+proc get_autospread_filename {} {
+	global VDEMOID env
+	return "/tmp/vdemo-spread-$VDEMOID-$env(USER).conf"
+}
+
 proc create_spread_conf {} {
-    global COMPONENTS COMMAND HOST VDEMOID env
+    global COMPONENTS COMMAND HOST env
     set spread_hosts ""
     foreach {c} "$COMPONENTS" {
         if {"$COMMAND($c)" == "spreaddaemon"} {
@@ -875,14 +890,9 @@ proc create_spread_conf {} {
         }
     }
     set segments [lsort -unique "$segments"]
-    set filename "$env(VDEMO_demoRoot)/spread-$env(USER)-$VDEMOID.conf"
+    set filename [get_autospread_filename]
     if {[catch {open $filename w 0664} fd]} {
-        # something went wrong
-        # try local file again
-        set filename "/tmp/spread-$env(USER)-$VDEMOID.conf"
-        if {[catch {open $filename w 0664} fd]} {
-            error "Could not open auto-generated spread configuration $filename"
-        }
+        error "Could not open auto-generated spread configuration $filename"
     }
     set ::env(SPREAD_CONFIG) $filename
     if {![info exists ::env(SPREAD_PORT)]} {set ::env(SPREAD_PORT) 4803}
@@ -892,7 +902,7 @@ proc create_spread_conf {} {
         if {[string match "127.*" $seg]} {
             set sp_seg "$seg.255:$env(SPREAD_PORT)"
         } else {
-            set sp_seg "225.42.65.$num:$env(SPREAD_PORT)"
+            set sp_seg [compute_spread_segment $seg $num]
             set num [expr $num + 1]
         }
         puts $fd "Spread_Segment $sp_seg {"
@@ -900,11 +910,13 @@ proc create_spread_conf {} {
                 puts $fd "\t $h \t $IP($h)"
             }
         puts $fd "}"
-        puts $fd "SocketPortReuse = ON"
         puts $fd ""
     }
+    puts $fd "SocketPortReuse = ON"
     
     close $fd
+	puts "created spread conf $filename"
+	exec cat $filename
 }
 
 proc handle_screen_failure {chan} {
