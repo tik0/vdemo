@@ -196,7 +196,7 @@ function vdemo_stop_component {
 	if [ "$VDEMO_pid" ]; then
 		echo "stopping $VDEMO_title: screen pid: ${VDEMO_pid}" >&2
 		# call stop_component if that function exists
-		if declare -f stop_component > /dev/null; then
+		if declare -F stop_component > /dev/null; then
 			echo "calling stop_component"
 			stop_component $1
 		else

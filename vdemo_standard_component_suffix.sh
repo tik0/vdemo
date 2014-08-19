@@ -76,7 +76,7 @@ if [ -z "$VDEMO_logfile_prefix" ]; then
 	export VDEMO_logfile_prefix="/tmp/vdemo-$USER/component_"
 fi
 
-if ! declare -f "component" >/dev/null; then
+if ! declare -F "component" >/dev/null; then
 	echo 'function "component" is not declared or declared as variable'
 	exit 1
 fi
@@ -92,7 +92,7 @@ source "$VDEMO_root/vdemo_base.sh"
 #          If function does not exist: True.
 function call_if_exists {
   func=$1; shift
-  if declare -f $func >/dev/null; then
+  if declare -F $func >/dev/null; then
     $func $@
   else
     true
