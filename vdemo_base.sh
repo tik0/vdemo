@@ -31,7 +31,7 @@ function vdemo_check_component {
     VDEMO_pid=$(vdemo_pidFromScreen ${VDEMO_title})
     if [ "$VDEMO_pid" ]; then
         echo "checking $VDEMO_title" >&2
-        if ps --no-headers -fp "${VDEMO_pid}"; then
+        if ps -o user,pid,stime,cmd --no-headers -p "${VDEMO_pid}"; then
             echo "running" >&2
             return 0
         else
@@ -175,29 +175,71 @@ function all_children {
 	done
 }
 
+function vdemo_pidsFromComponent {
+	# pid of bash process inside screen
+    local ppid=$(ps --ppid $1 -o pid --no-headers)
+    local children=$(ps --ppid $ppid -o pid --no-headers --sort -start_time,-pid)
+
+    # exclude the logging process (tee)
+    for pid in $children; do
+        if [ "$(ps -p $pid -o comm=)" != "tee" ]; then
+            echo -n " $pid"
+        fi
+    done
+}
+
 # stop a component
 # $1: title of the component
 function vdemo_stop_component {
 	VDEMO_title="$1"
 	VDEMO_pid=$(vdemo_pidFromScreen ${VDEMO_title})
 	if [ "$VDEMO_pid" ]; then
-		VDEMO_compo_pids=$(all_children --filter ${VDEMO_title} "$VDEMO_pid")
+		echo "stopping $VDEMO_title: screen pid: ${VDEMO_pid}" >&2
+		# call stop_component if that function exists
+		if declare -f stop_component > /dev/null; then
+			echo "calling stop_component"
+			stop_component $1
+		else
+			# by default we first kill children process with SIGINT (2s timeout)
+			vdemo_stop_signal_children $1
+		fi
+		# kill the screen and all its children (if there are still processes)
+		vdemo_stop_kill_screen $1
+	fi
+}
 
-		echo "stopping $VDEMO_title:: VDEMO_pid: ${VDEMO_pid} VDEMO_compo_pids: ${VDEMO_compo_pids}" >&2
-
-		for pid in $VDEMO_compo_pids; do
-			echo "killing child process $pid: $(ps -p $pid -o comm=)"
-			kill -SIGINT $pid > /dev/null 2>&1
-			# wait for process to be finished
-			for i in {1..30}; do
-				sleep 0.1
-				kill -0 $pid > /dev/null 2>&1 || break
-			done
+# stop screen children of component by signal
+# $1 - title of component
+# $2 - signal to use (default: SIGINT)
+# $3 - timeout, waiting for a single component (default: 2s)
+function vdemo_stop_signal_children {
+	VDEMO_title="$1"
+	VDEMO_pid=$(vdemo_pidFromScreen ${VDEMO_title})
+	VDEMO_compo_pids=$(vdemo_pidsFromComponent $VDEMO_pid)
+	local SIGNAL=${2:-SIGINT}
+	local TIMEOUT=$((10*${3:-2}))
+	for pid in $VDEMO_compo_pids; do
+		echo "sending signal $SIGNAL to child process $pid: $(ps -p $pid -o comm=)"
+		kill -$SIGNAL $pid > /dev/null 2>&1
+		# wait for process to be finished
+		for i in {1..$TIMEOUT}; do
+			sleep 0.1
+			kill -0 $pid > /dev/null 2>&1 || break
 		done
+	done
+}
 
-		PIDS=$(all_children "$VDEMO_pid")
+# kill vdemo screen and all its children
+# $1 - title of component
+# $2 - timeout (default 2s)
+function vdemo_stop_kill_screen {
+	VDEMO_pid=$(vdemo_pidFromScreen ${VDEMO_title})
+	local PIDS=$(all_children $VDEMO_pid)
+	local TIMEOUT=$((10*${2:-2}))
+	if [ -n "$PIDS" ]; then
+		echo "killing $PIDS"
 		kill $PIDS > /dev/null 2>&1
-		for i in {1..20}; do
+		for i in {1..$TIMEOUT}; do
 			sleep 0.1
 			kill -0 $PIDS > /dev/null 2>&1 || break
 		done
