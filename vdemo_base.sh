@@ -39,8 +39,8 @@ function vdemo_check_component {
             return 2
         fi
     else
-    echo "no screen registered" >&2
-    return 1
+		echo "no screen registered" >&2
+		return 1
     fi
 }
 

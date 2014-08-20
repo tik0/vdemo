@@ -7,6 +7,32 @@ package require Tclx
 
 set SSHCMD "ssh -oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -oPasswordAuthentication=no -oConnectTimeout=15"
 
+# Theme settings
+set FONT "helvetica 9"
+ttk::style configure "." -font $FONT
+ttk::style configure sunken.TFrame -relief sunken
+ttk::style configure groove.TFrame -relief groove
+
+ttk::style configure TButton -font "$FONT bold" -padding "2 -1"
+ttk::style configure TCheckbutton -padding "2 -1"
+ttk::style configure cmd.TButton -padding "2 -1" -width -5
+ttk::style map ok.cmd.TButton -background [list !disabled green3  active green2]
+ttk::style map failed.cmd.TButton -background [list !disabled red2  active red]
+ttk::style map starting.cmd.TButton -background [list !disabled yellow2  active yellow]
+
+ttk::style configure clock.TButton -font "$FONT"
+ttk::style configure exit.TButton
+
+ttk::style configure TLabel -padding "2 -1"
+ttk::style configure level.TLabel -foreground darkblue -width 5
+ttk::style configure label.TLabel -width 15 -anchor e
+ttk::style configure group.TLabel -foreground darkblue -width 10 -anchor e
+ttk::style configure host.TEntry  -width 5
+
+ttk::style configure alert.TLabel -foreground blue -background yellow
+ttk::style configure info.TLabel -foreground blue -background yellow
+ttk::style configure log.TLabel -justify left -anchor e -relief sunken -foreground gray30
+
 proc parse_options {comp} {
     global env HOST COMPONENTS ARGS USEX TERMINAL WAIT_READY NOAUTO LOGGING GROUP DETACHTIME COMP_LEVEL EXPORTS TITLE CONT_CHECK CHECKNOWAIT_TIME
     set NEWARGS [list]
@@ -132,9 +158,7 @@ proc set_group_noauto {grp} {
 }
 
 proc gui_tcl {} {
-    global HOST SCREENED_SSH COMPONENTS ARGS TERMINAL USEX LOGTEXT env NOAUTO LOGGING  GROUP SCREENED  COMP_LEVEL COMPWIDGET WATCHFILE COMMAND LEVELS TITLE TIMERDETACH ISSTARTING
-    set BOLDFONT "-*-helvetica-bold-r-*-*-10-*-*-*-*-*-*-*"
-    set FONT "-*-helvetica-medium-r-*-*-10-*-*-*-*-*-*-*"
+    global HOST SCREENED_SSH COMPONENTS ARGS TERMINAL USEX LOGTEXT env NOAUTO LOGGING  GROUP SCREENED  COMP_LEVEL COMPWIDGET WATCHFILE COMMAND LEVELS TITLE TIMERDETACH
     set root "."
     set base ""
     set LOGTEXT "demo configured from '$env(VDEMO_demoConfig)'"
@@ -145,106 +169,107 @@ proc gui_tcl {} {
     set groups ""
     set LEVELS ""
     
-    frame $base.components
-    frame $base.components.singles
+    ttk::frame $base.components
+    ttk::frame $base.components.singles
     iwidgets::scrolledframe $base.components.singles.comp -vscrollmode dynamic -hscrollmode dynamic
     bind_wheel_sf $base.components.singles.comp
     set COMPWIDGET [$base.components.singles.comp childsite]
     pack $base.components.singles -side top -fill both -expand yes
-    pack $base.components.singles.comp -side left -expand yes -fill both
+    pack $base.components.singles.comp -side left -fill both -expand yes
     
     foreach {c} "$COMPONENTS" {
         set hosts "$hosts $HOST($c)"
         set groups "$groups $GROUP($c)"
         set LEVELS "$LEVELS $COMP_LEVEL($c)"
         set TIMERDETACH($c) 0
-        set ISSTARTING($c) 0
-        #reliefs: flat, groove, raised, ridge, solid, or sunken
-        frame $COMPWIDGET.$c -relief groove -borderwidth 1
-        pack $COMPWIDGET.$c -side top -fill both
-        label $COMPWIDGET.$c.level -foreground darkblue -width 1 -text "$COMP_LEVEL($c)" -activebackground white -pady -3 -padx -7 -borderwidth 1 -font "$BOLDFONT"
-        pack $COMPWIDGET.$c.level -side left
+
+        ttk::frame $COMPWIDGET.$c -style groove.TFrame
+        pack $COMPWIDGET.$c -side top -fill both -expand yes
+        ttk::label $COMPWIDGET.$c.level -style level.TLabel -text "$COMP_LEVEL($c)"        
+        ttk::label $COMPWIDGET.$c.label -style label.TLabel -text "$TITLE($c)@"
+        ttk::entry $COMPWIDGET.$c.host  -width 10 -textvariable HOST($c)
+        ttk::label $COMPWIDGET.$c.group -style group.TLabel -text "$GROUP($c)"
+
+        ttk::button $COMPWIDGET.$c.start -style cmd.TButton -text "start" -command "component_cmd $c start"
+        ttk::button $COMPWIDGET.$c.stop  -style cmd.TButton -text "stop" -command "component_cmd $c stop"
+        ttk::button $COMPWIDGET.$c.check -style cmd.TButton -text "check" -command "component_cmd $c check"
+        ttk::checkbutton $COMPWIDGET.$c.noauto -text "no auto" -variable NOAUTO($c)
+        ttk::checkbutton $COMPWIDGET.$c.ownx   -text "own X" -variable USEX($c)
+        ttk::checkbutton $COMPWIDGET.$c.logging -text "logging" -variable LOGGING($c)
+        ttk::button $COMPWIDGET.$c.viewlog -style cmd.TButton -text "view log" -command "component_cmd $c showlog"
+        frame $COMPWIDGET.$c.terminal
+
+        set SCREENED($c) 0
+        ttk::checkbutton $COMPWIDGET.$c.terminal.screen -text "show term" -command "component_cmd $c screen" -variable SCREENED($c) -onvalue 1 -offvalue 0
+        ttk::button $COMPWIDGET.$c.inspect -style cmd.TButton -text "inspect" -command "component_cmd $c inspect"
         
-        label $COMPWIDGET.$c.group -anchor e -foreground darkblue -font "$FONT" -width 10 -text "$GROUP($c)"
-        label $COMPWIDGET.$c.label -font "$BOLDFONT" -width 25 -anchor e -text "$TITLE($c)@"
-        entry $COMPWIDGET.$c.host -borderwidth 1 -highlightthickness 0 -font "$FONT" -width 10 -textvariable HOST($c)
+        pack $COMPWIDGET.$c.level -side left
         pack $COMPWIDGET.$c.label -side left -fill x
         pack $COMPWIDGET.$c.host -side left
         pack $COMPWIDGET.$c.group -side left -fill x
-        button $COMPWIDGET.$c.start -activebackground gray95 -pady -3 -padx -7 -borderwidth 1 -font "$BOLDFONT" -text "start" -command "component_cmd $c start"
-        button $COMPWIDGET.$c.stop -activebackground gray95 -pady -3 -padx -7 -borderwidth 1 -font "$BOLDFONT" -text "stop" -command "component_cmd $c stop"
-        button $COMPWIDGET.$c.check -pady -3 -padx -7 -borderwidth 1 -font "$BOLDFONT" -text "check" -command "component_cmd $c check"
-        checkbutton $COMPWIDGET.$c.noauto -font "$BOLDFONT" -borderwidth 1 -text "no auto" -variable NOAUTO($c) -foreground darkblue
-        checkbutton $COMPWIDGET.$c.ownx -font "$BOLDFONT" -borderwidth 1 -text "own X" -variable USEX($c)
-        checkbutton $COMPWIDGET.$c.logging -font "$BOLDFONT" -borderwidth 1 -text "logging" -variable LOGGING($c)
-        button $COMPWIDGET.$c.logoutput -activebackground gray95 -font "$BOLDFONT" -pady -3 -padx -7 -borderwidth 1 -text "view log" -command "component_cmd $c showlog"
-        frame $COMPWIDGET.$c.terminal
-        set SCREENED($c) 0
-        checkbutton $COMPWIDGET.$c.terminal.screen -pady -3 -padx -7 -font "$BOLDFONT" -borderwidth 1 -text "show term" -command "component_cmd $c screen" -variable SCREENED($c) -onvalue 1 -offvalue 0
-        button $COMPWIDGET.$c.inspect -pady -3 -padx -7 -font "$BOLDFONT" -activebackground gray95 -borderwidth 1 -text "inspect" -command "component_cmd $c inspect"
-        
-        pack $COMPWIDGET.$c.ownx -side right
+
+        pack $COMPWIDGET.$c.ownx -side right -padx 3
         pack $COMPWIDGET.$c.inspect -side right
-        pack $COMPWIDGET.$c.logoutput -side right
+        pack $COMPWIDGET.$c.viewlog -side right
         pack $COMPWIDGET.$c.logging -side right
         pack $COMPWIDGET.$c.terminal -side right
         pack $COMPWIDGET.$c.terminal.screen -side right
-        
-        pack $COMPWIDGET.$c.start -side left
-        pack $COMPWIDGET.$c.stop -side left
-        pack $COMPWIDGET.$c.check -side left
-        pack $COMPWIDGET.$c.noauto -side left
+        pack $COMPWIDGET.$c.noauto -side right -padx 3
+        pack $COMPWIDGET.$c.check -side right
+        pack $COMPWIDGET.$c.stop -side right
+        pack $COMPWIDGET.$c.start -side right
         set_status $c unknown
     }
     
-    # button to control ALL components
-    frame $base.components.all -relief groove -borderwidth 1
-    pack $base.components.all -side top -fill both
-    label $base.components.all.label -anchor e -font "$BOLDFONT" -text "ALL COMPONENTS" -foreground darkblue
-    pack $base.components.all.label -side left -fill x
-    button $base.components.all.start -font "$BOLDFONT" -pady -3 -padx -7 -borderwidth 1 -text "start" -foreground darkblue -command "allcomponents_cmd start"
-    button $base.components.all.stop -font "$BOLDFONT" -pady -3 -padx -7 -borderwidth 1 -text "stop" -foreground darkblue -command "allcomponents_cmd stop"
-    button $base.components.all.check -font "$BOLDFONT" -pady -3 -padx -7 -borderwidth 1 -text "check" -foreground darkblue -command "allcomponents_cmd check"
+    # buttons to control ALL components
+    ttk::frame $base.components.all -style groove.TFrame
+    pack $base.components.all -side top -fill x
+    ttk::label $base.components.all.label -style TLabel -text "ALL COMPONENTS"
+    ttk::button $base.components.all.start -style cmd.TButton -text "start" -command "allcomponents_cmd start"
+    ttk::button $base.components.all.stop  -style cmd.TButton -text "stop"  -command "allcomponents_cmd stop"
+    ttk::button $base.components.all.check -style cmd.TButton -text "check" -command "allcomponents_cmd check"
+    pack $base.components.all.label -side left
     pack $base.components.all.start -side left
-    pack $base.components.all.stop -side left
+    pack $base.components.all.stop  -side left
     pack $base.components.all.check -side left
     
     # clear logger button
-    button $base.components.all.clearLogger -font "$BOLDFONT" -pady -3 -padx 10 -borderwidth 1 -text "clear logger" -command "clearLogger"
-    pack $base.components.all.clearLogger -side right
+    ttk::button $base.components.all.clearLogger -text "clear logger" -command "clearLogger"
+    pack $base.components.all.clearLogger -side right -ipadx 15
     
-    frame $base.components.group
+    ttk::frame $base.components.group
     pack $base.components.group -side top -fill x
     # button for level control:
     set LEVELS [lsort -unique "$LEVELS"]
-    frame $base.components.group.level -borderwidth 0
+    ttk::frame $base.components.group.level
     pack $base.components.group.level -side left -fill both
     foreach {g} "$LEVELS" {
-        frame $base.components.group.level.$g -relief groove -borderwidth 1
+        ttk::frame $base.components.group.level.$g -style groove.TFrame
         pack $base.components.group.level.$g -side top -fill x
-        label $base.components.group.level.$g.label -anchor w -font "$BOLDFONT" -text "$g" -foreground darkblue
-        button $base.components.group.level.$g.start -font "$BOLDFONT" -pady -3 -padx -3 -borderwidth 1 -text "start" -foreground darkblue -command "level_cmd start $g"
-        button $base.components.group.level.$g.stop -font "$BOLDFONT" -pady -3 -padx -3 -borderwidth 1 -text "stop" -foreground darkblue -command "level_cmd stop $g"
-        button $base.components.group.level.$g.check -font "$BOLDFONT" -pady -3 -padx -3 -borderwidth 1 -text "check" -foreground darkblue -command "level_cmd check $g"
-        pack $base.components.group.level.$g.check -side right
-        pack $base.components.group.level.$g.stop -side right
-        pack $base.components.group.level.$g.start -side right
-        pack $base.components.group.level.$g.label -side right -fill x
+
+        ttk::label $base.components.group.level.$g.label  -text "$g"
+        ttk::button $base.components.group.level.$g.start -style cmd.TButton -text "start" -command "level_cmd start $g"
+        ttk::button $base.components.group.level.$g.stop  -style cmd.TButton -text "stop"  -command "level_cmd stop $g"
+        ttk::button $base.components.group.level.$g.check -style cmd.TButton -text "check" -command "level_cmd check $g"
+        pack $base.components.group.level.$g.label -side left -padx 5 -fill x
+        pack $base.components.group.level.$g.start -side left
+        pack $base.components.group.level.$g.stop  -side left
+        pack $base.components.group.level.$g.check -side left
     }
     # button for group control:
     set groups [lsort -unique "$groups"]
-    frame $base.components.group.named -borderwidth 0
-    pack $base.components.group.named -side left -fill both
+    ttk::frame $base.components.group.named
+    pack $base.components.group.named -side left -fill x
     foreach {g} "$groups" {
-        frame $base.components.group.named.$g -relief groove -borderwidth 1
+        ttk::frame $base.components.group.named.$g -style groove.TFrame
         pack $base.components.group.named.$g -side top -fill x
-        label $base.components.group.named.$g.label -width 10 -anchor e -font "$BOLDFONT" -text "$g" -foreground darkblue
-        pack $base.components.group.named.$g.label -side left -fill x
-        button $base.components.group.named.$g.start -font "$BOLDFONT" -pady -3 -padx -3 -borderwidth 1 -text "start" -foreground darkblue -command "group_cmd start $g"
-        button $base.components.group.named.$g.stop -font "$BOLDFONT" -pady -3 -padx -3 -borderwidth 1 -text "stop" -foreground darkblue -command "group_cmd stop $g"
-        button $base.components.group.named.$g.check -font "$BOLDFONT" -pady -3 -padx -3 -borderwidth 1 -text "check" -foreground darkblue -command "group_cmd check $g"
-        checkbutton $base.components.group.named.$g.noauto -pady -3 -padx -3 -font "$BOLDFONT" -borderwidth 1 -text "no auto" -command "set_group_noauto $g" -variable GNOAUTO($g) -onvalue 1 -offvalue 0 -foreground darkblue
+        ttk::label $base.components.group.named.$g.label  -style group.TLabel -text "$g" -width 10 -anchor e 
+        ttk::button $base.components.group.named.$g.start -style cmd.TButton -text "start" -command "group_cmd start $g"
+        ttk::button $base.components.group.named.$g.stop  -style cmd.TButton -text "stop"  -command "group_cmd stop $g"
+        ttk::button $base.components.group.named.$g.check -style cmd.TButton -text "check" -command "group_cmd check $g"
+        ttk::checkbutton $base.components.group.named.$g.noauto -text "no auto" -command "set_group_noauto $g" -variable GNOAUTO($g) -onvalue 1 -offvalue 0
 
+        pack $base.components.group.named.$g.label -side left -padx 2
         pack $base.components.group.named.$g.start -side left
         pack $base.components.group.named.$g.stop -side left
         pack $base.components.group.named.$g.check -side left
@@ -252,11 +277,10 @@ proc gui_tcl {} {
     }
     
     # LOGGER area (WATCHFILE)
-    frame $base.components.group.log -borderwidth 0
-    text $base.components.group.log.text -yscrollcommand "$base.components.group.log.sb set" \
-            -height 8 -font "$FONT" -background white -highlightthickness 0
+    ttk::frame $base.components.group.log
+    text $base.components.group.log.text -yscrollcommand "$base.components.group.log.sb set" -height 8
     
-    scrollbar $base.components.group.log.sb -command "$base.components.group.log.text yview"
+    ttk::scrollbar $base.components.group.log.sb -command "$base.components.group.log.text yview"
     pack $base.components.group.log -side left -fill both -expand 1
     pack $base.components.group.log.text -side left -fill both -expand 1
     pack $base.components.group.log.sb -side right -fill y
@@ -267,45 +291,44 @@ proc gui_tcl {} {
     pack $base.components -side top -fill both -expand yes
     
     # logarea
-    label $base.logarea -font "$FONT" -textvariable LOGTEXT -width 50 -anchor e -height 1 -justify left -relief sunken -foreground gray30
+    ttk::label $base.logarea -textvariable LOGTEXT -style log.TLabel
     pack $base.logarea -side top -fill both
     
     set hosts [lsort -unique "$hosts"]
-    frame $base.ssh
+    ttk::frame $base.ssh
     pack $base.ssh -side left -fill x
-    label $base.ssh.label -font "$BOLDFONT" -text "ssh to"
+    ttk::label $base.ssh.label -text "ssh to"
     pack $base.ssh.label -side left
     foreach {h} "$hosts" {
 		add_host $h
     }
 
-    button $base.exit -pady -3 -padx 20 -borderwidth 1 -text "exit" -font "$BOLDFONT" -command {gui_exit}
+    ttk::button $base.exit -style exit.TButton -text "exit" -command {gui_exit}
     pack $base.exit -side right
   
     if {[info exists ::env(VDEMO_alert_string)]} {
-        label $base.orlabel -font "$BOLDFONT" -text "$env(VDEMO_alert_string)" -foreground blue -background yellow
+        ttk::label $base.orlabel -style alert.TLabel -text "$env(VDEMO_alert_string)"
         pack $base.orlabel -fill x
     } elseif {[info exists ::env(VDEMO_info_string)]} {
- 	    label $base.orlabel -font "$BOLDFONT" -text "no robot config loaded" -foreground blue
+ 	    ttk::label $base.orlabel -style info.TLabel -text "no robot config loaded"
      	pack $base.orlabel -fill x 	
     }
 }
 
 proc add_host {host} {
 	global HOST SCREENED_SSH
-	set BOLDFONT "-*-helvetica-bold-r-*-*-10-*-*-*-*-*-*-*"
-    set FONT "-*-helvetica-medium-r-*-*-10-*-*-*-*-*-*-*"
 	set base ""
 	set lh [string tolower "$host"]
-
-	button $base.ssh.$lh -pady -3 -padx -7 -borderwidth 1 -text "$host" -font "$BOLDFONT" -command "remote_xterm $host"
-	button $base.ssh.clocks_$lh -pady -3 -padx -7 -borderwidth 1 -text "C" -font "$FONT" -command "remote_clock $host"
 	set SCREENED_SSH($host) 0
-	checkbutton  $base.ssh.screen_$lh -pady -3 -padx -7 -borderwidth 1 -text "" -font "$FONT" -command "screen_ssh_master $host" -variable SCREENED_SSH($host) -onvalue 1 -offvalue 0
 
-	pack $base.ssh.$lh -side left -fill x
-	pack $base.ssh.clocks_$lh -side left -fill x
-	pack $base.ssh.screen_$lh -side left -fill x
+	ttk::frame  $base.ssh.$lh
+	ttk::button $base.ssh.$lh.xterm -style cmd.TButton -text "$host" -command "remote_xterm $host"
+	ttk::button $base.ssh.$lh.clock -style cmd.TButton -text "⌚" -command "remote_clock $host" -width -2
+	ttk::checkbutton $base.ssh.$lh.screen -text "" -command "screen_ssh_master $host" -variable SCREENED_SSH($host) -onvalue 1 -offvalue 0
+	pack $base.ssh.$lh -side left -fill x -padx 3
+	pack $base.ssh.$lh.xterm  -side left -fill x
+	pack $base.ssh.$lh.clock  -side left -fill x
+	pack $base.ssh.$lh.screen -side left -fill x
 }
 
 proc clearLogger {} {
@@ -462,7 +485,7 @@ proc cancel_detach_timer {comp} {
 }
 
 proc component_cmd {comp cmd} {
-    global env HOST COMPONENTS ARGS TERMINAL USEX WAIT_READY LOGGING WAIT_BREAK SCREENED DETACHTIME COMPWIDGET COMMAND EXPORTS TITLE COMPSTATUS TIMERDETACH ISSTARTING
+    global env HOST COMPONENTS ARGS TERMINAL USEX WAIT_READY LOGGING WAIT_BREAK SCREENED DETACHTIME COMPWIDGET COMMAND EXPORTS TITLE COMPSTATUS TIMERDETACH
     set cpath "$env(VDEMO_componentPath)"
     set component_script "$cpath/component_$COMMAND($comp)"
     set component_options "-t $TITLE($comp)"
@@ -477,12 +500,11 @@ proc component_cmd {comp cmd} {
     switch $cmd {
         start {
             try_eval {
-                $COMPWIDGET.$comp.start configure -state disabled
-                if { $ISSTARTING($comp) } {
+                if { [$COMPWIDGET.$comp.start instate disabled] } {
                     puts "$TITLE($comp): not ready, still waiting for the process"
                     return
                 }
-                set ISSTARTING($comp) 1
+                $COMPWIDGET.$comp.start state disabled
                 update
                 set res [ssh_command "screen -wipe | fgrep -q .$COMMAND($comp).$TITLE($comp)_" "$HOST($comp)"]
                 if {$res == 10} {
@@ -512,8 +534,7 @@ proc component_cmd {comp cmd} {
                 wait_ready $comp
             } {} {
                 #finally
-                set ISSTARTING($comp) 0
-                $COMPWIDGET.$comp.start configure -state normal
+                $COMPWIDGET.$comp.start state !disabled
                 if {$COMPSTATUS($comp) == 2 && $WAIT_READY($comp) > 0} {
                     set_status $comp 0
                     set SCREENED($comp) 0
@@ -522,7 +543,7 @@ proc component_cmd {comp cmd} {
         }
         stop {
             set cmd_line "$VARS $component_script $component_options stop"
-            $COMPWIDGET.$comp.stop flash
+#            $COMPWIDGET.$comp.stop flash
             set WAIT_BREAK 1
             set_status $comp unknown
             
@@ -563,7 +584,7 @@ proc component_cmd {comp cmd} {
             
             if {$res == 0} {
                 set_status $comp 1
-            } elseif { $ISSTARTING($comp) } {
+            } elseif { [$COMPWIDGET.$comp.start instate disabled] } {
                 set_status $comp 2
             } else {
                 cancel_detach_timer $comp
@@ -589,13 +610,13 @@ proc set_status {comp status} {
     global COMPWIDGET COMPSTATUS
     set COMPSTATUS($comp) $status
     if {$status == 1} {
-        $COMPWIDGET.$comp.check configure -background green3 -activebackground green2
+        $COMPWIDGET.$comp.check configure -style ok.cmd.TButton
     } elseif {$status == 0} {
-        $COMPWIDGET.$comp.check configure -background red2 -activebackground red
+        $COMPWIDGET.$comp.check configure -style failed.cmd.TButton
     } elseif {$status == 2} {
-        $COMPWIDGET.$comp.check configure -background yellow2 -activebackground yellow
+        $COMPWIDGET.$comp.check configure -style starting.cmd.TButton
     } else {
-        $COMPWIDGET.$comp.check configure -background grey -activebackground grey
+        $COMPWIDGET.$comp.check configure -style cmd.TButton
     }
     update
 }
@@ -664,8 +685,8 @@ proc connect_host {fifo host} {
 proc connect_hosts {} {
     global COMPONENTS HOST
     
-    label .vdemoinit -text "init VDemo - be patient..." -foreground darkgreen -font "-*-helvetica-bold-r-*-*-30-*-*-*-*-*-*-*"
-    label .vdemoinit2 -text "" -foreground darkred -font "-*-helvetica-bold-r-*-*-20-*-*-*-*-*-*-*"
+    label .vdemoinit -text "init VDemo - be patient..." -foreground darkgreen -font "helvetica 30 bold"
+    label .vdemoinit2 -text "" -foreground darkred -font "helvetica 20 bold"
     pack .vdemoinit
     pack .vdemoinit2
     update
