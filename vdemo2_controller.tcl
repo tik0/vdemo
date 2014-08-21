@@ -755,8 +755,12 @@ proc create_spread_conf {} {
     # list of adapter ips to find best local ip
     set local_addr [exec ip -o -4 addr | sed {s/.*inet \(\([0-9]\{1,3\}\.\)\{3\}[0-9]\{1,3\}\).*/\1/g}]
     set segments ""
+	set REGEXP_IP {([0-9]{1,3}\.){3}[0-9]{1,3}}
     foreach {h} "$spread_hosts" {
-        set ip [exec ping -c1 $h | grep "bytes from" | egrep -o {([0-9]{1,3}\.){3}[0-9]{1,3}}]
+		set ip ""
+		if { [catch {set ip [exec ping -c1 $h | grep "bytes from" | egrep -o "$REGEXP_IP"]}] } {
+			catch {set ip [exec dig +search +short $h | egrep -o $REGEXP_IP]}
+		}
         # if address is localhost and we have a config with multiple hosts
         if {[string match "127.*" $ip] && [llength "$spread_hosts"] > 1} {
             # try to find alternatives the host resolves to
@@ -767,7 +771,7 @@ proc create_spread_conf {} {
                 }
             }
         }
-        if {"$ip" == ""} {continue}
+        if {"$ip" == ""} {puts "failed to lookup host $h"; continue}
         set seg [join [lrange [split $ip .] 0 2] .]
         set segments "$segments $seg"
         set IP($h) $ip
@@ -788,7 +792,7 @@ proc create_spread_conf {} {
         }
     }
     set ::env(SPREAD_CONFIG) $filename
-    if {![info exists hosts($seg)]} {set ::env(SPREAD_PORT) 4803}
+    if {![info exists ::env(SPREAD_PORT)]} {set ::env(SPREAD_PORT) 4803}
     
     set num 1
     foreach {seg} "$segments" {
