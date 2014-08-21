@@ -443,7 +443,7 @@ proc wait_ready {comp} {
     global WAIT_READY WAIT_BREAK COMPSTATUS CONT_CHECK WAIT_BREAK TITLE CHECKNOWAIT_TIME
     set WAIT_BREAK 0
     if {[string is digit $WAIT_READY($comp)] && $WAIT_READY($comp) > 0} {
-        puts "$TITLE($comp): waiting for the process to be ready"
+        puts "$TITLE($comp): waiting for the process to get ready"
         set endtime [expr [clock milliseconds] + $WAIT_READY($comp) * 1000]
         set checktime [expr [clock milliseconds] + 1000]
         while {$endtime > [clock milliseconds]} {
@@ -506,6 +506,7 @@ proc component_cmd {comp cmd} {
                 }
                 $COMPWIDGET.$comp.start state disabled
                 update
+
                 set res [ssh_command "screen -wipe | fgrep -q .$COMMAND($comp).$TITLE($comp)_" "$HOST($comp)"]
                 if {$res == 10} {
 					puts "no connection to $HOST($comp)"
@@ -542,15 +543,22 @@ proc component_cmd {comp cmd} {
             }
         }
         stop {
-            set cmd_line "$VARS $component_script $component_options stop"
-#            $COMPWIDGET.$comp.stop flash
-            set WAIT_BREAK 1
+			if { [$COMPWIDGET.$comp.stop instate disabled] } {
+                puts "$TITLE($comp): already stopping"
+                return
+            }
+			$COMPWIDGET.$comp.stop state disabled
             set_status $comp unknown
+            cancel_detach_timer $comp
+
+            set cmd_line "$VARS $component_script $component_options stop"
+            set WAIT_BREAK 1
             
             ssh_command "$cmd_line" "$HOST($comp)"
             set SCREENED($comp) 0
-            cancel_detach_timer $comp
-            update
+
+			after idle $COMPWIDGET.$comp.stop state !disabled
+
             if {$COMPSTATUS($comp) != 0} {
                 after idle "component_cmd $comp check"
             }
@@ -577,11 +585,18 @@ proc component_cmd {comp cmd} {
             ssh_command "$cmd_line" "$HOST($comp)"
         }
         check {
-            set cmd_line "$VARS $component_script $component_options check"
-            
+			if { [$COMPWIDGET.$comp.check instate disabled] } {
+                puts "$TITLE($comp): already checking"
+                return
+            }
+			$COMPWIDGET.$comp.check state disabled
             set_status $comp unknown
+
+            set cmd_line "$VARS $component_script $component_options check"
             set res [ssh_command "$cmd_line" "$HOST($comp)"]
             
+			after idle $COMPWIDGET.$comp.check state !disabled
+
             if {$res == 0} {
                 set_status $comp 1
             } elseif { [$COMPWIDGET.$comp.start instate disabled] } {
