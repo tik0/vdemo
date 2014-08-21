@@ -316,6 +316,8 @@ proc clearLogger {} {
 
 proc init_logger {filename} {
     global mypid
+	 exec mkdir -p [file dirname $filename]
+	 exec touch $filename
     if { [catch {open "|tail -n 5 --pid=$mypid -F $filename"} infile] } {
         puts  "Could not open $filename for reading."
     } else {
