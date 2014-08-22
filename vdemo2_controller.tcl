@@ -1,8 +1,11 @@
 #!/bin/bash
 # kate: replace-tabs on; indent-width 4;
 # the next line restarts using wish \
-exec wish8.5 "$0" "$@"
+exec wish "$0" "$@"
+
+# required for scrollable frame
 package require Iwidgets 4.0
+# required for signal handling
 package require Tclx
 
 set SSHCMD "ssh -oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -oPasswordAuthentication=no -oConnectTimeout=15"
@@ -379,7 +382,8 @@ proc allcomponents_cmd {cmd} {
     } else {
         set WAIT_BREAK 0
         foreach {level} "$LEVELS" {
-            if {$WAIT_BREAK} {
+            if {$WAIT_BREAK} { 
+				# if WAIT_BREAK was set to 1 somewhere, we stop the loop
                 break
             }
             level_cmd $cmd $level
@@ -571,7 +575,7 @@ proc component_cmd {comp cmd} {
         screen {
             cancel_detach_timer $comp
             if {$SCREENED($comp)} {
-                set cmd_line "$VARS xterm -fg white -bg black -title \"$comp - detach by \[C-a d\]\" -e $component_script $component_options screen &"
+                set cmd_line "$VARS xterm -fg white -bg black -title \"$comp@$HOST($comp) - detach by \[C-a d\]\" -e $component_script $component_options screen &"
                 ssh_command "$cmd_line" "$HOST($comp)"
                 after idle "component_cmd $comp check"
             } else {
