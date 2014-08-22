@@ -536,8 +536,12 @@ proc component_cmd {comp cmd} {
                     set component_options "$component_options --noiconic"
                 }
                 set cmd_line "$VARS $component_script $component_options start"
-                ssh_command "$cmd_line" "$HOST($comp)"
+                set res [ssh_command "$cmd_line" "$HOST($comp)"]
                 
+				if {$res == 2} {
+					puts "X connection failed: consider xhost + on $HOST($comp)"
+				}
+
                 set SCREENED($comp) 1
                 if {$DETACHTIME($comp) >= 0} {
                     cancel_detach_timer $comp

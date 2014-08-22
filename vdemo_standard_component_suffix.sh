@@ -111,8 +111,9 @@ case "$1" in
 
 	if [ "${vdemo_start_XSERVER}" ]; then
 	    comp_display=$(start_Xserver)
-	    echo "DISPLAY: $comp_display" >&2 
-	    vdemo_start_component -d $comp_display -n $title $vdemo_start_ICONIC $vdemo_start_LOGGING
+		if [ $? == 2 ]; then exit 2; fi
+	    echo "DISPLAY: $comp_display" >&2
+	    vdemo_start_component -n $title $vdemo_start_LOGGING $vdemo_start_ICONIC -d $comp_display
 	else
 	    vdemo_start_component -n $title $vdemo_start_LOGGING $vdemo_start_ICONIC
 	fi
