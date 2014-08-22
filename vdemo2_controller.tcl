@@ -844,7 +844,7 @@ proc create_spread_conf {} {
 	set REGEXP_IP {([0-9]{1,3}\.){3}[0-9]{1,3}}
     foreach {h} "$spread_hosts" {
 		set ip ""
-		if { [catch {set ip [exec ping -c1 $h | grep "bytes from" | egrep -o "$REGEXP_IP"]}] } {
+		if { [catch {set ip [exec ping -c1 -W 1 $h | grep "bytes from" | egrep -o "$REGEXP_IP"]}] } {
 			catch {set ip [exec dig +search +short $h | egrep -o $REGEXP_IP]}
 		}
         # if address is localhost and we have a config with multiple hosts
