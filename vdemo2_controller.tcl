@@ -665,6 +665,10 @@ proc screen_ssh_master {h} {
     global SCREENED_SSH
     set screenid [get_master_screen_name $h]
     if {$SCREENED_SSH($h) == 1} {
+		if { [catch {exec bash -c "screen -wipe | fgrep -q .$screenid"} ] } {
+			set f [get_fifo_name $h]
+			connect_host $f $h 0
+		}
         exec  xterm -title "MASTER SSH CONNECTION TO $h." -e screen -r -S $screenid &
     } else {
         catch {exec  screen -d -S $screenid}
