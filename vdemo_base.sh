@@ -194,7 +194,7 @@ function vdemo_stop_component {
 	VDEMO_pid=$(vdemo_pidFromScreen ${VDEMO_title})
 	if [ "$VDEMO_pid" ]; then
 		echo "stopping $VDEMO_title: screen pid: ${VDEMO_pid}" >&2
-		local PIDS=$(all_children $VDEMO_pid)
+		local PIDS=$(vdemo_pidsFromComponent $VDEMO_pid)
 		# call stop_component if that function exists
 		if declare -F stop_component > /dev/null; then
 			echo "calling stop_component"
@@ -203,11 +203,13 @@ function vdemo_stop_component {
 			# by default we first kill children processes with SIGINT (2s timeout)
 			vdemo_stop_signal_children $1 SIGINT 2
 		fi
-		# kill the screen and all its children (if there are still processes)
+		# kill remaining children processes
 		local REMAIN_PIDS=$(ps --no-headers -o pid,comm -p $PIDS)
 		test -n "$REMAIN_PIDS" && \
 			(echo "killing remaining processes"; echo "$REMAIN_PIDS")
 		kill -9 $PIDS > /dev/null 2>&1
+		# to be really sure, also kill the screen process
+		kill -9 $VDEMO_pid > /dev/null 2>&1
 	fi
 }
 
