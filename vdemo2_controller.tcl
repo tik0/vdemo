@@ -169,7 +169,7 @@ proc set_group_noauto {grp} {
 }
 
 proc gui_tcl {} {
-    global HOST SCREENED_SSH COMPONENTS ARGS TERMINAL USEX LOGTEXT env NOAUTO LOGGING  GROUP SCREENED  COMP_LEVEL COMPWIDGET WATCHFILE COMMAND LEVELS TITLE TIMERDETACH
+    global HOST COMPONENTS ARGS TERMINAL USEX LOGTEXT env NOAUTO LOGGING  GROUP SCREENED  COMP_LEVEL COMPWIDGET WATCHFILE COMMAND LEVELS TITLE TIMERDETACH
     set root "."
     set base ""
     set LOGTEXT "demo configured from '$env(VDEMO_demoConfig)'"
@@ -665,23 +665,44 @@ proc screen_ssh_master {h} {
     global SCREENED_SSH
     set screenid [get_master_screen_name $h]
     if {$SCREENED_SSH($h) == 1} {
-        exec  xterm -title "MASTER SSH CONNECTION TO $h." -e screen -d -r -S $screenid &
+        exec  xterm -title "MASTER SSH CONNECTION TO $h." -e screen -r -S $screenid &
     } else {
         catch {exec  screen -d -S $screenid}
     }
 }
 
-proc ssh_command {cmd hostname} {
-    set f [get_fifo_name $hostname]
-    if {[file exists "$f.in"] == 0} {
-		if { [tk_messageBox -message "Establish connection to $hostname?" -type yesno -icon question] == yes} {
-			connect_host $f $hostname
-			add_host $hostname
-			update
-		} else {
-			return 10
+proc ssh_command {cmd hostname {check 1}} {
+	global WAIT_BREAK
+	set f [get_fifo_name $hostname]
+
+	# check if master connection is in place
+	if $check {
+		set screenid [get_master_screen_name $hostname]
+
+		if { [catch {exec bash -c "screen -wipe | fgrep -q .$screenid"} ] } {
+			# need to establish connection in first place?
+			if {[file exists "$f.in"] == 0} {
+				if { [tk_messageBox -message "Establish connection to $hostname?" \
+					-type yesno -icon question] == yes} {
+					connect_host $f $hostname
+					add_host $hostname
+				} else {
+					set WAIT_BREAK 1
+					return 10
+				}
+			} else {
+				if { [tk_messageBox -message "Lost connection to $hostname. Reestablish?" \
+					-type yesno -icon question] == yes} {
+					connect_host $f $hostname 0
+				} else {
+					set WAIT_BREAK 1
+					return 10
+				}
+			}
 		}
-    }
+	}
+
+	# actually issue the command
     set cmd [string trim "$cmd"]
     puts "run '$cmd' on host '$hostname'"
     set res [exec bash -c "echo 'echo \"****************************************\" 1>&2; date 1>&2; echo \"*** RUN $cmd\" 1>&2; $cmd 1>&2; echo \$?' > $f.in; cat $f.out"]
@@ -698,7 +719,7 @@ proc get_fifo_name {hostname} {
     return "$TEMPDIR/vdemo-$VDEMOID-ssh-$env(USER)-$hostname"
 }
 
-proc connect_host {fifo host} {
+proc connect_host {fifo host {doMonitor 1}} {
 	global env SSHCMD
 	exec rm -f "$fifo.in"
 	exec rm -f "$fifo.out"
@@ -711,12 +732,14 @@ proc connect_host {fifo host} {
 	if {[info exists env(VDEMO_exports)]} {
 		foreach {var} "$env(VDEMO_exports)" {
 			if {[info exists env($var)]} {
-				ssh_command "export $var=$env($var)" $host
+				ssh_command "export $var=$env($var)" $host 0
 			}
 		}
 	}
-	ssh_command "source $env(VDEMO_demoConfig)" $host
+	ssh_command "source $env(VDEMO_demoConfig)" $host 0
 	exec screen -dS $screenid
+
+	if $doMonitor {connect_screenmonitoring $host}
 }
 
 proc connect_hosts {} {
@@ -756,7 +779,7 @@ proc disconnect_hosts {} {
     set fifos [lsort -unique "$fifos"]
     
     foreach {f} "$fifos" {
-        puts "terminating control channel session on $fifo_host($f)"
+        puts "terminating master-ssh-connection to $fifo_host($f)"
         set screenid [get_master_screen_name $fifo_host($f)]
         catch {exec bash -c "screen -list $screenid | grep vdemo | cut -d. -f1 | xargs kill 2>&1"}
         exec rm -f "$f.in"
@@ -766,16 +789,17 @@ proc disconnect_hosts {} {
 
 proc finish {} {
     global MONITORCHAN_HOST TEMPDIR
-    disconnect_hosts
     if {$::AUTO_SPREAD_CONF == 1} {
         puts "deleting generated spread config"
         file delete $::env(SPREAD_CONFIG)
     }
+
     foreach ch [chan names] {
         if { [info exists MONITORCHAN_HOST($ch)] } {
             exec kill -HUP [lindex [pid $ch] 0]
         }
     }
+    disconnect_hosts
     catch {exec rmdir "$TEMPDIR"}
     exit
 }
@@ -872,41 +896,43 @@ proc create_spread_conf {} {
     close $fd
 }
 
-proc handle_screenmonitoring {chan} {
-    global MONITORCHAN_HOST COMPONENTS HOST COMMAND TITLE COMPSTATUS WAIT_BREAK
+proc handle_screen_failure {chan} {
+    global MONITORCHAN_HOST SCREENED_SSH COMPONENTS HOST COMMAND TITLE COMPSTATUS WAIT_BREAK VDEMOID
     if {[gets $chan line] >= 0} {
-        foreach {comp} "$COMPONENTS" {
-            if {$HOST($comp) == $MONITORCHAN_HOST($chan) && [string match "*.$COMMAND($comp).$TITLE($comp)_" "$line"]} {
-                puts "$TITLE($comp): screen closed on $MONITORCHAN_HOST($chan), checking..."
-                component_cmd $comp check
-                cancel_detach_timer $comp
-                if { $COMPSTATUS($comp) != "ok_screen" } {
-                    set WAIT_BREAK 1
-                }
+		set host ""
+		regexp "^\[\[:digit:]]+\.vdemo-$VDEMOID-(.*)\$" $line matched host
+		if {"$host" != ""} {
+			set SCREENED_SSH($host) 0
+			if { [tk_messageBox -message "Lost connection to $host. Reestablish?" \
+				-type yesno -icon question] == yes} {
+				set f [get_fifo_name $host]
+				connect_host $f $host 0
+			}
+		} else {
+			set host $MONITORCHAN_HOST($chan)
+			foreach {comp} "$COMPONENTS" {
+				if {$HOST($comp) == $host && \
+					[string match "*.$COMMAND($comp).$TITLE($comp)_" "$line"]} {
+					puts "$TITLE($comp): screen closed on $MONITORCHAN_HOST($chan), calling stop..."
+					component_cmd $comp stop
+				}
             }
         }
     }
     if {[eof $chan]} {
-        puts "screen monitoring channel for host $MONITORCHAN_HOST($chan) received EOF"
+        puts "screen monitoring failed on $MONITORCHAN_HOST($chan) (received EOF): install inotifywait?"
         close $chan
     }
 }
 
-proc connect_screenmonitoring {} {
+# setup inotifywait on remote hosts to monitor deletions in screen-directory
+proc connect_screenmonitoring {host} {
     global MONITORCHAN_HOST COMPONENTS HOST env SSHCMD
-    set hosts ""
-    foreach {c} "$COMPONENTS" {
-        set hosts "$hosts $HOST($c)"
-    }
-    set hosts [lsort -unique "$hosts"]
-    foreach {host} "$hosts" {
-        set chan [open "|$SSHCMD -tt $host inotifywait -e delete -qm --format %f /var/run/screen/S-$env(USER)" "r+"]
-        set MONITORCHAN_HOST($chan) $host
-        fconfigure $chan -blocking 0 -buffering line -translation auto
-        fileevent $chan readable [list handle_screenmonitoring $chan]
-    }
+    set chan [open "|$SSHCMD -tt $host inotifywait -e delete -qm --format %f /var/run/screen/S-$env(USER)" "r+"]
+    set MONITORCHAN_HOST($chan) $host
+    fconfigure $chan -blocking 0 -buffering line -translation auto
+    fileevent $chan readable [list handle_screen_failure $chan]
 }
-
 
 proc gui_exit {} {
     global COMPONENTS COMPSTATUS
@@ -969,7 +995,6 @@ if {![info exists ::env(LD_LIBRARY_PATH)]} {
 # cleanup dangling connections first
 disconnect_hosts
 connect_hosts
-connect_screenmonitoring
 update
 gui_tcl
 update
