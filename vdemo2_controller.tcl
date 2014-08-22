@@ -8,6 +8,11 @@ package require Tclx
 set SSHCMD "ssh -oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -oPasswordAuthentication=no -oConnectTimeout=15"
 
 # Theme settings
+proc define_theme_color {style defaultBgnd mapping} {
+	ttk::style configure $style -background $defaultBgnd
+	ttk::style map $style -background $mapping
+}
+
 set FONT "helvetica 9"
 ttk::style configure "." -font $FONT
 ttk::style configure sunken.TFrame -relief sunken
@@ -16,9 +21,12 @@ ttk::style configure groove.TFrame -relief groove
 ttk::style configure TButton -font "$FONT bold" -padding "2 -1"
 ttk::style configure TCheckbutton -padding "2 -1"
 ttk::style configure cmd.TButton -padding "2 -1" -width -5
-ttk::style map ok.cmd.TButton -background [list !disabled green3  active green2]
-ttk::style map failed.cmd.TButton -background [list !disabled red2  active red]
-ttk::style map starting.cmd.TButton -background [list !disabled yellow2  active yellow]
+
+define_theme_color ok.cmd.TButton green3 [list active green2]
+define_theme_color noscreen.ok.cmd.TButton orange2 [list active orange]
+define_theme_color failed.cmd.TButton red2 [list active red]
+define_theme_color check.failed.cmd.TButton pink [list active pink2]
+define_theme_color starting.cmd.TButton yellow2 [list active yellow]
 
 ttk::style configure clock.TButton -font "$FONT"
 ttk::style configure exit.TButton
@@ -452,7 +460,7 @@ proc wait_ready {comp} {
                 component_cmd $comp check
                 set checktime [expr [clock milliseconds] + 1000]
             }
-            if {$COMPSTATUS($comp) == 1 || $WAIT_BREAK} {
+            if {[string match *_screen $COMPSTATUS($comp)] || $WAIT_BREAK} {
                 break
             }
         }
@@ -517,7 +525,7 @@ proc component_cmd {comp cmd} {
                 }
                 
                 set WAIT_BREAK 0
-                set_status $comp 2
+                set_status $comp starting
                 cancel_detach_timer $comp
                 
                 if {$DETACHTIME($comp) < 0} {
@@ -536,8 +544,8 @@ proc component_cmd {comp cmd} {
             } {} {
                 #finally
                 $COMPWIDGET.$comp.start state !disabled
-                if {$COMPSTATUS($comp) == 2 && $WAIT_READY($comp) > 0} {
-                    set_status $comp 0
+                if {$COMPSTATUS($comp) == "starting" && $WAIT_READY($comp) > 0} {
+                    set_status $comp failed_noscreen
                     set SCREENED($comp) 0
                 }
             }
@@ -558,10 +566,7 @@ proc component_cmd {comp cmd} {
             set SCREENED($comp) 0
 
 			after idle $COMPWIDGET.$comp.stop state !disabled
-
-            if {$COMPSTATUS($comp) != 0} {
-                after idle "component_cmd $comp check"
-            }
+            after idle "component_cmd $comp check"
         }
         screen {
             cancel_detach_timer $comp
@@ -597,15 +602,28 @@ proc component_cmd {comp cmd} {
             
 			after idle $COMPWIDGET.$comp.check state !disabled
 
-            if {$res == 0} {
-                set_status $comp 1
+			set noscreen 0
+			if {[expr $res / 10] == 0} { # on_check was successful
+				if {[expr $res % 10] == 0} {
+					set_status $comp ok_screen
+				} else {
+					set_status $comp ok_noscreen
+					set noscreen 1
+				}
             } elseif { [$COMPWIDGET.$comp.start instate disabled] } {
-                set_status $comp 2
-            } else {
-                cancel_detach_timer $comp
-                set SCREENED($comp) 0
-                set_status $comp 0
+                set_status $comp starting
+            } else { # on_check failed
+				if {[expr $res % 10] != 0} {
+					set_status $comp failed_noscreen
+					set noscreen 1
+				} else {
+					set_status $comp failed_check
+				}
             }
+			if {$noscreen == 1} {
+				cancel_detach_timer $comp
+				set SCREENED($comp) 0
+			}
         }
         inspect {
             set cmd_line "$VARS $component_script $component_options inspect"
@@ -624,15 +642,15 @@ bind all <5> "+wheelEvent %X %Y  5"
 proc set_status {comp status} {
     global COMPWIDGET COMPSTATUS
     set COMPSTATUS($comp) $status
-    if {$status == 1} {
-        $COMPWIDGET.$comp.check configure -style ok.cmd.TButton
-    } elseif {$status == 0} {
-        $COMPWIDGET.$comp.check configure -style failed.cmd.TButton
-    } elseif {$status == 2} {
-        $COMPWIDGET.$comp.check configure -style starting.cmd.TButton
-    } else {
-        $COMPWIDGET.$comp.check configure -style cmd.TButton
-    }
+    switch -- $status {
+		starting {set style "starting.cmd.TButton"}
+		ok_screen {set style ok.cmd.TButton}
+		ok_noscreen {set style "noscreen.ok.cmd.TButton"}
+		failed_noscreen {set style "failed.cmd.TButton"}
+		failed_screen {set style "check.failed.cmd.TButton"}
+		default  {set style "cmd.TButton"}
+	}
+    $COMPWIDGET.$comp.check configure -style $style
     update
 }
 
@@ -858,7 +876,7 @@ proc handle_screenmonitoring {chan} {
                 puts "$TITLE($comp): screen closed on $MONITORCHAN_HOST($chan), checking..."
                 component_cmd $comp check
                 cancel_detach_timer $comp
-                if { $COMPSTATUS($comp) != 1 } {
+                if { $COMPSTATUS($comp) != "ok_screen" } {
                     set WAIT_BREAK 1
                 }
             }
@@ -890,7 +908,8 @@ proc gui_exit {} {
     global COMPONENTS COMPSTATUS
     set quickexit 1
     foreach {comp} "$COMPONENTS" {
-        if { $COMPSTATUS($comp) == 1 || $COMPSTATUS($comp) == 2} {
+        if { [string match *_screen $COMPSTATUS($comp)] || \
+			 $COMPSTATUS($comp) == "starting"} {
             set quickexit 0
             break
         }

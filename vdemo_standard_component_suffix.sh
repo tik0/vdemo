@@ -122,8 +122,16 @@ case "$1" in
 	call_if_exists on_stop
 	;;
     check)
-	call_if_exists on_check && vdemo_check_component $title
-	exit $?
+	vdemo_check_component $title; processResult=$?
+	re="^on_check[^{]*\{[[:space:]]*true[[:space:]]*\}$"
+	func=$(declare -f on_check)
+	if [[ -n $func && ! $func =~ $re ]] ; then
+		# only call on_check if it is defined and non-trivial
+		on_check; callResult=$?
+	else
+		callResult=$processResult
+	fi
+	exit $((10*callResult + processResult)) # combine both results
 	;;
     screen)
 	vdemo_reattach_screen $title
