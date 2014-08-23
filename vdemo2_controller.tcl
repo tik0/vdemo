@@ -679,7 +679,7 @@ proc screen_ssh_master {h} {
     }
 }
 
-proc ssh_command {cmd hostname {check 1}} {
+proc ssh_command {cmd hostname {check 1} {silent 0}} {
 	global WAIT_BREAK
 	set f [get_fifo_name $hostname]
 
@@ -712,8 +712,11 @@ proc ssh_command {cmd hostname {check 1}} {
 
 	# actually issue the command
     set cmd [string trim "$cmd"]
-    puts "run '$cmd' on host '$hostname'"
-    set res [exec bash -c "echo 'echo \"****************************************\" 1>&2; date 1>&2; echo \"*** RUN $cmd\" 1>&2; $cmd 1>&2; echo \$?' > $f.in; cat $f.out"]
+	if {!$silent} {
+		puts "run '$cmd' on host '$hostname'"
+		set verbose "echo \"****************************************\" 1>&2; date 1>&2; echo \"*** RUN $cmd\" 1>&2;"
+	} else {set verbose ""}
+    set res [exec bash -c "echo '$verbose $cmd 1>&2; echo \$?' > $f.in; cat $f.out"]
     return $res
 }
 
