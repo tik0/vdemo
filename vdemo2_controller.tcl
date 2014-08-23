@@ -752,8 +752,9 @@ proc connect_host {fifo host {doMonitor 1}} {
 
 	if $doMonitor {connect_screenmonitoring $host}
 
-	if {"$host" != [info hostname]} {
-		exec bash -c "scp -q $SSHOPTS $::env(SPREAD_CONFIG) $host:/tmp"
+	if {$::AUTO_SPREAD_CONF == 1} {
+		set content [exec cat $::env(SPREAD_CONFIG)]
+		exec bash -c "echo 'echo \"$content\" > $::env(SPREAD_CONFIG)' > $fifo.in"
 	}
 }
 
