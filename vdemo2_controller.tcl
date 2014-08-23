@@ -837,9 +837,12 @@ proc remove_duplicates {} {
     set COMPONENTS $_COMPONENTS
 }
 
-proc compute_spread_segment {seg num} {
+proc compute_spread_segment {ip num} {
 	global env
-	return "225.42.65.$num:$env(SPREAD_PORT)"
+	set octets [split $ip .]
+	# use IP octets 1-4
+	set seg [join [lrange $octets 1 3] .]
+	return "225.$seg:$env(SPREAD_PORT)"
 }
 
 proc get_autospread_filename {} {
@@ -903,7 +906,7 @@ proc create_spread_conf {} {
         if {[string match "127.*" $seg]} {
             set sp_seg "$seg.255:$env(SPREAD_PORT)"
         } else {
-            set sp_seg [compute_spread_segment $seg $num]
+            set sp_seg [compute_spread_segment $IP([lindex $hosts($seg) 0]) $num]
             set num [expr $num + 1]
         }
         puts $fd "Spread_Segment $sp_seg {"
