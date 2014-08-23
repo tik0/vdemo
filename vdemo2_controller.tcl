@@ -8,7 +8,7 @@ package require Iwidgets 4.0
 # required for signal handling
 package require Tclx
 
-set SSHCMD "ssh -oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -oPasswordAuthentication=no -oConnectTimeout=15"
+set SSHOPTS "-oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -oPasswordAuthentication=no -oConnectTimeout=15"
 
 # Theme settings
 proc define_theme_color {style defaultBgnd mapping} {
@@ -731,14 +731,14 @@ proc get_fifo_name {hostname} {
 }
 
 proc connect_host {fifo host {doMonitor 1}} {
-	global env SSHCMD
+	global env SSHOPTS
 	exec rm -f "$fifo.in"
 	exec rm -f "$fifo.out"
 	exec mkfifo "$fifo.in"
 	exec mkfifo "$fifo.out"
 
 	set screenid [get_master_screen_name $host]
-	exec xterm -title "establish ssh connection to $fifo" -n "$fifo" -e screen -mS $screenid bash -c "tail -s 0.1 -n 10000 -f $fifo.in | $SSHCMD -Y $host bash | while read s; do echo \$s > $fifo.out; done" &
+	exec xterm -title "establish ssh connection to $fifo" -n "$fifo" -e screen -mS $screenid bash -c "tail -s 0.1 -n 10000 -f $fifo.in | ssh $SSHOPTS -Y $host bash | while read s; do echo \$s > $fifo.out; done" &
 
 	if {[info exists env(VDEMO_exports)]} {
 		foreach {var} "$env(VDEMO_exports)" {
@@ -753,7 +753,7 @@ proc connect_host {fifo host {doMonitor 1}} {
 	if $doMonitor {connect_screenmonitoring $host}
 
 	if {"$host" != [info hostname]} {
-		exec bash -c "scp -q $::env(SPREAD_CONFIG) $host:/tmp"
+		exec bash -c "scp -q $SSHOPTS $::env(SPREAD_CONFIG) $host:/tmp"
 	}
 }
 
@@ -950,8 +950,8 @@ proc handle_screen_failure {chan} {
 
 # setup inotifywait on remote hosts to monitor deletions in screen-directory
 proc connect_screenmonitoring {host} {
-    global MONITORCHAN_HOST COMPONENTS HOST env SSHCMD
-    set chan [open "|$SSHCMD -tt $host inotifywait -e delete -qm --format %f /var/run/screen/S-$env(USER)" "r+"]
+    global MONITORCHAN_HOST COMPONENTS HOST env SSHOPTS
+    set chan [open "|ssh $SSHOPTS -tt $host inotifywait -e delete -qm --format %f /var/run/screen/S-$env(USER)" "r+"]
     set MONITORCHAN_HOST($chan) $host
     fconfigure $chan -blocking 0 -buffering line -translation auto
     fileevent $chan readable [list handle_screen_failure $chan]
