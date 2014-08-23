@@ -8,7 +8,7 @@ package require Iwidgets 4.0
 # required for signal handling
 package require Tclx
 
-set SSHOPTS "-oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -oPasswordAuthentication=no -oConnectTimeout=15"
+set SSHOPTS "-oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -oConnectTimeout=15"
 
 # Theme settings
 proc define_theme_color {style defaultBgnd mapping} {
