@@ -21,7 +21,7 @@ function start_Xserver {
 function vdemo_pidFromScreen {
     # we append underscore to distinguish between components with same prefix
     VDEMO_title="$1_"
-    screen -ls | grep ${VDEMO_title} | cut -f1 -d. | tr -d "\t "
+    screen -ls | grep "${VDEMO_title}\s" | cut -f1 -d. | tr -d "\t "
 }
 
 # check for a running component
