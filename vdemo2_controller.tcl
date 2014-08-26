@@ -58,7 +58,7 @@ proc parse_options {comp} {
     set LOGGING($comp) 0
     set COMP_LEVEL($comp) ""
     set EXPORTS($comp) ""
-    
+
     for {set i 0} \$i<[llength $ARGS($comp)] {incr i} {
         set arg [lindex $ARGS($comp) $i]; set val [lindex $ARGS($comp) [expr $i+1]]
         switch -glob -- $arg {
@@ -133,7 +133,7 @@ proc parse_env_var {} {
             set COMMAND($component_name) "$thisCommand"
             set TITLE($component_name) "$thisCommand"
             set COMPONENTS "$COMPONENTS $component_name"
-            
+
             set HOST($component_name) $host
             set ARGS($component_name) [lindex $thisComp 2]
             # do not simply tokenize at spaces, but allow quoted strings ("" or '')
@@ -146,7 +146,7 @@ proc parse_env_var {} {
         }
     }
     puts ""
-    
+
 }
 
 proc bind_wheel_sf {comp} {
@@ -175,11 +175,11 @@ proc gui_tcl {} {
     set LOGTEXT "demo configured from '$env(VDEMO_demoConfig)'"
     wm title . "vdemo_controller: $env(VDEMO_demoConfig)"
     wm geometry . "850x600"
-    
+
     set hosts ""
     set groups ""
     set LEVELS ""
-    
+
     ttk::frame $base.components
     ttk::frame $base.components.singles
     iwidgets::scrolledframe $base.components.singles.comp -vscrollmode dynamic -hscrollmode dynamic
@@ -187,7 +187,7 @@ proc gui_tcl {} {
     set COMPWIDGET [$base.components.singles.comp childsite]
     pack $base.components.singles -side top -fill both -expand yes
     pack $base.components.singles.comp -side left -fill both -expand yes
-    
+
     foreach {c} "$COMPONENTS" {
         set hosts "$hosts $HOST($c)"
         set groups "$groups $GROUP($c)"
@@ -196,7 +196,7 @@ proc gui_tcl {} {
 
         ttk::frame $COMPWIDGET.$c -style groove.TFrame
         pack $COMPWIDGET.$c -side top -fill both -expand yes
-        ttk::label $COMPWIDGET.$c.level -style level.TLabel -text "$COMP_LEVEL($c)"        
+        ttk::label $COMPWIDGET.$c.level -style level.TLabel -text "$COMP_LEVEL($c)"
         ttk::label $COMPWIDGET.$c.label -style label.TLabel -text "$TITLE($c)@"
         ttk::entry $COMPWIDGET.$c.host  -width 10 -textvariable HOST($c)
         ttk::label $COMPWIDGET.$c.group -style group.TLabel -text "$GROUP($c)"
@@ -213,7 +213,7 @@ proc gui_tcl {} {
         set SCREENED($c) 0
         ttk::checkbutton $COMPWIDGET.$c.terminal.screen -text "show term" -command "component_cmd $c screen" -variable SCREENED($c) -onvalue 1 -offvalue 0
         ttk::button $COMPWIDGET.$c.inspect -style cmd.TButton -text "inspect" -command "component_cmd $c inspect"
-        
+
         pack $COMPWIDGET.$c.level -side left
         pack $COMPWIDGET.$c.label -side left -fill x
         pack $COMPWIDGET.$c.host -side left
@@ -225,13 +225,13 @@ proc gui_tcl {} {
         pack $COMPWIDGET.$c.logging -side right
         pack $COMPWIDGET.$c.terminal -side right
         pack $COMPWIDGET.$c.terminal.screen -side right
-        pack $COMPWIDGET.$c.noauto -side right -padx 3
+        pack $COMPWIDGET.$c.noauto -side right -padx 2
         pack $COMPWIDGET.$c.check -side right
         pack $COMPWIDGET.$c.stop -side right
         pack $COMPWIDGET.$c.start -side right
         set_status $c unknown
     }
-    
+
     # buttons to control ALL components
     ttk::frame $base.components.all -style groove.TFrame
     pack $base.components.all -side top -fill x
@@ -243,11 +243,11 @@ proc gui_tcl {} {
     pack $base.components.all.start -side left
     pack $base.components.all.stop  -side left
     pack $base.components.all.check -side left
-    
+
     # clear logger button
     ttk::button $base.components.all.clearLogger -text "clear logger" -command "clearLogger"
     pack $base.components.all.clearLogger -side right -ipadx 15
-    
+
     ttk::frame $base.components.group
     pack $base.components.group -side top -fill x
     # button for level control:
@@ -274,7 +274,7 @@ proc gui_tcl {} {
     foreach {g} "$groups" {
         ttk::frame $base.components.group.named.$g -style groove.TFrame
         pack $base.components.group.named.$g -side top -fill x
-        ttk::label $base.components.group.named.$g.label  -style group.TLabel -text "$g" -width 10 -anchor e 
+        ttk::label $base.components.group.named.$g.label  -style group.TLabel -text "$g" -width 10 -anchor e
         ttk::button $base.components.group.named.$g.start -style cmd.TButton -text "start" -command "group_cmd start $g"
         ttk::button $base.components.group.named.$g.stop  -style cmd.TButton -text "stop"  -command "group_cmd stop $g"
         ttk::button $base.components.group.named.$g.check -style cmd.TButton -text "check" -command "group_cmd check $g"
@@ -286,11 +286,11 @@ proc gui_tcl {} {
         pack $base.components.group.named.$g.check -side left
         pack $base.components.group.named.$g.noauto -side left
     }
-    
+
     # LOGGER area (WATCHFILE)
     ttk::frame $base.components.group.log
     text $base.components.group.log.text -yscrollcommand "$base.components.group.log.sb set" -height 8
-    
+
     ttk::scrollbar $base.components.group.log.sb -command "$base.components.group.log.text yview"
     pack $base.components.group.log -side left -fill both -expand 1
     pack $base.components.group.log.text -side left -fill both -expand 1
@@ -298,13 +298,13 @@ proc gui_tcl {} {
     if {"$WATCHFILE" != ""} {
         init_logger "$WATCHFILE"
     }
-    
+
     pack $base.components -side top -fill both -expand yes
-    
+
     # logarea
     ttk::label $base.logarea -textvariable LOGTEXT -style log.TLabel
     pack $base.logarea -side top -fill both
-    
+
     set hosts [lsort -unique "$hosts"]
     ttk::frame $base.ssh
     pack $base.ssh -side left -fill x
@@ -316,13 +316,13 @@ proc gui_tcl {} {
 
     ttk::button $base.exit -style exit.TButton -text "exit" -command {gui_exit}
     pack $base.exit -side right
-  
+
     if {[info exists ::env(VDEMO_alert_string)]} {
         ttk::label $base.orlabel -style alert.TLabel -text "$env(VDEMO_alert_string)"
         pack $base.orlabel -fill x
     } elseif {[info exists ::env(VDEMO_info_string)]} {
  	    ttk::label $base.orlabel -style info.TLabel -text "no robot config loaded"
-     	pack $base.orlabel -fill x 	
+     	pack $base.orlabel -fill x
     }
 }
 
@@ -364,7 +364,7 @@ proc insertLog {infile} {
     if { [gets $infile line] >= 0 } {
         .components.group.log.text insert end "$line\n"  ;# Add a newline too
         .components.group.log.text yview moveto 1
-        
+
     } else {
         # Close the pipe - otherwise we will loop endlessly
         close $infile
@@ -382,7 +382,7 @@ proc allcomponents_cmd {cmd} {
     } else {
         set WAIT_BREAK 0
         foreach {level} "$LEVELS" {
-            if {$WAIT_BREAK} { 
+            if {$WAIT_BREAK} {
 				# if WAIT_BREAK was set to 1 somewhere, we stop the loop
                 break
             }
@@ -508,7 +508,7 @@ proc component_cmd {comp cmd} {
         set component_options "$component_options -l"
     }
     set VARS "$EXPORTS($comp) "
-    
+
     switch $cmd {
         start {
             try_eval {
@@ -527,17 +527,17 @@ proc component_cmd {comp cmd} {
                     puts "$TITLE($comp): already running, stopping first..."
                     component_cmd $comp stop
                 }
-                
+
                 set WAIT_BREAK 0
                 set_status $comp starting
                 cancel_detach_timer $comp
-                
+
                 if {$DETACHTIME($comp) < 0} {
                     set component_options "$component_options --noiconic"
                 }
                 set cmd_line "$VARS $component_script $component_options start"
                 set res [ssh_command "$cmd_line" "$HOST($comp)"]
-                
+
 				if {$res == 2} {
 					puts "X connection failed: consider xhost + on $HOST($comp)"
 				}
@@ -569,7 +569,7 @@ proc component_cmd {comp cmd} {
 
             set cmd_line "$VARS $component_script $component_options stop"
             set WAIT_BREAK 1
-            
+
             ssh_command "$cmd_line" "$HOST($comp)"
             set SCREENED($comp) 0
 
@@ -607,7 +607,7 @@ proc component_cmd {comp cmd} {
 
             set cmd_line "$VARS $component_script $component_options check"
             set res [ssh_command "$cmd_line" "$HOST($comp)"]
-            
+
 			after idle $COMPWIDGET.$comp.check state !disabled
 
 			set noscreen 0
@@ -760,13 +760,13 @@ proc connect_host {fifo host {doMonitor 1}} {
 
 proc connect_hosts {} {
     global COMPONENTS HOST
-    
+
     label .vdemoinit -text "init VDemo - be patient..." -foreground darkgreen -font "helvetica 30 bold"
     label .vdemoinit2 -text "" -foreground darkred -font "helvetica 20 bold"
     pack .vdemoinit
     pack .vdemoinit2
     update
-    
+
     set fifos ""
     foreach {c} "$COMPONENTS" {
         set fifo "[get_fifo_name $HOST($c)]"
@@ -774,7 +774,7 @@ proc connect_hosts {} {
         set fifo_host($fifo) "$HOST($c)"
     }
     set fifos [lsort -unique "$fifos"]
-    
+
     foreach {f} "$fifos" {
         .vdemoinit2 configure -text "connect to $fifo_host($f)"
         update
@@ -793,7 +793,7 @@ proc disconnect_hosts {} {
         set fifo_host($fifo) "$HOST($c)"
     }
     set fifos [lsort -unique "$fifos"]
-    
+
     foreach {f} "$fifos" {
         puts "terminating master-ssh-connection to $fifo_host($f)"
         set screenid [get_master_screen_name $fifo_host($f)]
@@ -823,7 +823,7 @@ proc finish {} {
 
 proc remove_duplicates {} {
     global COMPONENTS TITLE HOST
-    
+
     set _COMPONENTS {}
     foreach {c} "$COMPONENTS" {
         set cmdhost "$TITLE($c):$HOST($c)"
@@ -900,7 +900,7 @@ proc create_spread_conf {} {
     }
     set ::env(SPREAD_CONFIG) $filename
     if {![info exists ::env(SPREAD_PORT)]} {set ::env(SPREAD_PORT) 4803}
-    
+
     set num 1
     foreach {seg} "$segments" {
         if {[string match "127.*" $seg]} {
@@ -917,7 +917,7 @@ proc create_spread_conf {} {
         puts $fd ""
     }
     puts $fd "SocketPortReuse = ON"
-    
+
     close $fd
 	puts "created spread conf $filename"
 	exec cat $filename
