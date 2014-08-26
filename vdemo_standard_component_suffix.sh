@@ -53,7 +53,7 @@ while [ $# -gt 0 ]; do
 	    echo "$HELP" >& 2
 	    exit 1
 	    ;;
-	*)	    
+	*)
 	    break
 	    ;;
     esac
@@ -62,7 +62,7 @@ done
 
 # obligatory arguments check
 if [ $# -lt 1 ]; then
-    echo "obligatory argument(s) missing. $HELP" >&2 
+    echo "obligatory argument(s) missing. $HELP" >&2
     exit 1
 fi
 
@@ -81,7 +81,7 @@ if ! declare -F "component" >/dev/null; then
 	exit 1
 fi
 
-# run the 
+# run the
 test -f "$VDEMO_sysConfig" && source "$VDEMO_sysConfig" $VDEMO_sysConfigOptions
 source "$VDEMO_root/vdemo_base.sh"
 
@@ -170,7 +170,7 @@ case "$1" in
 	call_if_exists on_stop
 	;;
     *)
-	echo "wrong argument. $HELP" >&2 
+	echo "wrong argument. $HELP" >&2
 	exit 1
 	;;
 esac
