@@ -174,7 +174,7 @@ proc gui_tcl {} {
     set base ""
     set LOGTEXT "demo configured from '$env(VDEMO_demoConfig)'"
     wm title . "vdemo_controller: $env(VDEMO_demoConfig)"
-    wm geometry . "850x600"
+    wm geometry . "930x600"
 
     set hosts ""
     set groups ""
@@ -197,7 +197,7 @@ proc gui_tcl {} {
         ttk::frame $COMPWIDGET.$c -style groove.TFrame
         pack $COMPWIDGET.$c -side top -fill both -expand yes
         ttk::label $COMPWIDGET.$c.level -style level.TLabel -text "$COMP_LEVEL($c)"
-        ttk::label $COMPWIDGET.$c.label -style label.TLabel -text "$TITLE($c)@"
+        ttk::label $COMPWIDGET.$c.label -width 25 -style label.TLabel -text "$TITLE($c)@"
         ttk::entry $COMPWIDGET.$c.host  -width 10 -textvariable HOST($c)
         ttk::label $COMPWIDGET.$c.group -style group.TLabel -text "$GROUP($c)"
 
