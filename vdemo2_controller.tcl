@@ -270,7 +270,7 @@ proc gui_tcl {} {
     # button for group control:
     set groups [lsort -unique "$groups"]
     ttk::frame $base.components.group.named
-    pack $base.components.group.named -side left -fill x
+    pack $base.components.group.named -side left -fill both
     foreach {g} "$groups" {
         ttk::frame $base.components.group.named.$g -style groove.TFrame
         pack $base.components.group.named.$g -side top -fill x
