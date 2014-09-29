@@ -769,6 +769,10 @@ proc connect_hosts {} {
 
     set fifos ""
     foreach {c} "$COMPONENTS" {
+        if {$HOST($c) == ""} {
+            puts "WARNING: empty host name for component $c"
+            continue
+        }
         set fifo "[get_fifo_name $HOST($c)]"
         set fifos "$fifos $fifo"
         set fifo_host($fifo) "$HOST($c)"
@@ -778,7 +782,7 @@ proc connect_hosts {} {
     foreach {f} "$fifos" {
         .vdemoinit2 configure -text "connect to $fifo_host($f)"
         update
-		connect_host $f $fifo_host($f)
+        connect_host $f $fifo_host($f)
     }
     destroy .vdemoinit
     destroy .vdemoinit2
@@ -795,6 +799,7 @@ proc disconnect_hosts {} {
     set fifos [lsort -unique "$fifos"]
 
     foreach {f} "$fifos" {
+        if {$fifo_host($f) == ""} {continue}
         puts "terminating master-ssh-connection to $fifo_host($f)"
         set screenid [get_master_screen_name $fifo_host($f)]
         set screenPID [exec bash -c "screen -list $screenid | grep vdemo | cut -d. -f1"]
