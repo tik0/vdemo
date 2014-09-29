@@ -655,7 +655,7 @@ proc set_status {comp status} {
 		ok_screen {set style ok.cmd.TButton}
 		ok_noscreen {set style "noscreen.ok.cmd.TButton"}
 		failed_noscreen {set style "failed.cmd.TButton"}
-		failed_screen {set style "check.failed.cmd.TButton"}
+		failed_check {set style "check.failed.cmd.TButton"}
 		default  {set style "cmd.TButton"}
 	}
     $COMPWIDGET.$comp.check configure -style $style
