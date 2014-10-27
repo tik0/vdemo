@@ -45,7 +45,7 @@ ttk::style configure info.TLabel -foreground blue -background yellow
 ttk::style configure log.TLabel -justify left -anchor e -relief sunken -foreground gray30
 
 proc parse_options {comp} {
-    global env HOST COMPONENTS ARGS USEX TERMINAL WAIT_READY NOAUTO LOGGING GROUP DETACHTIME COMP_LEVEL EXPORTS TITLE CONT_CHECK CHECKNOWAIT_TIME
+    global env HOST COMPONENTS ARGS USEX TERMINAL WAIT_READY NOAUTO LOGGING GROUP DETACHTIME COMP_LEVEL EXPORTS TITLE CONT_CHECK CHECKNOWAIT_TIME TERMINATE_ON_EXIT
     set NEWARGS [list]
     set USEX($comp) 0
     set WAIT_READY($comp) 0
@@ -58,6 +58,7 @@ proc parse_options {comp} {
     set LOGGING($comp) 0
     set COMP_LEVEL($comp) ""
     set EXPORTS($comp) ""
+    set TERMINATE_ON_EXIT($comp) 0
 
     for {set i 0} \$i<[llength $ARGS($comp)] {incr i} {
         set arg [lindex $ARGS($comp) $i]; set val [lindex $ARGS($comp) [expr $i+1]]
@@ -101,6 +102,9 @@ proc parse_options {comp} {
             -L {
                 set COMP_LEVEL($comp) "$val"
                 incr i
+            }
+            -Q {
+                set TERMINATE_ON_EXIT($comp) 1
             }
             default {
                 set NEWARGS [lappend NEWARGS $arg]
@@ -169,12 +173,12 @@ proc set_group_noauto {grp} {
 }
 
 proc gui_tcl {} {
-    global HOST COMPONENTS ARGS TERMINAL USEX LOGTEXT env NOAUTO LOGGING  GROUP SCREENED  COMP_LEVEL COMPWIDGET WATCHFILE COMMAND LEVELS TITLE TIMERDETACH
+    global HOST COMPONENTS ARGS TERMINAL USEX LOGTEXT env NOAUTO LOGGING  GROUP SCREENED  COMP_LEVEL COMPWIDGET WATCHFILE COMMAND LEVELS TITLE TIMERDETACH TERMINATE_ON_EXIT
     set root "."
     set base ""
     set LOGTEXT "demo configured from '$env(VDEMO_demoConfig)'"
     wm title . "vdemo_controller: $env(VDEMO_demoConfig)"
-    wm geometry . "930x600"
+    wm geometry . "960x600"
 
     set hosts ""
     set groups ""
@@ -205,6 +209,7 @@ proc gui_tcl {} {
         ttk::button $COMPWIDGET.$c.stop  -style cmd.TButton -text "stop" -command "component_cmd $c stop"
         ttk::button $COMPWIDGET.$c.check -style cmd.TButton -text "check" -command "component_cmd $c check"
         ttk::checkbutton $COMPWIDGET.$c.noauto -text "no auto" -variable NOAUTO($c)
+        ttk::checkbutton $COMPWIDGET.$c.terminate -text "exit" -variable TERMINATE_ON_EXIT($c)
         ttk::checkbutton $COMPWIDGET.$c.ownx   -text "own X" -variable USEX($c)
         ttk::checkbutton $COMPWIDGET.$c.logging -text "logging" -variable LOGGING($c)
         ttk::button $COMPWIDGET.$c.viewlog -style cmd.TButton -text "view log" -command "component_cmd $c showlog"
@@ -220,6 +225,7 @@ proc gui_tcl {} {
         pack $COMPWIDGET.$c.group -side left -fill x
 
         pack $COMPWIDGET.$c.ownx -side right -padx 3
+        pack $COMPWIDGET.$c.terminate -side right
         pack $COMPWIDGET.$c.inspect -side right
         pack $COMPWIDGET.$c.viewlog -side right
         pack $COMPWIDGET.$c.logging -side right
@@ -929,7 +935,7 @@ proc create_spread_conf {} {
 }
 
 proc handle_screen_failure {chan} {
-    global MONITORCHAN_HOST SCREENED_SSH COMPONENTS HOST COMMAND TITLE COMPSTATUS WAIT_BREAK VDEMOID
+    global MONITORCHAN_HOST SCREENED_SSH COMPONENTS HOST COMMAND TITLE COMPSTATUS WAIT_BREAK VDEMOID TERMINATE_ON_EXIT COMPWIDGET
     if {[gets $chan line] >= 0} {
 		set host ""
 		regexp "^\[\[:digit:]]+\.vdemo-$VDEMOID-(.*)\$" $line matched host
@@ -946,7 +952,20 @@ proc handle_screen_failure {chan} {
 				if {$HOST($comp) == $host && \
 					[string match "*.$COMMAND($comp).$TITLE($comp)_" "$line"]} {
 					puts "$TITLE($comp): screen closed on $MONITORCHAN_HOST($chan), calling stop..."
+                    # store the previous state of the gui to determine whether
+                    # we have been called as a consequence of a user initiated
+                    # stop request (in that case the button is already disabled)
+                    # or through inotify (button not disabled).
+                    # We need to store this variable before calling stop here
+                    # to preserve the original state before user interaction.
+                    set already_disabled [$COMPWIDGET.$comp.stop instate disabled]
 					component_cmd $comp stop
+                    # only if this is not a user initiated stop, exit the system
+                    # if requested to
+                    if {!$already_disabled && $TERMINATE_ON_EXIT($comp)} {
+                        allcomponents_cmd "stop"
+                        gui_exit
+                    }
 				}
             }
         }
