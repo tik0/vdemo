@@ -12,8 +12,8 @@ set SSHOPTS "-oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -oConnect
 
 # Theme settings
 proc define_theme_color {style defaultBgnd mapping} {
-	ttk::style configure $style -background $defaultBgnd
-	ttk::style map $style -background $mapping
+    ttk::style configure $style -background $defaultBgnd
+    ttk::style map $style -background $mapping
 }
 
 set FONT "helvetica 9"
@@ -317,7 +317,7 @@ proc gui_tcl {} {
     ttk::label $base.ssh.label -text "ssh to"
     pack $base.ssh.label -side left
     foreach {h} "$hosts" {
-		add_host $h
+        add_host $h
     }
 
     ttk::button $base.exit -style exit.TButton -text "exit" -command {gui_exit}
@@ -327,25 +327,25 @@ proc gui_tcl {} {
         ttk::label $base.orlabel -style alert.TLabel -text "$env(VDEMO_alert_string)"
         pack $base.orlabel -fill x
     } elseif {[info exists ::env(VDEMO_info_string)]} {
- 	    ttk::label $base.orlabel -style info.TLabel -text "no robot config loaded"
-     	pack $base.orlabel -fill x
+        ttk::label $base.orlabel -style info.TLabel -text "no robot config loaded"
+        pack $base.orlabel -fill x
     }
 }
 
 proc add_host {host} {
-	global HOST SCREENED_SSH
-	set base ""
-	set lh [string tolower "$host"]
-	set SCREENED_SSH($host) 0
+    global HOST SCREENED_SSH
+    set base ""
+    set lh [string tolower "$host"]
+    set SCREENED_SSH($host) 0
 
-	ttk::frame  $base.ssh.$lh
-	ttk::button $base.ssh.$lh.xterm -style cmd.TButton -text "$host" -command "remote_xterm $host"
-	ttk::button $base.ssh.$lh.clock -style cmd.TButton -text "⌚" -command "remote_clock $host" -width -2
-	ttk::checkbutton $base.ssh.$lh.screen -text "" -command "screen_ssh_master $host" -variable SCREENED_SSH($host) -onvalue 1 -offvalue 0
-	pack $base.ssh.$lh -side left -fill x -padx 3
-	pack $base.ssh.$lh.xterm  -side left -fill x
-	pack $base.ssh.$lh.clock  -side left -fill x
-	pack $base.ssh.$lh.screen -side left -fill x
+    ttk::frame  $base.ssh.$lh
+    ttk::button $base.ssh.$lh.xterm -style cmd.TButton -text "$host" -command "remote_xterm $host"
+    ttk::button $base.ssh.$lh.clock -style cmd.TButton -text "⌚" -command "remote_clock $host" -width -2
+    ttk::checkbutton $base.ssh.$lh.screen -text "" -command "screen_ssh_master $host" -variable SCREENED_SSH($host) -onvalue 1 -offvalue 0
+    pack $base.ssh.$lh -side left -fill x -padx 3
+    pack $base.ssh.$lh.xterm  -side left -fill x
+    pack $base.ssh.$lh.clock  -side left -fill x
+    pack $base.ssh.$lh.screen -side left -fill x
 }
 
 proc clearLogger {} {
@@ -356,8 +356,8 @@ proc clearLogger {} {
 
 proc init_logger {filename} {
     global mypid
-	 exec mkdir -p [file dirname $filename]
-	 exec touch $filename
+     exec mkdir -p [file dirname $filename]
+     exec touch $filename
     if { [catch {open "|tail -n 5 --pid=$mypid -F $filename"} infile] } {
         puts  "Could not open $filename for reading."
     } else {
@@ -391,7 +391,7 @@ proc allcomponents_cmd {cmd} {
         set WAIT_BREAK 0
         foreach {level} "$LEVELS" {
             if {$WAIT_BREAK} {
-				# if WAIT_BREAK was set to 1 somewhere, we stop the loop
+                # if WAIT_BREAK was set to 1 somewhere, we stop the loop
                 break
             }
             level_cmd $cmd $level
@@ -408,12 +408,12 @@ proc group_cmd {cmd grp} {
                 component_cmd $comp $cmd
             }
         }
-	} elseif {"$cmd" == "check"} {
+    } elseif {"$cmd" == "check"} {
         foreach {comp} "$COMPONENTS" {
-			if {$GROUP($comp) == $grp} {
-				component_cmd $comp $cmd
-			}
-		}
+            if {$GROUP($comp) == $grp} {
+                component_cmd $comp $cmd
+            }
+        }
     } else {
         set WAIT_BREAK 0
         foreach {comp} "$COMPONENTS" {
@@ -438,12 +438,12 @@ proc level_cmd {cmd level} {
                 component_cmd $comp $cmd
             }
         }
-	} elseif {"$cmd" == "check"} {
+    } elseif {"$cmd" == "check"} {
         foreach {comp} "$COMPONENTS" {
-			if {$COMP_LEVEL($comp) == $level} {
-				component_cmd $comp $cmd
-			}
-		}
+            if {$COMP_LEVEL($comp) == $level} {
+                component_cmd $comp $cmd
+            }
+        }
     } else {
         set WAIT_BREAK 0
         foreach {comp} "$COMPONENTS" {
@@ -529,8 +529,8 @@ proc component_cmd {comp cmd} {
 
                 set res [ssh_command "screen -wipe | fgrep -q .$COMMAND($comp).$TITLE($comp)_" "$HOST($comp)"]
                 if {$res == 10} {
-					puts "no connection to $HOST($comp)"
-					return
+                    puts "no connection to $HOST($comp)"
+                    return
                 } elseif {$res == 0} {
                     puts "$TITLE($comp): already running, stopping first..."
                     component_cmd $comp stop
@@ -546,9 +546,9 @@ proc component_cmd {comp cmd} {
                 set cmd_line "$VARS $component_script $component_options start"
                 set res [ssh_command "$cmd_line" "$HOST($comp)"]
 
-				if {$res == 2} {
-					puts "X connection failed: consider xhost + on $HOST($comp)"
-				}
+                if {$res == 2} {
+                    puts "X connection failed: consider xhost + on $HOST($comp)"
+                }
 
                 set SCREENED($comp) 1
                 if {$DETACHTIME($comp) >= 0} {
@@ -567,11 +567,11 @@ proc component_cmd {comp cmd} {
             }
         }
         stop {
-			if { [$COMPWIDGET.$comp.stop instate disabled] } {
+            if { [$COMPWIDGET.$comp.stop instate disabled] } {
                 puts "$TITLE($comp): already stopping"
                 return
             }
-			$COMPWIDGET.$comp.stop state disabled
+            $COMPWIDGET.$comp.stop state disabled
             set_status $comp unknown
             cancel_detach_timer $comp
 
@@ -581,7 +581,7 @@ proc component_cmd {comp cmd} {
             ssh_command "$cmd_line" "$HOST($comp)"
             set SCREENED($comp) 0
 
-			after idle $COMPWIDGET.$comp.stop state !disabled
+            after idle $COMPWIDGET.$comp.stop state !disabled
             after idle "component_cmd $comp check"
         }
         screen {
@@ -606,40 +606,40 @@ proc component_cmd {comp cmd} {
             ssh_command "$cmd_line" "$HOST($comp)"
         }
         check {
-			if { [$COMPWIDGET.$comp.check instate disabled] } {
+            if { [$COMPWIDGET.$comp.check instate disabled] } {
                 puts "$TITLE($comp): already checking"
                 return
             }
-			$COMPWIDGET.$comp.check state disabled
+            $COMPWIDGET.$comp.check state disabled
             set_status $comp unknown
 
             set cmd_line "$VARS $component_script $component_options check"
             set res [ssh_command "$cmd_line" "$HOST($comp)"]
 
-			after idle $COMPWIDGET.$comp.check state !disabled
+            after idle $COMPWIDGET.$comp.check state !disabled
 
-			set noscreen 0
-			if {[expr $res / 10] == 0} { # on_check was successful
-				if {[expr $res % 10] == 0} {
-					set_status $comp ok_screen
-				} else {
-					set_status $comp ok_noscreen
-					set noscreen 1
-				}
+            set noscreen 0
+            if {[expr $res / 10] == 0} { # on_check was successful
+                if {[expr $res % 10] == 0} {
+                    set_status $comp ok_screen
+                } else {
+                    set_status $comp ok_noscreen
+                    set noscreen 1
+                }
             } elseif { [$COMPWIDGET.$comp.start instate disabled] } {
                 set_status $comp starting
             } else { # on_check failed
-				if {[expr $res % 10] != 0} {
-					set_status $comp failed_noscreen
-					set noscreen 1
-				} else {
-					set_status $comp failed_check
-				}
+                if {[expr $res % 10] != 0} {
+                    set_status $comp failed_noscreen
+                    set noscreen 1
+                } else {
+                    set_status $comp failed_check
+                }
             }
-			if {$noscreen == 1} {
-				cancel_detach_timer $comp
-				set SCREENED($comp) 0
-			}
+            if {$noscreen == 1} {
+                cancel_detach_timer $comp
+                set SCREENED($comp) 0
+            }
         }
         inspect {
             set cmd_line "$VARS $component_script $component_options inspect"
@@ -659,13 +659,13 @@ proc set_status {comp status} {
     global COMPWIDGET COMPSTATUS
     set COMPSTATUS($comp) $status
     switch -- $status {
-		starting {set style "starting.cmd.TButton"}
-		ok_screen {set style ok.cmd.TButton}
-		ok_noscreen {set style "noscreen.ok.cmd.TButton"}
-		failed_noscreen {set style "failed.cmd.TButton"}
-		failed_check {set style "check.failed.cmd.TButton"}
-		default  {set style "cmd.TButton"}
-	}
+        starting {set style "starting.cmd.TButton"}
+        ok_screen {set style ok.cmd.TButton}
+        ok_noscreen {set style "noscreen.ok.cmd.TButton"}
+        failed_noscreen {set style "failed.cmd.TButton"}
+        failed_check {set style "check.failed.cmd.TButton"}
+        default  {set style "cmd.TButton"}
+    }
     $COMPWIDGET.$comp.check configure -style $style
     update
 }
@@ -677,10 +677,10 @@ proc screen_ssh_master {h} {
     global SCREENED_SSH
     set screenid [get_master_screen_name $h]
     if {$SCREENED_SSH($h) == 1} {
-		if { [catch {exec bash -c "screen -wipe | fgrep -q .$screenid"} ] } {
-			set f [get_fifo_name $h]
-			connect_host $f $h 0
-		}
+        if { [catch {exec bash -c "screen -wipe | fgrep -q .$screenid"} ] } {
+            set f [get_fifo_name $h]
+            connect_host $f $h 0
+        }
         exec  xterm -title "MASTER SSH CONNECTION TO $h." -e screen -r -S $screenid &
     } else {
         catch {exec  screen -d -S $screenid}
@@ -688,42 +688,42 @@ proc screen_ssh_master {h} {
 }
 
 proc ssh_command {cmd hostname {check 1} {silent 0}} {
-	global WAIT_BREAK
-	set f [get_fifo_name $hostname]
+    global WAIT_BREAK
+    set f [get_fifo_name $hostname]
 
-	# check if master connection is in place
-	if $check {
-		set screenid [get_master_screen_name $hostname]
+    # check if master connection is in place
+    if $check {
+        set screenid [get_master_screen_name $hostname]
 
-		if { [catch {exec bash -c "screen -wipe | fgrep -q .$screenid"} ] } {
-			# need to establish connection in first place?
-			if {[file exists "$f.in"] == 0} {
-				if { [tk_messageBox -message "Establish connection to $hostname?" \
-					-type yesno -icon question] == yes} {
-					connect_host $f $hostname
-					add_host $hostname
-				} else {
-					set WAIT_BREAK 1
-					return 10
-				}
-			} else {
-				if { [tk_messageBox -message "Lost connection to $hostname. Reestablish?" \
-					-type yesno -icon question] == yes} {
-					connect_host $f $hostname 0
-				} else {
-					set WAIT_BREAK 1
-					return 10
-				}
-			}
-		}
-	}
+        if { [catch {exec bash -c "screen -wipe | fgrep -q .$screenid"} ] } {
+            # need to establish connection in first place?
+            if {[file exists "$f.in"] == 0} {
+                if { [tk_messageBox -message "Establish connection to $hostname?" \
+                    -type yesno -icon question] == yes} {
+                    connect_host $f $hostname
+                    add_host $hostname
+                } else {
+                    set WAIT_BREAK 1
+                    return 10
+                }
+            } else {
+                if { [tk_messageBox -message "Lost connection to $hostname. Reestablish?" \
+                    -type yesno -icon question] == yes} {
+                    connect_host $f $hostname 0
+                } else {
+                    set WAIT_BREAK 1
+                    return 10
+                }
+            }
+        }
+    }
 
-	# actually issue the command
+    # actually issue the command
     set cmd [string trim "$cmd"]
-	if {!$silent} {
-		puts "run '$cmd' on host '$hostname'"
-		set verbose "echo \"****************************************\" 1>&2; date 1>&2; echo \"*** RUN $cmd\" 1>&2;"
-	} else {set verbose ""}
+    if {!$silent} {
+        puts "run '$cmd' on host '$hostname'"
+        set verbose "echo \"****************************************\" 1>&2; date 1>&2; echo \"*** RUN $cmd\" 1>&2;"
+    } else {set verbose ""}
     set res [exec bash -c "echo '$verbose $cmd 1>&2; echo \$?' > $f.in; cat $f.out"]
     return $res
 }
@@ -739,31 +739,31 @@ proc get_fifo_name {hostname} {
 }
 
 proc connect_host {fifo host {doMonitor 1}} {
-	global env SSHOPTS
-	exec rm -f "$fifo.in"
-	exec rm -f "$fifo.out"
-	exec mkfifo "$fifo.in"
-	exec mkfifo "$fifo.out"
+    global env SSHOPTS
+    exec rm -f "$fifo.in"
+    exec rm -f "$fifo.out"
+    exec mkfifo "$fifo.in"
+    exec mkfifo "$fifo.out"
 
-	set screenid [get_master_screen_name $host]
-	exec xterm -title "establish ssh connection to $fifo" -n "$fifo" -e screen -mS $screenid bash -c "tail -s 0.1 -n 10000 -f $fifo.in | ssh $SSHOPTS -Y $host bash | while read s; do echo \$s > $fifo.out; done" &
+    set screenid [get_master_screen_name $host]
+    exec xterm -title "establish ssh connection to $fifo" -n "$fifo" -e screen -mS $screenid bash -c "tail -s 0.1 -n 10000 -f $fifo.in | ssh $SSHOPTS -Y $host bash | while read s; do echo \$s > $fifo.out; done" &
 
-	if {[info exists env(VDEMO_exports)]} {
-		foreach {var} "$env(VDEMO_exports)" {
-			if {[info exists env($var)]} {
-				ssh_command "export $var=$env($var)" $host 0
-			}
-		}
-	}
-	ssh_command "source $env(VDEMO_demoConfig)" $host 0
-	exec screen -dS $screenid
+    if {[info exists env(VDEMO_exports)]} {
+        foreach {var} "$env(VDEMO_exports)" {
+            if {[info exists env($var)]} {
+                ssh_command "export $var=$env($var)" $host 0
+            }
+        }
+    }
+    ssh_command "source $env(VDEMO_demoConfig)" $host 0
+    exec screen -dS $screenid
 
-	if $doMonitor {connect_screenmonitoring $host}
+    if $doMonitor {connect_screenmonitoring $host}
 
-	if {$::AUTO_SPREAD_CONF == 1} {
-		set content [exec cat $::env(SPREAD_CONFIG)]
-		exec bash -c "echo 'echo \"$content\" > $::env(SPREAD_CONFIG)' > $fifo.in"
-	}
+    if {$::AUTO_SPREAD_CONF == 1} {
+        set content [exec cat $::env(SPREAD_CONFIG)]
+        exec bash -c "echo 'echo \"$content\" > $::env(SPREAD_CONFIG)' > $fifo.in"
+    }
 }
 
 proc connect_hosts {} {
@@ -811,11 +811,11 @@ proc disconnect_hosts {} {
         puts "terminating master-ssh-connection to $fifo_host($f)"
         set screenid [get_master_screen_name $fifo_host($f)]
         set screenPID [exec bash -c "screen -list $screenid | grep vdemo | cut -d. -f1"]
-		if {$::AUTO_SPREAD_CONF == 1 && "$screenPID" != "" && [file exists "$f.in"]} {
-			# send ssh command, but do not wait for result
-			set cmd "rm -f $env(SPREAD_CONFIG)"
-			exec bash -c "echo 'echo \"*** RUN $cmd\" 1>&2; $cmd 1>&2; echo \$?' > $f.in"
-		}
+        if {$::AUTO_SPREAD_CONF == 1 && "$screenPID" != "" && [file exists "$f.in"]} {
+            # send ssh command, but do not wait for result
+            set cmd "rm -f $env(SPREAD_CONFIG)"
+            exec bash -c "echo 'echo \"*** RUN $cmd\" 1>&2; $cmd 1>&2; echo \$?' > $f.in"
+        }
         catch {exec bash -c "screen -list $screenid | grep vdemo | cut -d. -f1 | xargs kill 2>&1"}
         exec rm -f "$f.in"
         exec rm -f "$f.out"
@@ -851,16 +851,16 @@ proc remove_duplicates {} {
 }
 
 proc compute_spread_segment {ip num} {
-	global env
-	set octets [split $ip .]
-	# use IP octets 1-4
-	set seg [join [lrange $octets 1 3] .]
-	return "225.$seg:$env(SPREAD_PORT)"
+    global env
+    set octets [split $ip .]
+    # use IP octets 1-4
+    set seg [join [lrange $octets 1 3] .]
+    return "225.$seg:$env(SPREAD_PORT)"
 }
 
 proc get_autospread_filename {} {
-	global VDEMOID env
-	return "/tmp/vdemo-spread-$VDEMOID-$env(USER).conf"
+    global VDEMOID env
+    return "/tmp/vdemo-spread-$VDEMOID-$env(USER).conf"
 }
 
 proc create_spread_conf {} {
@@ -880,12 +880,12 @@ proc create_spread_conf {} {
     # list of adapter ips to find best local ip
     set local_addr [exec ip -o -4 addr | sed {s/.*inet \(\([0-9]\{1,3\}\.\)\{3\}[0-9]\{1,3\}\).*/\1/g}]
     set segments ""
-	set REGEXP_IP {([0-9]{1,3}\.){3}[0-9]{1,3}}
+    set REGEXP_IP {([0-9]{1,3}\.){3}[0-9]{1,3}}
     foreach {h} "$spread_hosts" {
-		set ip ""
-		if { [catch {set ip [exec ping -c1 -W 1 $h | grep "bytes from" | egrep -o "$REGEXP_IP"]}] } {
-			catch {set ip [exec dig +search +short $h | egrep -o $REGEXP_IP]}
-		}
+        set ip ""
+        if { [catch {set ip [exec ping -c1 -W 1 $h | grep "bytes from" | egrep -o "$REGEXP_IP"]}] } {
+            catch {set ip [exec dig +search +short $h | egrep -o $REGEXP_IP]}
+        }
         # if address is localhost and we have a config with multiple hosts
         if {[string match "127.*" $ip] && [llength "$spread_hosts"] > 1} {
             # try to find alternatives the host resolves to
@@ -932,28 +932,28 @@ proc create_spread_conf {} {
     puts $fd "SocketPortReuse = ON"
 
     close $fd
-	puts "created spread conf $filename"
-	exec cat $filename
+    puts "created spread conf $filename"
+    exec cat $filename
 }
 
 proc handle_screen_failure {chan} {
     global MONITORCHAN_HOST SCREENED_SSH COMPONENTS HOST COMMAND TITLE COMPSTATUS WAIT_BREAK VDEMOID TERMINATE_ON_EXIT COMPWIDGET ALLCOMPONENT_STOP
     if {[gets $chan line] >= 0} {
-		set host ""
-		regexp "^\[\[:digit:]]+\.vdemo-$VDEMOID-(.*)\$" $line matched host
-		if {"$host" != ""} {
-			set SCREENED_SSH($host) 0
-			if { [tk_messageBox -message "Lost connection to $host. Reestablish?" \
-				-type yesno -icon question] == yes} {
-				set f [get_fifo_name $host]
-				connect_host $f $host 0
-			}
-		} else {
-			set host $MONITORCHAN_HOST($chan)
-			foreach {comp} "$COMPONENTS" {
-				if {$HOST($comp) == $host && \
-					[string match "*.$COMMAND($comp).$TITLE($comp)_" "$line"]} {
-					puts "$TITLE($comp): screen closed on $MONITORCHAN_HOST($chan), calling stop..."
+        set host ""
+        regexp "^\[\[:digit:]]+\.vdemo-$VDEMOID-(.*)\$" $line matched host
+        if {"$host" != ""} {
+            set SCREENED_SSH($host) 0
+            if { [tk_messageBox -message "Lost connection to $host. Reestablish?" \
+                -type yesno -icon question] == yes} {
+                set f [get_fifo_name $host]
+                connect_host $f $host 0
+            }
+        } else {
+            set host $MONITORCHAN_HOST($chan)
+            foreach {comp} "$COMPONENTS" {
+                if {$HOST($comp) == $host && \
+                    [string match "*.$COMMAND($comp).$TITLE($comp)_" "$line"]} {
+                    puts "$TITLE($comp): screen closed on $MONITORCHAN_HOST($chan), calling stop..."
                     # store the previous state of the gui to determine whether
                     # we have been called as a consequence of a user initiated
                     # stop request (in that case the button is already disabled)
@@ -961,14 +961,14 @@ proc handle_screen_failure {chan} {
                     # We need to store this variable before calling stop here
                     # to preserve the original state before user interaction.
                     set already_disabled [$COMPWIDGET.$comp.stop instate disabled]
-					component_cmd $comp stop
+                    component_cmd $comp stop
                     # only if this is not a user initiated stop, exit the system
                     # if requested to
                     if {!$already_disabled && !$ALLCOMPONENT_STOP && $TERMINATE_ON_EXIT($comp)} {
                         allcomponents_cmd "stop"
                         gui_exit
                     }
-				}
+                }
             }
         }
     }
@@ -992,7 +992,7 @@ proc gui_exit {} {
     set quickexit 1
     foreach {comp} "$COMPONENTS" {
         if { [string match *_screen $COMPSTATUS($comp)] || \
-			 $COMPSTATUS($comp) == "starting"} {
+             $COMPSTATUS($comp) == "starting"} {
             set quickexit 0
             break
         }
