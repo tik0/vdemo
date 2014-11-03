@@ -937,7 +937,7 @@ proc create_spread_conf {} {
 }
 
 proc handle_screen_failure {chan} {
-    global MONITORCHAN_HOST SCREENED_SSH COMPONENTS HOST COMMAND TITLE COMPSTATUS WAIT_BREAK VDEMOID TERMINATE_ON_EXIT COMPWIDGET ALLCOMPONENT_STOP IN_AUTO_TERMINATE
+    global MONITORCHAN_HOST SCREENED_SSH COMPONENTS HOST COMMAND TITLE COMPSTATUS WAIT_BREAK VDEMOID TERMINATE_ON_EXIT COMPWIDGET ALLCOMPONENT_STOP
     if {[gets $chan line] >= 0} {
         set host ""
         regexp "^\[\[:digit:]]+\.vdemo-$VDEMOID-(.*)\$" $line matched host
@@ -965,11 +965,8 @@ proc handle_screen_failure {chan} {
                     # only if this is not a user initiated stop, exit the system
                     # if requested to
                     if {!$already_disabled && !$ALLCOMPONENT_STOP && $TERMINATE_ON_EXIT($comp)} {
-                        # Ensure that there will not be any user dialog in case
-                        # we automatically shutdown the system
-                        set IN_AUTO_TERMINATE 1
                         allcomponents_cmd "stop"
-                        gui_exit
+                        finish
                     }
                 }
             }
@@ -991,7 +988,7 @@ proc connect_screenmonitoring {host} {
 }
 
 proc gui_exit {} {
-    global COMPONENTS COMPSTATUS IN_AUTO_TERMINATE
+    global COMPONENTS COMPSTATUS
     set quickexit 1
     foreach {comp} "$COMPONENTS" {
         if { [string match *_screen $COMPSTATUS($comp)] || \
@@ -1000,7 +997,7 @@ proc gui_exit {} {
             break
         }
     }
-    if {$IN_AUTO_TERMINATE || $quickexit || [tk_messageBox -message "Really quit?" -type yesno -icon question] == yes} {
+    if {$quickexit || [tk_messageBox -message "Really quit?" -type yesno -icon question] == yes} {
         finish
     }
 }
@@ -1034,7 +1031,6 @@ set mypid [pid]
 puts "My process id is $mypid"
 
 set ALLCOMPONENT_STOP 0
-set IN_AUTO_TERMINATE 0
 
 signal trap SIGINT finish
 signal trap SIGHUP finish
