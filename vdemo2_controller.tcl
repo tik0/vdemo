@@ -379,14 +379,12 @@ proc insertLog {infile} {
 
 
 proc allcomponents_cmd {cmd} {
-    global HOST COMPONENTS ARGS TERMINAL USEX WAIT_READY WAIT_BREAK NOAUTO LEVELS ALLCOMPONENT_STOP
+    global HOST COMPONENTS ARGS TERMINAL USEX WAIT_READY WAIT_BREAK NOAUTO LEVELS
     if {"$cmd" == "stop"} {
-        set ALLCOMPONENT_STOP 1
         set WAIT_BREAK 1
         foreach {level} "[lreverse [lsort $LEVELS]]" {
             level_cmd $cmd $level
         }
-        set ALLCOMPONENT_STOP 0
     } else {
         set WAIT_BREAK 0
         foreach {level} "$LEVELS" {
@@ -937,7 +935,7 @@ proc create_spread_conf {} {
 }
 
 proc handle_screen_failure {chan} {
-    global MONITORCHAN_HOST SCREENED_SSH COMPONENTS HOST COMMAND TITLE COMPSTATUS WAIT_BREAK VDEMOID TERMINATE_ON_EXIT COMPWIDGET ALLCOMPONENT_STOP
+    global MONITORCHAN_HOST SCREENED_SSH COMPONENTS HOST COMMAND TITLE COMPSTATUS WAIT_BREAK VDEMOID TERMINATE_ON_EXIT COMPWIDGET
     if {[gets $chan line] >= 0} {
         set host ""
         regexp "^\[\[:digit:]]+\.vdemo-$VDEMOID-(.*)\$" $line matched host
@@ -964,7 +962,7 @@ proc handle_screen_failure {chan} {
                     component_cmd $comp stop
                     # only if this is not a user initiated stop, exit the system
                     # if requested to
-                    if {!$already_disabled && !$ALLCOMPONENT_STOP && $TERMINATE_ON_EXIT($comp)} {
+                    if {!$already_disabled && $TERMINATE_ON_EXIT($comp)} {
                         allcomponents_cmd "stop"
                         finish
                     }
@@ -1029,8 +1027,6 @@ proc setup_temp_dir { } {
 
 set mypid [pid]
 puts "My process id is $mypid"
-
-set ALLCOMPONENT_STOP 0
 
 signal trap SIGINT finish
 signal trap SIGHUP finish
