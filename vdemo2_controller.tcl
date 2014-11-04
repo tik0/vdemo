@@ -723,11 +723,11 @@ proc ssh_command {cmd hostname {check 1} {silent 0}} {
         set verbose "echo \"****************************************\" 1>&2; date 1>&2; echo \"*** RUN $cmd\" 1>&2;"
     } else {set verbose ""}
 
-    set res 0
-    # if we didn't check for the connection to be in place, we timeout here.
-    # otherwise, if the connection is broken, we will get stuck here forever
-    if {[catch {exec timeout 5s bash -c "echo '$verbose $cmd 1>&2; echo \$?' > $f.in; cat $f.out"}]} {
-        set res [lindex $::errorCode 2]
+    # We timeout here if the connection is broken. Otherwise, writing to the fifo will last forever.
+    # The error code of the timeout is 124. For some reason tcl creates an exception on timeout
+    set res 124
+    catch {
+        set res [exec timeout 5 bash -c "echo '$verbose $cmd 1>&2; echo \$?' > $f.in; cat $f.out"]
     }
     return $res
 }
@@ -756,12 +756,12 @@ proc connect_host {fifo host {doMonitor 1}} {
         foreach {var} "$env(VDEMO_exports)" {
             if {[info exists env($var)]} {
                 set res [ssh_command "export $var=$env($var)" $host 0]
-                if $res {return}
+                if {$res == 124} {return}
             }
         }
     }
     set res [ssh_command "source $env(VDEMO_demoConfig)" $host 0]
-    if $res {return}
+    if {$res == 124} {return}
 
     exec screen -dS $screenid
 
