@@ -722,7 +722,13 @@ proc ssh_command {cmd hostname {check 1} {silent 0}} {
         puts "run '$cmd' on host '$hostname'"
         set verbose "echo \"****************************************\" 1>&2; date 1>&2; echo \"*** RUN $cmd\" 1>&2;"
     } else {set verbose ""}
-    set res [exec bash -c "echo '$verbose $cmd 1>&2; echo \$?' > $f.in; cat $f.out"]
+
+    set res 0
+    # if we didn't check for the connection to be in place, we timeout here.
+    # otherwise, if the connection is broken, we will get stuck here forever
+    if {[catch {exec timeout 5s bash -c "echo '$verbose $cmd 1>&2; echo \$?' > $f.in; cat $f.out"}]} {
+        set res [lindex $::errorCode 2]
+    }
     return $res
 }
 
@@ -749,11 +755,14 @@ proc connect_host {fifo host {doMonitor 1}} {
     if {[info exists env(VDEMO_exports)]} {
         foreach {var} "$env(VDEMO_exports)" {
             if {[info exists env($var)]} {
-                ssh_command "export $var=$env($var)" $host 0
+                set res [ssh_command "export $var=$env($var)" $host 0]
+                if $res {return}
             }
         }
     }
-    ssh_command "source $env(VDEMO_demoConfig)" $host 0
+    set res [ssh_command "source $env(VDEMO_demoConfig)" $host 0]
+    if $res {return}
+
     exec screen -dS $screenid
 
     if $doMonitor {connect_screenmonitoring $host}
