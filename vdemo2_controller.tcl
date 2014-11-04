@@ -882,7 +882,7 @@ proc create_spread_conf {} {
     foreach {h} "$spread_hosts" {
         set ip ""
         if { [catch {set ip [exec ping -c1 -W 1 $h | grep "bytes from" | egrep -o "$REGEXP_IP"]}] } {
-            catch {set ip [exec dig +search +short $h | egrep -o $REGEXP_IP]}
+            catch {set ip [exec dig +tries=1 +retry=0 +time=1 +search +short $h | egrep -o $REGEXP_IP]}
         }
         # if address is localhost and we have a config with multiple hosts
         if {[string match "127.*" $ip] && [llength "$spread_hosts"] > 1} {
