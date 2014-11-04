@@ -887,10 +887,12 @@ proc create_spread_conf {} {
         # if address is localhost and we have a config with multiple hosts
         if {[string match "127.*" $ip] && [llength "$spread_hosts"] > 1} {
             # try to find alternatives the host resolves to
-            set ips [exec getent ahostsv4 $h | grep "STREAM" | cut -d " " -f1 | sort | uniq]
-            foreach {lip} "$ips" {
-                if {[lsearch -exact $local_addr $lip] > -1} {
-                    set ip $lip
+            catch {
+                set ips [exec getent ahostsv4 $h | grep "STREAM" | cut -d " " -f1 | sort | uniq]
+                foreach {lip} "$ips" {
+                    if {[lsearch -exact $local_addr $lip] > -1} {
+                        set ip $lip
+                    }
                 }
             }
         }
