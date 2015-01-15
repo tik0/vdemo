@@ -44,6 +44,11 @@ ttk::style configure alert.TLabel -foreground blue -background yellow
 ttk::style configure info.TLabel -foreground blue -background yellow
 ttk::style configure log.TLabel -justify left -anchor e -relief sunken -foreground gray30
 
+# debugging puts
+proc dputs args {
+    puts stderr "-- $args"
+}
+
 proc parse_options {comp} {
     global env HOST COMPONENTS ARGS USEX TERMINAL WAIT_READY NOAUTO LOGGING GROUP DETACHTIME COMP_LEVEL EXPORTS TITLE CONT_CHECK CHECKNOWAIT_TIME TERMINATE_ON_EXIT
     set NEWARGS [list]
@@ -458,7 +463,7 @@ proc level_cmd {cmd level} {
 }
 
 proc wait_ready {comp} {
-    global WAIT_READY WAIT_BREAK COMPSTATUS CONT_CHECK WAIT_BREAK TITLE CHECKNOWAIT_TIME
+    global WAIT_READY WAIT_BREAK COMPSTATUS CONT_CHECK WAIT_BREAK TITLE CHECKNOWAIT_TIME COMPWIDGET
     set WAIT_BREAK 0
     if {[string is digit $WAIT_READY($comp)] && $WAIT_READY($comp) > 0} {
         puts "$TITLE($comp): waiting for the process to get ready"
@@ -466,18 +471,25 @@ proc wait_ready {comp} {
         set checktime [expr [clock milliseconds] + 1000]
         while {$endtime > [clock milliseconds]} {
             sleep 100
+            # check every 1000ms
             if {$CONT_CHECK($comp) && $checktime < [clock milliseconds]} {
                 component_cmd $comp check
                 set checktime [expr [clock milliseconds] + 1000]
             }
-            if {[string match *_screen $COMPSTATUS($comp)] || $WAIT_BREAK} {
+            if {[string match "ok_*" $COMPSTATUS($comp)] || $WAIT_BREAK} {
                 break
             }
         }
+        dputs "$TITLE($comp): finished waiting"
+
+        # first re-enable start button
+        $COMPWIDGET.$comp.start state !disabled
+        # and then check component a last time to reflect final state
         component_cmd $comp check
-        puts "$TITLE($comp): finished waiting"
     } else {
-        puts "$TITLE($comp): not waiting for the process to be ready"
+        dputs "$TITLE($comp): not waiting for the process to get ready"
+        # re-enable start button
+        $COMPWIDGET.$comp.start state !disabled
         after [expr $CHECKNOWAIT_TIME($comp) * 1000] "component_cmd $comp check"
     }
 }
@@ -517,56 +529,49 @@ proc component_cmd {comp cmd} {
 
     switch $cmd {
         start {
-            try_eval {
-                if { [$COMPWIDGET.$comp.start instate disabled] } {
-                    puts "$TITLE($comp): not ready, still waiting for the process"
-                    return
-                }
-                $COMPWIDGET.$comp.start state disabled
-                update
-
-                set res [ssh_command "screen -wipe | fgrep -q .$COMMAND($comp).$TITLE($comp)_" "$HOST($comp)"]
-                if {$res == 10} {
-                    puts "no connection to $HOST($comp)"
-                    return
-                } elseif {$res == 0} {
-                    puts "$TITLE($comp): already running, stopping first..."
-                    component_cmd $comp stop
-                }
-
-                set WAIT_BREAK 0
-                set_status $comp starting
-                cancel_detach_timer $comp
-
-                if {$DETACHTIME($comp) < 0} {
-                    set component_options "$component_options --noiconic"
-                }
-                set cmd_line "$VARS $component_script $component_options start"
-                set res [ssh_command "$cmd_line" "$HOST($comp)"]
-
-                if {$res == 2} {
-                    puts "X connection failed: consider xhost + on $HOST($comp)"
-                }
-
-                set SCREENED($comp) 1
-                if {$DETACHTIME($comp) >= 0} {
-                    cancel_detach_timer $comp
-                    set detach_after [expr $DETACHTIME($comp) * 1000]
-                    set TIMERDETACH($comp) [after $detach_after "component_cmd $comp detach"]
-                }
-                wait_ready $comp
-            } {} {
-                #finally
-                $COMPWIDGET.$comp.start state !disabled
-                if {$COMPSTATUS($comp) == "starting" && $WAIT_READY($comp) > 0} {
-                    set_status $comp failed_noscreen
-                    set SCREENED($comp) 0
-                }
+            if { [$COMPWIDGET.$comp.start instate disabled] } {
+                puts "$TITLE($comp): not ready, still waiting for the process"
+                return
             }
+            $COMPWIDGET.$comp.start state disabled
+            update
+
+            set res [ssh_command "screen -wipe | fgrep -q .$COMMAND($comp).$TITLE($comp)_" "$HOST($comp)"]
+            if {$res == 10} {
+                puts "no connection to $HOST($comp)"
+                return
+            } elseif {$res == 0} {
+                puts "$TITLE($comp): already running, stopping first..."
+                component_cmd $comp stop
+            }
+
+            set WAIT_BREAK 0
+            set_status $comp starting
+            cancel_detach_timer $comp
+
+            if {$DETACHTIME($comp) < 0} {
+                set component_options "$component_options --noiconic"
+            }
+            set cmd_line "$VARS $component_script $component_options start"
+            set res [ssh_command "$cmd_line" "$HOST($comp)"]
+
+            if {$res == 2} {
+                puts "*** X connection failed: consider xhost + on $HOST($comp)"
+                set_status $comp failed_noscreen
+                $COMPWIDGET.$comp.start state !disabled
+                return
+            }
+
+            set SCREENED($comp) 1
+            if {$DETACHTIME($comp) >= 0} {
+                set detach_after [expr $DETACHTIME($comp) * 1000]
+                set TIMERDETACH($comp) [after $detach_after "component_cmd $comp detach"]
+            }
+            wait_ready $comp
         }
         stop {
             if { [$COMPWIDGET.$comp.stop instate disabled] } {
-                puts "$TITLE($comp): already stopping"
+                dputs "$TITLE($comp): already stopping"
                 return
             }
             $COMPWIDGET.$comp.stop state disabled
@@ -605,7 +610,7 @@ proc component_cmd {comp cmd} {
         }
         check {
             if { [$COMPWIDGET.$comp.check instate disabled] } {
-                puts "$TITLE($comp): already checking"
+                dputs "$TITLE($comp): already checking"
                 return
             }
             $COMPWIDGET.$comp.check state disabled
@@ -613,10 +618,15 @@ proc component_cmd {comp cmd} {
 
             set cmd_line "$VARS $component_script $component_options check"
             set res [ssh_command "$cmd_line" "$HOST($comp)"]
+            dputs "ssh result: $res"
+            if {$res == 124} {puts "ssh command timed out"; return}
 
             after idle $COMPWIDGET.$comp.check state !disabled
 
             set noscreen 0
+            # res = 10*callResult + processResult
+            # callResult is the result from the on_check function (0 on success)
+            # processResult: 0: success, 1: no screen, 2: PID not there
             if {[expr $res / 10] == 0} { # on_check was successful
                 if {[expr $res % 10] == 0} {
                     set_status $comp ok_screen
@@ -634,7 +644,8 @@ proc component_cmd {comp cmd} {
                     set_status $comp failed_check
                 }
             }
-            if {$noscreen == 1} {
+            if {$noscreen} {
+                dputs "$comp not running: cancel detach timer"
                 cancel_detach_timer $comp
                 set SCREENED($comp) 0
             }
@@ -658,12 +669,13 @@ proc set_status {comp status} {
     set COMPSTATUS($comp) $status
     switch -- $status {
         starting {set style "starting.cmd.TButton"}
-        ok_screen {set style ok.cmd.TButton}
+        ok_screen {set style "ok.cmd.TButton"}
         ok_noscreen {set style "noscreen.ok.cmd.TButton"}
         failed_noscreen {set style "failed.cmd.TButton"}
         failed_check {set style "check.failed.cmd.TButton"}
         default  {set style "cmd.TButton"}
     }
+    dputs "change status of $comp to $status: $style"
     $COMPWIDGET.$comp.check configure -style $style
     update
 }
