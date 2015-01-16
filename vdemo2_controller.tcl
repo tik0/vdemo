@@ -490,7 +490,7 @@ proc wait_ready {comp} {
         dputs "$TITLE($comp): not waiting for the process to get ready"
         # re-enable start button
         $COMPWIDGET.$comp.start state !disabled
-        after [expr $CHECKNOWAIT_TIME($comp) * 1000] "component_cmd $comp check"
+        after [expr $CHECKNOWAIT_TIME($comp) * 1000] component_cmd $comp check
     }
 }
 
@@ -565,7 +565,7 @@ proc component_cmd {comp cmd} {
             set SCREENED($comp) 1
             if {$DETACHTIME($comp) >= 0} {
                 set detach_after [expr $DETACHTIME($comp) * 1000]
-                set TIMERDETACH($comp) [after $detach_after "component_cmd $comp detach"]
+                set TIMERDETACH($comp) [after $detach_after component_cmd $comp detach]
             }
             wait_ready $comp
         }
@@ -585,14 +585,14 @@ proc component_cmd {comp cmd} {
             set SCREENED($comp) 0
 
             after idle $COMPWIDGET.$comp.stop state !disabled
-            after idle "component_cmd $comp check"
+            after idle component_cmd $comp check
         }
         screen {
             cancel_detach_timer $comp
             if {$SCREENED($comp)} {
                 set cmd_line "$VARS xterm -fg white -bg black -title \"$comp@$HOST($comp) - detach by \[C-a d\]\" -e $component_script $component_options screen &"
                 ssh_command "$cmd_line" "$HOST($comp)"
-                after idle "component_cmd $comp check"
+                after idle component_cmd $comp check
             } else {
                 set cmd_line "$VARS $component_script $component_options detach"
                 ssh_command "$cmd_line" "$HOST($comp)"
