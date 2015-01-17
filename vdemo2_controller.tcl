@@ -537,7 +537,7 @@ proc component_cmd {comp cmd} {
             update
 
             set res [ssh_command "screen -wipe | fgrep -q .$COMMAND($comp).$TITLE($comp)_" "$HOST($comp)"]
-            if {$res == 10} {
+            if {$res == -1} {
                 puts "no connection to $HOST($comp)"
                 return
             } elseif {$res == 0} {
@@ -619,9 +619,11 @@ proc component_cmd {comp cmd} {
             set cmd_line "$VARS $component_script $component_options check"
             set res [ssh_command "$cmd_line" "$HOST($comp)"]
             dputs "ssh result: $res"
-            if {$res == 124} {puts "ssh command timed out"; return}
 
             after idle $COMPWIDGET.$comp.check state !disabled
+
+            if {$res == -1} {puts "no ssh connection"; return}
+            if {$res == 124} {puts "ssh command timed out"; return}
 
             set noscreen 0
             # res = 10*callResult + processResult
@@ -714,7 +716,7 @@ proc ssh_command {cmd hostname {check 1} {silent 0}} {
                     add_host $hostname
                 } else {
                     set WAIT_BREAK 1
-                    return 10
+                    return -1
                 }
             } else {
                 if { [tk_messageBox -message "Lost connection to $hostname. Reestablish?" \
@@ -722,7 +724,7 @@ proc ssh_command {cmd hostname {check 1} {silent 0}} {
                     connect_host $f $hostname 0
                 } else {
                     set WAIT_BREAK 1
-                    return 10
+                    return -1
                 }
             }
         }
@@ -741,6 +743,7 @@ proc ssh_command {cmd hostname {check 1} {silent 0}} {
     catch {
         set res [exec timeout 5 bash -c "echo '$verbose $cmd 1>&2; echo \$?' > $f.in; cat $f.out"]
     }
+    dputs "ssh result: $res"
     return $res
 }
 
