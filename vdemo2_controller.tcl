@@ -619,8 +619,12 @@ proc component_cmd {comp cmd} {
             set cmd_line "$VARS $component_script $component_options check"
             set res [ssh_command "$cmd_line" "$HOST($comp)"]
             dputs "ssh result: $res"
-
             after idle $COMPWIDGET.$comp.check state !disabled
+
+            if { ! [string is integer -strict $res]} {
+                puts "internal error: ssh result is not an integer: '$res'"
+                return
+            }
 
             if {$res == -1} {puts "no ssh connection"; return}
             if {$res == 124} {puts "ssh command timed out"; return}
