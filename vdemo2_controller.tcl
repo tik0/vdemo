@@ -996,9 +996,9 @@ proc create_spread_conf {} {
             set num [expr $num + 1]
         }
         puts $fd "Spread_Segment $sp_seg {"
-            foreach {h} $hosts($seg) {
-                puts $fd "\t $h \t $IP($h)"
-            }
+        foreach {h} $hosts($seg) {
+            puts $fd "\t $h \t $IP($h)"
+        }
         puts $fd "}"
         puts $fd ""
     }
