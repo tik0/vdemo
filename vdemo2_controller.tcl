@@ -703,35 +703,56 @@ proc screen_ssh_master {h} {
     }
 }
 
-proc ssh_command {cmd hostname {check 1} {silent 0}} {
+proc ssh_check_connection {hostname} {
     global WAIT_BREAK
+    set f [get_fifo_name $hostname]
+    set screenid [get_master_screen_name $hostname]
+    
+    if { [catch {exec bash -c "screen -wipe | fgrep -q .$screenid"} ] } {
+        # need to establish connection in first place?
+        if {[file exists "$f.in"] == 0} {
+            if { [tk_messageBox -message "Establish connection to $hostname?" \
+                -type yesno -icon question] == yes} {
+                connect_host $f $hostname
+                add_host $hostname
+            } else {
+                set WAIT_BREAK 1
+                return -1
+            }
+        } else {
+            if { [tk_messageBox -message "Lost connection to $hostname. Reestablish?" \
+                -type yesno -icon question] == yes} {
+                connect_host $f $hostname 0
+            } else {
+                set WAIT_BREAK 1
+                return -1
+            }
+        }
+    }
+
+    # Issue a dummy command to check whether connection is broken. In this case we get a timeout.
+    # Without checking, reading $f.out will last forever when ssh connection is broken.
+    # The error code of the timeout is 124. Tcl creates an exception on timeout.
+    # Instead of timing out on the real ssh_command, we timeout here on a dummy, because here we
+    # know, that the command shouldn't last long. However, the real ssh_command could last rather
+    # long, e.g. stopping a difficult component. This would generate a spurious timeout.
+    catch { set res 124; set res [exec bash -c "echo 'echo 0' > $f.in; timeout 1 cat $f.out"] }
+    dputs "connection check result: $res"
+
+    # cat might also fetch the result of a previous, delayed ssh command. Hence, if we didn't 
+    # timed out, set the result always to zero.
+    if {$res != 124} {set res 0}
+    return $res
+}
+
+proc ssh_command {cmd hostname {check 1} {silent 0}} {
     set f [get_fifo_name $hostname]
 
     # check if master connection is in place
     if $check {
-        set screenid [get_master_screen_name $hostname]
-
-        if { [catch {exec bash -c "screen -wipe | fgrep -q .$screenid"} ] } {
-            # need to establish connection in first place?
-            if {[file exists "$f.in"] == 0} {
-                if { [tk_messageBox -message "Establish connection to $hostname?" \
-                    -type yesno -icon question] == yes} {
-                    connect_host $f $hostname
-                    add_host $hostname
-                } else {
-                    set WAIT_BREAK 1
-                    return -1
-                }
-            } else {
-                if { [tk_messageBox -message "Lost connection to $hostname. Reestablish?" \
-                    -type yesno -icon question] == yes} {
-                    connect_host $f $hostname 0
-                } else {
-                    set WAIT_BREAK 1
-                    return -1
-                }
-            }
-        }
+        set res [ssh_check_connection $hostname]
+        # return on error
+        if $res { return $res; }
     }
 
     # actually issue the command
@@ -741,12 +762,7 @@ proc ssh_command {cmd hostname {check 1} {silent 0}} {
         set verbose "echo \"****************************************\" 1>&2; date 1>&2; echo \"*** RUN $cmd\" 1>&2;"
     } else {set verbose ""}
 
-    # We timeout here if the connection is broken. Otherwise, writing to the fifo will last forever.
-    # The error code of the timeout is 124. For some reason tcl creates an exception on timeout
-    set res 124
-    catch {
-        set res [exec timeout 5 bash -c "echo '$verbose $cmd 1>&2; echo \$?' > $f.in; cat $f.out"]
-    }
+    set res [exec bash -c "echo '$verbose $cmd 1>&2; echo \$?' > $f.in; cat $f.out"]
     dputs "ssh result: $res"
     return $res
 }
