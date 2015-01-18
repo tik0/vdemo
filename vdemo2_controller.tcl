@@ -212,6 +212,9 @@ proc gui_tcl {} {
         ttk::label $COMPWIDGET.$c.level -style level.TLabel -text "$COMP_LEVEL($c)"
         ttk::label $COMPWIDGET.$c.label -width 25 -style label.TLabel -text "$TITLE($c)@"
         ttk::entry $COMPWIDGET.$c.host  -width 10 -textvariable HOST($c)
+        # disable host field for spreaddaemon: cannot add/change hosts in spread config
+        if {"$COMMAND($c)" == "spreaddaemon"} { $COMPWIDGET.$c.host state disabled }
+
         ttk::label $COMPWIDGET.$c.group -style group.TLabel -text "$GROUP($c)"
 
         ttk::button $COMPWIDGET.$c.start -style cmd.TButton -text "start" -command "component_cmd $c start"
