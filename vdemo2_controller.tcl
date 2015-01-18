@@ -54,7 +54,7 @@ proc dputs {args {level 1}} {
 }
 
 proc parse_options {comp} {
-    global env HOST COMPONENTS ARGS USEX TERMINAL WAIT_READY NOAUTO LOGGING GROUP DETACHTIME COMP_LEVEL EXPORTS TITLE CONT_CHECK CHECKNOWAIT_TIME TERMINATE_ON_EXIT
+    global env COMPONENTS ARGS USEX TERMINAL WAIT_READY NOAUTO LOGGING GROUP DETACHTIME COMP_LEVEL EXPORTS TITLE CONT_CHECK CHECKNOWAIT_TIME TERMINATE_ON_EXIT
     set NEWARGS [list]
     set USEX($comp) 0
     set WAIT_READY($comp) 0
@@ -125,13 +125,14 @@ proc parse_options {comp} {
 
 
 proc parse_env_var {} {
-    global env HOST COMPONENTS ARGS USEX WATCHFILE COMMAND TITLE VDEMOID DEBUG_LEVEL
+    global env HOST HOSTS COMPONENTS ARGS USEX WATCHFILE COMMAND TITLE VDEMOID DEBUG_LEVEL
     set VDEMOID [file tail [file rootname $env(VDEMO_demoConfig)]]
     set components_list "$env(VDEMO_components)"
     set comp [split "$components_list" ":"]
     set nCompos [llength "$comp"]
     set COMPONENTS {}
     set WATCHFILE ""
+    set HOSTS ""
     catch {set DEBUG_LEVEL $env(VDEMO_DEBUG_LEVEL)}
     catch {set WATCHFILE $env(VDEMO_watchfile)}
     dputs "VDEMO_watchfile = $WATCHFILE"
@@ -148,6 +149,7 @@ proc parse_env_var {} {
             set TITLE($component_name) "$thisCommand"
             set COMPONENTS "$COMPONENTS $component_name"
 
+            if {"$host" != ""} {lappend HOSTS $host}
             set HOST($component_name) $host
             set ARGS($component_name) [lindex $thisComp 2]
             # do not simply tokenize at spaces, but allow quoted strings ("" or '')
@@ -159,8 +161,7 @@ proc parse_env_var {} {
             error "component $i: exepected three comma separated groups in '[string trim [lindex "$comp" $i]]'"
         }
     }
-    puts ""
-
+    set HOSTS [lsort -unique $HOSTS]
 }
 
 proc bind_wheel_sf {comp} {
@@ -183,14 +184,13 @@ proc set_group_noauto {grp} {
 }
 
 proc gui_tcl {} {
-    global HOST COMPONENTS ARGS TERMINAL USEX LOGTEXT env NOAUTO LOGGING  GROUP SCREENED  COMP_LEVEL COMPWIDGET WATCHFILE COMMAND LEVELS TITLE TIMERDETACH TERMINATE_ON_EXIT
+    global HOST HOSTS COMPONENTS ARGS TERMINAL USEX LOGTEXT env NOAUTO LOGGING  GROUP SCREENED  COMP_LEVEL COMPWIDGET WATCHFILE COMMAND LEVELS TITLE TIMERDETACH TERMINATE_ON_EXIT
     set root "."
     set base ""
     set LOGTEXT "demo configured from '$env(VDEMO_demoConfig)'"
     wm title . "vdemo_controller: $env(VDEMO_demoConfig)"
     wm geometry . "960x600"
 
-    set hosts ""
     set groups ""
     set LEVELS ""
 
@@ -203,7 +203,6 @@ proc gui_tcl {} {
     pack $base.components.singles.comp -side left -fill both -expand yes
 
     foreach {c} "$COMPONENTS" {
-        set hosts "$hosts $HOST($c)"
         set groups "$groups $GROUP($c)"
         set LEVELS "$LEVELS $COMP_LEVEL($c)"
         set TIMERDETACH($c) 0
@@ -321,12 +320,11 @@ proc gui_tcl {} {
     ttk::label $base.logarea -textvariable LOGTEXT -style log.TLabel
     pack $base.logarea -side top -fill both
 
-    set hosts [lsort -unique "$hosts"]
     ttk::frame $base.ssh
     pack $base.ssh -side left -fill x
     ttk::label $base.ssh.label -text "ssh to"
     pack $base.ssh.label -side left
-    foreach {h} "$hosts" {
+    foreach {h} $HOSTS {
         add_host $h
     }
 
@@ -850,7 +848,7 @@ proc connect_host {fifo host {doMonitor 1}} {
 }
 
 proc connect_hosts {} {
-    global COMPONENTS HOST
+    global HOSTS
 
     label .vdemoinit -text "init VDemo - be patient..." -foreground darkgreen -font "helvetica 30 bold"
     label .vdemoinit2 -text "" -foreground darkred -font "helvetica 20 bold"
@@ -858,50 +856,32 @@ proc connect_hosts {} {
     pack .vdemoinit2
     update
 
-    set fifos ""
-    foreach {c} "$COMPONENTS" {
-        if {$HOST($c) == ""} {
-            puts "WARNING: empty host name for component $c"
-            continue
-        }
-        set fifo "[get_fifo_name $HOST($c)]"
-        set fifos "$fifos $fifo"
-        set fifo_host($fifo) "$HOST($c)"
-    }
-    set fifos [lsort -unique "$fifos"]
-
-    foreach {f} "$fifos" {
-        .vdemoinit2 configure -text "connect to $fifo_host($f)"
+    foreach {h} $HOSTS {
+        .vdemoinit2 configure -text "connect to $h"
         update
-        connect_host $f $fifo_host($f)
+        set fifo [get_fifo_name $h]
+        connect_host $fifo $h
     }
     destroy .vdemoinit
     destroy .vdemoinit2
 }
 
 proc disconnect_hosts {} {
-    global COMPONENTS env HOST
-    set fifos ""
-    foreach {c} "$COMPONENTS" {
-        set fifo "[get_fifo_name $HOST($c)]"
-        set fifos "$fifos $fifo"
-        set fifo_host($fifo) "$HOST($c)"
-    }
-    set fifos [lsort -unique "$fifos"]
+    global env HOSTS
 
-    foreach {f} "$fifos" {
-        if {$fifo_host($f) == ""} {continue}
-        dputs "disconnecting from $fifo_host($f)"
-        set screenid [get_master_screen_name $fifo_host($f)]
+    foreach {h} $HOSTS {
+        dputs "disconnecting from $h"
+        set screenid [get_master_screen_name $h]
+        set fifo [get_fifo_name $h]
         set screenPID [exec bash -c "screen -list $screenid | grep vdemo | cut -d. -f1"]
-        if {$::AUTO_SPREAD_CONF == 1 && "$screenPID" != "" && [file exists "$f.in"]} {
+        if {$::AUTO_SPREAD_CONF == 1 && "$screenPID" != "" && [file exists "$fifo.in"]} {
             # send ssh command, but do not wait for result
             set cmd "rm -f $env(SPREAD_CONFIG)"
-            exec bash -c "echo 'echo \"*** RUN $cmd\" 1>&2; $cmd 1>&2; echo \$?' > $f.in"
+            exec bash -c "echo 'echo \"*** RUN $cmd\" 1>&2; $cmd 1>&2; echo \$?' > $fifo.in"
         }
         catch {exec bash -c "screen -list $screenid | grep vdemo | cut -d. -f1 | xargs kill 2>&1"}
-        exec rm -f "$f.in"
-        exec rm -f "$f.out"
+        exec rm -f "$fifo.in"
+        exec rm -f "$fifo.out"
     }
 }
 
@@ -948,10 +928,15 @@ proc get_autospread_filename {} {
 
 proc create_spread_conf {} {
     global COMPONENTS COMMAND HOST env
+    set ::AUTO_SPREAD_CONF 0
+
+    # If SPREAD_CONFIG was defined in environment, we are already done
+    if {[info exists ::env(SPREAD_CONFIG)]} { return }
+
     set spread_hosts ""
     foreach {c} "$COMPONENTS" {
         if {"$COMMAND($c)" == "spreaddaemon"} {
-            set spread_hosts "$spread_hosts $HOST($c)"
+            lappend spread_hosts $HOST($c)
         }
     }
     set spread_hosts [lsort -unique "$spread_hosts"]
@@ -1017,7 +1002,7 @@ proc create_spread_conf {} {
     puts $fd "SocketPortReuse = ON"
 
     close $fd
-    puts "created spread conf $filename"
+    puts "created spread config: $filename"
     exec cat $filename
 }
 
@@ -1117,18 +1102,15 @@ puts "My process id is $mypid"
 
 signal trap SIGINT finish
 signal trap SIGHUP finish
+
 setup_temp_dir
 parse_env_var
 remove_duplicates
 
-# auto-create spread config
-set ::AUTO_SPREAD_CONF 0
-if {![info exists ::env(SPREAD_CONFIG)]} {
-    create_spread_conf
-}
 if {![info exists ::env(LD_LIBRARY_PATH)]} {
     set ::env(LD_LIBRARY_PATH) ""
 }
+create_spread_conf
 
 # cleanup dangling connections first
 disconnect_hosts
@@ -1136,6 +1118,7 @@ connect_hosts
 update
 gui_tcl
 update
+
 # autostart
 if {[info exists env(VDEMO_autostart)] && $env(VDEMO_autostart) == "true"} {
     puts "Starting all components due to autostart request"
