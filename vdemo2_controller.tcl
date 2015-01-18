@@ -45,8 +45,12 @@ ttk::style configure info.TLabel -foreground blue -background yellow
 ttk::style configure log.TLabel -justify left -anchor e -relief sunken -foreground gray30
 
 # debugging puts
-proc dputs args {
-    puts stderr "-- $args"
+set DEBUG_LEVEL 0
+proc dputs {args {level 1}} {
+    global DEBUG_LEVEL
+    if [expr $level <= $DEBUG_LEVEL] {
+        puts stderr "-- $args"
+    }
 }
 
 proc parse_options {comp} {
@@ -121,16 +125,17 @@ proc parse_options {comp} {
 
 
 proc parse_env_var {} {
-    global env HOST COMPONENTS ARGS USEX WATCHFILE COMMAND TITLE VDEMOID
+    global env HOST COMPONENTS ARGS USEX WATCHFILE COMMAND TITLE VDEMOID DEBUG_LEVEL
     set VDEMOID [file tail [file rootname $env(VDEMO_demoConfig)]]
     set components_list "$env(VDEMO_components)"
     set comp [split "$components_list" ":"]
     set nCompos [llength "$comp"]
     set COMPONENTS {}
     set WATCHFILE ""
+    catch {set DEBUG_LEVEL $env(VDEMO_DEBUG_LEVEL)}
     catch {set WATCHFILE $env(VDEMO_watchfile)}
-    puts "VDEMO_watchfile = $WATCHFILE"
-    puts "COMPONENTS: "
+    dputs "VDEMO_watchfile = $WATCHFILE"
+    dputs "COMPONENTS: "
     for {set i 0} { $i < $nCompos } {incr i} {
         set thisComp [split [string trim [lindex "$comp" $i]] ","]
         if {[llength "$thisComp"] == 3} {
@@ -147,7 +152,7 @@ proc parse_env_var {} {
             set ARGS($component_name) [lindex $thisComp 2]
             # do not simply tokenize at spaces, but allow quoted strings ("" or '')
             set ARGS($component_name) [regexp -all -inline -- "\\S+|\[^ =\]+=(?:\\S+|\"\[^\"]+\"|'\[^'\]+')" $ARGS($component_name)]
-            puts "$component_name\tHOST: $HOST($component_name)\tARGS: $ARGS($component_name)"
+            dputs [format "%-20s HOST: %-13s ARGS: %s" $component_name $HOST($component_name) $ARGS($component_name)]
             # parse options known by the script and remove them from them the list
             parse_options "$component_name"
         } elseif {[string length [string trim [lindex "$comp" $i]]] != 0} {
@@ -618,7 +623,7 @@ proc component_cmd {comp cmd} {
 
             set cmd_line "$VARS $component_script $component_options check"
             set res [ssh_command "$cmd_line" "$HOST($comp)"]
-            dputs "ssh result: $res"
+            dputs "ssh result: $res" 2
             after idle $COMPWIDGET.$comp.check state !disabled
 
             if { ! [string is integer -strict $res]} {
@@ -681,7 +686,7 @@ proc set_status {comp status} {
         failed_check {set style "check.failed.cmd.TButton"}
         default  {set style "cmd.TButton"}
     }
-    dputs "change status of $comp to $status: $style"
+    dputs "change status of $comp to $status: $style" 2
     $COMPWIDGET.$comp.check configure -style $style
     update
 }
@@ -763,7 +768,7 @@ proc ssh_command {cmd hostname {check 1} {silent 0}} {
     } else {set verbose ""}
 
     set res [exec bash -c "echo '$verbose $cmd 1>&2; echo \$?' > $f.in; cat $f.out"]
-    dputs "ssh result: $res"
+    dputs "ssh result: $res" 2
     return $res
 }
 
@@ -886,7 +891,7 @@ proc remove_duplicates {} {
             set _HAVE($cmdhost) "$cmdhost"
             set _COMPONENTS "$_COMPONENTS $c"
         } else {
-            puts "duplicate component title: $TITLE($c):$HOST($c)"
+            dputs "duplicate component title: $TITLE($c):$HOST($c)"
         }
     }
     set COMPONENTS $_COMPONENTS

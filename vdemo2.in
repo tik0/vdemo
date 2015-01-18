@@ -16,8 +16,9 @@ usage: $SCRIPTNAME [options] <Config file>
 vdemo starter
 
  options:
-  -h  --help         this help text
-  -a  --auto         automatically start all components
+  -h  --help           this help text
+  -a  --auto           automatically start all components
+  -d  --debug [level]  set debug [level]
 
  author: Marc Hanheide ($RCS_ID)
 "
@@ -28,22 +29,30 @@ set -e
 # option checks
 while [ $# -gt 0 ]; do
     case $1 in
-	"-h"|"--help")
-	    echo "$HELP" >& 2
-	    exit 0
-	    ;;
+    "-h"|"--help")
+        echo "$HELP" >& 2
+        exit 0
+        ;;
     "-a"|"--auto")
         echo "Automatically starting all components"
         export VDEMO_autostart="true"
         ;;
-	-*)
-	    echo "illegal option $1" >& 2
-	    echo "$USAGE" >& 2
-	    exit 1
-	    ;;
-	*)
-	    break
-	    ;;
+    "-d"|"--debug")
+        export VDEMO_DEBUG_LEVEL=1
+        if [[ $2 =~ ^-?[0-9]+$ ]] ; then
+            export VDEMO_DEBUG_LEVEL=$2
+            shift
+        fi
+        echo "Using debug level $VDEMO_DEBUG_LEVEL"
+        ;;
+    -*)
+        echo "illegal option $1" >& 2
+        echo "$USAGE" >& 2
+        exit 1
+        ;;
+    *)
+        break
+        ;;
     esac
     shift
 done
