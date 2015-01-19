@@ -750,7 +750,7 @@ proc ssh_check_connection {hostname} {
     return $res
 }
 
-proc ssh_command {cmd hostname {check 1} {silent 0}} {
+proc ssh_command {cmd hostname {check 1} {verbose 1}} {
     set f [get_fifo_name $hostname]
 
     # check if master connection is in place
@@ -762,7 +762,7 @@ proc ssh_command {cmd hostname {check 1} {silent 0}} {
 
     # actually issue the command
     set cmd [string trim "$cmd"]
-    if {!$silent} {
+    if {$verbose > 0} {
         puts "run '$cmd' on host '$hostname'"
         set verbose "echo \"****************************************\" 1>&2; date 1>&2; echo \"*** RUN $cmd\" 1>&2;"
     } else {set verbose ""}
@@ -783,27 +783,62 @@ proc get_fifo_name {hostname} {
 }
 
 proc connect_host {fifo host {doMonitor 1}} {
-    global env SSHOPTS
+    global env SSHOPTS DEBUG_LEVEL
     exec rm -f "$fifo.in"
     exec rm -f "$fifo.out"
     exec mkfifo "$fifo.in"
     exec mkfifo "$fifo.out"
 
-    set screenid [get_master_screen_name $host]
-    exec xterm -title "establish ssh connection to $fifo" -n "$fifo" -e screen -mS $screenid bash -c "tail -s 0.1 -n 10000 -f $fifo.in | ssh $SSHOPTS -Y $host bash | while read s; do echo \$s > $fifo.out; done" &
+    # Here we establish the master connection. Commands pushed into $fifo.in get piped into
+    # the remote bash (over ssh) and the result is read again and piped into $fifo.out.
+    # This way, the remote stdout goes into $fifo.out, while remote stderr is displayed here.
+    set screenid [get_master_screen_name $host]   
+    exec screen -dmS $screenid bash -c "tail -s 0.1 -n 10000 -f $fifo.in | ssh $SSHOPTS -Y $host bash | while read s; do echo \$s > $fifo.out; done"
 
+    # Wait until connection is established. 
+    # Issue a echo command on remote host that only returns if a connection was established. 
+    puts -nonewline "connecting to $host: "; flush stdout
+    exec bash -c "echo 'echo connected' > $fifo.in"
+    # timeout: 30s (should be enough to enter ssh password if necessary)
+    set endtime [expr [clock seconds] + 30]
+    set xterm_shown 0
+    while {$endtime > [clock seconds]} {
+        set res [exec bash -c "timeout 1 cat $fifo.out; echo $?"]
+        set noScreen [catch {exec bash -c "screen -wipe | fgrep -q .$screenid"} ]
+        # continue waiting on timeout (124), otherwise break from loop
+        if {$res == 124} { puts -nonewline "."; flush stdout } { break }
+        # break from loop, when screen session was stopped
+        if {$noScreen} {set res "aborted"; break}
+
+        # show screen session in xterm after 1s (allow entering password, etc.)
+        if { ! $xterm_shown } {
+            exec xterm -title "establish ssh connection to $host" -n "$host" -e screen -rS $screenid &
+            set xterm_shown 1
+        }
+    }
+    if {[string match "connected*" $res]} {
+        puts " OK"
+    } else { # some failure
+        if {$res == 124} {puts " timeout"} {puts " error: $res"}
+        # quit screen session
+        catch {exec screen -XS $screenid quit}
+        exec rm -f "$fifo.in"
+        exec rm -f "$fifo.out"
+        return $res 
+    }
+
+    dputs "issuing remote initialization commands" 2
     if {[info exists env(VDEMO_exports)]} {
         foreach {var} "$env(VDEMO_exports)" {
             if {[info exists env($var)]} {
-                set res [ssh_command "export $var=$env($var)" $host 0]
-                if {$res == 124} {return}
+                ssh_command "export $var=$env($var)" $host 0 $DEBUG_LEVEL
             }
         }
     }
-    set res [ssh_command "source $env(VDEMO_demoConfig)" $host 0]
-    if {$res == 124} {return}
+    ssh_command "source $env(VDEMO_demoConfig)" $host 0 $DEBUG_LEVEL
 
-    exec screen -dS $screenid
+    # detach screen / close xterm
+    catch { exec screen -dS $screenid }
 
     if $doMonitor {connect_screenmonitoring $host}
 
@@ -811,6 +846,7 @@ proc connect_host {fifo host {doMonitor 1}} {
         set content [exec cat $::env(SPREAD_CONFIG)]
         exec bash -c "echo 'echo \"$content\" > $::env(SPREAD_CONFIG)' > $fifo.in"
     }
+    return 0
 }
 
 proc connect_hosts {} {
@@ -855,7 +891,7 @@ proc disconnect_hosts {} {
 
     foreach {f} "$fifos" {
         if {$fifo_host($f) == ""} {continue}
-        puts "terminating master-ssh-connection to $fifo_host($f)"
+        dputs "disconnecting from $fifo_host($f)"
         set screenid [get_master_screen_name $fifo_host($f)]
         set screenPID [exec bash -c "screen -list $screenid | grep vdemo | cut -d. -f1"]
         if {$::AUTO_SPREAD_CONF == 1 && "$screenPID" != "" && [file exists "$f.in"]} {
