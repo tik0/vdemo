@@ -765,7 +765,7 @@ proc ssh_command {cmd hostname {check 1} {verbose 1}} {
     set cmd [string trim "$cmd"]
     if {$verbose > 0} {
         puts "run '$cmd' on host '$hostname'"
-        set verbose "echo \"****************************************\" 1>&2; date 1>&2; echo \"*** RUN $cmd\" 1>&2;"
+        set verbose "echo 1>&2; date +\"*** %X %a, %x ***********************\" 1>&2; echo \"*** RUN $cmd\" 1>&2;"
     } else {set verbose ""}
 
     set res [exec bash -c "echo '$verbose $cmd 1>&2; echo \$?' > $f.in; cat $f.out"]
