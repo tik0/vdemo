@@ -1037,26 +1037,31 @@ proc handle_screen_failure {chan} {
                 set f [get_fifo_name $host]
                 connect_host $f $host 0
             }
-        } else {
+        } else { # a component crashed
             set host $MONITORCHAN_HOST($chan)
             foreach {comp} "$COMPONENTS" {
                 if {$HOST($comp) == $host && \
                     [string match "*.$COMMAND($comp).$TITLE($comp)_" "$line"]} {
-                    puts "$TITLE($comp): screen closed on $MONITORCHAN_HOST($chan), calling stop..."
-                    # store the previous state of the gui to determine whether
-                    # we have been called as a consequence of a user initiated
-                    # stop request (in that case the button is already disabled)
-                    # or through inotify (button not disabled).
-                    # We need to store this variable before calling stop here
-                    # to preserve the original state before user interaction.
-                    set already_disabled [$COMPWIDGET.$comp.stop instate disabled]
-                    component_cmd $comp stop
-                    # only if this is not a user initiated stop, exit the system
-                    # if requested to
-                    if {!$already_disabled && $TERMINATE_ON_EXIT($comp)} {
-                        allcomponents_cmd "stop"
-                        finish
+                    dputs "$comp closed its screen session on $host" 2
+                    if {[$COMPWIDGET.$comp.stop  instate disabled] || \
+                        [$COMPWIDGET.$comp.start instate disabled]} {
+                        # component was stopping or starting -> ignore event
+                    } else {
+                        # if this is not a user initiated stop, exit the system if requested
+                        if {$TERMINATE_ON_EXIT($comp)} {
+                            puts "$comp finished on $host: stopping vdemo"
+                            allcomponents_cmd "stop"
+                            finish
+                        } else {
+                            set ans [tk_messageBox -message \
+                                     "$TITLE($comp) crashed on $host.\nRestart?" \
+                                     -type yesno -icon warning]
+                            # trigger stop: eventually on_stop() does some cleanup
+                            component_cmd $comp stop
+                            if {"$ans" == "yes"} { component_cmd $comp start }
+                        }
                     }
+                    break
                 }
             }
         }
