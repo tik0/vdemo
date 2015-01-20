@@ -193,23 +193,24 @@ proc set_group_noauto {grp} {
     }
 }
 
+# base prefix for gui components
+set ::BASE ""
 proc gui_tcl {} {
     global HOST COMPONENTS ARGS TERMINAL USEX LOGTEXT env NOAUTO LOGGING  GROUP SCREENED  COMP_LEVEL COMPWIDGET WATCHFILE COMMAND LEVELS TITLE TIMERDETACH
-    set base ""
     set LOGTEXT "demo configured from '$env(VDEMO_demoConfig)'"
     wm title . "vdemo_controller: $env(VDEMO_demoConfig)"
-    wm geometry . "875x600"
+    wm geometry $::BASE. "875x600"
 
     set groups ""
     set LEVELS ""
 
-    ttk::frame $base.components
-    ttk::frame $base.components.singles
-    iwidgets::scrolledframe $base.components.singles.comp -vscrollmode dynamic -hscrollmode dynamic
-    bind_wheel_sf $base.components.singles.comp
-    set COMPWIDGET [$base.components.singles.comp childsite]
-    pack $base.components.singles -side top -fill both -expand yes
-    pack $base.components.singles.comp -side left -fill both -expand yes
+    ttk::frame $::BASE.components
+    ttk::frame $::BASE.components.singles
+    iwidgets::scrolledframe $::BASE.components.singles.comp -vscrollmode dynamic -hscrollmode dynamic
+    bind_wheel_sf $::BASE.components.singles.comp
+    set COMPWIDGET [$::BASE.components.singles.comp childsite]
+    pack $::BASE.components.singles -side top -fill both -expand yes
+    pack $::BASE.components.singles.comp -side left -fill both -expand yes
 
     foreach {c} "$COMPONENTS" {
         set groups "$groups $GROUP($c)"
@@ -258,100 +259,99 @@ proc gui_tcl {} {
     }
 
     # buttons to control ALL components
-    ttk::frame $base.components.all -style groove.TFrame
-    pack $base.components.all -side top -fill x
-    ttk::label $base.components.all.label -style TLabel -text "ALL COMPONENTS"
-    ttk::button $base.components.all.start -style cmd.TButton -text "start" -command "allcomponents_cmd start"
-    ttk::button $base.components.all.stop  -style cmd.TButton -text "stop"  -command "allcomponents_cmd stop"
-    ttk::button $base.components.all.check -style cmd.TButton -text "check" -command "allcomponents_cmd check"
-    pack $base.components.all.label -side left
-    pack $base.components.all.start -side left
-    pack $base.components.all.stop  -side left
-    pack $base.components.all.check -side left
+    ttk::frame $::BASE.components.all -style groove.TFrame
+    pack $::BASE.components.all -side top -fill x
+    ttk::label $::BASE.components.all.label -style TLabel -text "ALL COMPONENTS"
+    ttk::button $::BASE.components.all.start -style cmd.TButton -text "start" -command "allcomponents_cmd start"
+    ttk::button $::BASE.components.all.stop  -style cmd.TButton -text "stop"  -command "allcomponents_cmd stop"
+    ttk::button $::BASE.components.all.check -style cmd.TButton -text "check" -command "allcomponents_cmd check"
+    pack $::BASE.components.all.label -side left
+    pack $::BASE.components.all.start -side left
+    pack $::BASE.components.all.stop  -side left
+    pack $::BASE.components.all.check -side left
 
     # clear logger button
-    ttk::button $base.components.all.clearLogger -text "clear logger" -command "clearLogger"
-    pack $base.components.all.clearLogger -side right -ipadx 15
+    ttk::button $::BASE.components.all.clearLogger -text "clear logger" -command "clearLogger"
+    pack $::BASE.components.all.clearLogger -side right -ipadx 15
 
-    ttk::frame $base.components.group
-    pack $base.components.group -side top -fill x
+    ttk::frame $::BASE.components.group
+    pack $::BASE.components.group -side top -fill x
     # button for level control:
     set LEVELS [lsort -unique "$LEVELS"]
-    ttk::frame $base.components.group.level
-    pack $base.components.group.level -side left -fill both
+    ttk::frame $::BASE.components.group.level
+    pack $::BASE.components.group.level -side left -fill both
     foreach {g} "$LEVELS" {
-        ttk::frame $base.components.group.level.$g -style groove.TFrame
-        pack $base.components.group.level.$g -side top -fill x
+        ttk::frame $::BASE.components.group.level.$g -style groove.TFrame
+        pack $::BASE.components.group.level.$g -side top -fill x
 
-        ttk::label $base.components.group.level.$g.label  -text "$g"
-        ttk::button $base.components.group.level.$g.start -style cmd.TButton -text "start" -command "level_cmd start $g"
-        ttk::button $base.components.group.level.$g.stop  -style cmd.TButton -text "stop"  -command "level_cmd stop $g"
-        ttk::button $base.components.group.level.$g.check -style cmd.TButton -text "check" -command "level_cmd check $g"
-        pack $base.components.group.level.$g.label -side left -padx 5 -fill x
-        pack $base.components.group.level.$g.start -side left
-        pack $base.components.group.level.$g.stop  -side left
-        pack $base.components.group.level.$g.check -side left
+        ttk::label $::BASE.components.group.level.$g.label  -text "$g"
+        ttk::button $::BASE.components.group.level.$g.start -style cmd.TButton -text "start" -command "level_cmd start $g"
+        ttk::button $::BASE.components.group.level.$g.stop  -style cmd.TButton -text "stop"  -command "level_cmd stop $g"
+        ttk::button $::BASE.components.group.level.$g.check -style cmd.TButton -text "check" -command "level_cmd check $g"
+        pack $::BASE.components.group.level.$g.label -side left -padx 5 -fill x
+        pack $::BASE.components.group.level.$g.start -side left
+        pack $::BASE.components.group.level.$g.stop  -side left
+        pack $::BASE.components.group.level.$g.check -side left
     }
     # button for group control:
     set groups [lsort -unique "$groups"]
-    ttk::frame $base.components.group.named
-    pack $base.components.group.named -side left -fill both
+    ttk::frame $::BASE.components.group.named
+    pack $::BASE.components.group.named -side left -fill both
     foreach {g} "$groups" {
-        ttk::frame $base.components.group.named.$g -style groove.TFrame
-        pack $base.components.group.named.$g -side top -fill x
-        ttk::label $base.components.group.named.$g.label  -style group.TLabel -text "$g" -width 10 -anchor e
-        ttk::button $base.components.group.named.$g.start -style cmd.TButton -text "start" -command "group_cmd start $g"
-        ttk::button $base.components.group.named.$g.stop  -style cmd.TButton -text "stop"  -command "group_cmd stop $g"
-        ttk::button $base.components.group.named.$g.check -style cmd.TButton -text "check" -command "group_cmd check $g"
-        ttk::checkbutton $base.components.group.named.$g.noauto -text "no auto" -command "set_group_noauto $g" -variable GNOAUTO($g) -onvalue 1 -offvalue 0
+        ttk::frame $::BASE.components.group.named.$g -style groove.TFrame
+        pack $::BASE.components.group.named.$g -side top -fill x
+        ttk::label $::BASE.components.group.named.$g.label  -style group.TLabel -text "$g" -width 10 -anchor e
+        ttk::button $::BASE.components.group.named.$g.start -style cmd.TButton -text "start" -command "group_cmd start $g"
+        ttk::button $::BASE.components.group.named.$g.stop  -style cmd.TButton -text "stop"  -command "group_cmd stop $g"
+        ttk::button $::BASE.components.group.named.$g.check -style cmd.TButton -text "check" -command "group_cmd check $g"
+        ttk::checkbutton $::BASE.components.group.named.$g.noauto -text "no auto" -command "set_group_noauto $g" -variable GNOAUTO($g) -onvalue 1 -offvalue 0
 
-        pack $base.components.group.named.$g.label -side left -padx 2
-        pack $base.components.group.named.$g.start -side left
-        pack $base.components.group.named.$g.stop -side left
-        pack $base.components.group.named.$g.check -side left
-        pack $base.components.group.named.$g.noauto -side left
+        pack $::BASE.components.group.named.$g.label -side left -padx 2
+        pack $::BASE.components.group.named.$g.start -side left
+        pack $::BASE.components.group.named.$g.stop -side left
+        pack $::BASE.components.group.named.$g.check -side left
+        pack $::BASE.components.group.named.$g.noauto -side left
     }
 
     # LOGGER area (WATCHFILE)
-    ttk::frame $base.components.group.log
-    text $base.components.group.log.text -yscrollcommand "$base.components.group.log.sb set" -height 8
+    ttk::frame $::BASE.components.group.log
+    text $::BASE.components.group.log.text -yscrollcommand "$::BASE.components.group.log.sb set" -height 8
 
-    ttk::scrollbar $base.components.group.log.sb -command "$base.components.group.log.text yview"
-    pack $base.components.group.log -side left -fill both -expand 1
-    pack $base.components.group.log.text -side left -fill both -expand 1
-    pack $base.components.group.log.sb -side right -fill y
+    ttk::scrollbar $::BASE.components.group.log.sb -command "$::BASE.components.group.log.text yview"
+    pack $::BASE.components.group.log -side left -fill both -expand 1
+    pack $::BASE.components.group.log.text -side left -fill both -expand 1
+    pack $::BASE.components.group.log.sb -side right -fill y
     if {"$WATCHFILE" != ""} {
         init_logger "$WATCHFILE"
     }
 
-    pack $base.components -side top -fill both -expand yes
+    pack $::BASE.components -side top -fill both -expand yes
 
     # logarea
-    ttk::label $base.logarea -textvariable LOGTEXT -style log.TLabel
-    pack $base.logarea -side top -fill both
+    ttk::label $::BASE.logarea -textvariable LOGTEXT -style log.TLabel
+    pack $::BASE.logarea -side top -fill both
 
-    ttk::frame $base.ssh
-    pack $base.ssh -side left -fill x
-    ttk::label $base.ssh.label -text "ssh to"
-    pack $base.ssh.label -side left
+    ttk::frame $::BASE.ssh
+    pack $::BASE.ssh -side left -fill x
+    ttk::label $::BASE.ssh.label -text "ssh to"
+    pack $::BASE.ssh.label -side left
     foreach {h} $::HOSTS {
         gui_add_host $h
     }
 
-    ttk::button $base.exit -style exit.TButton -text "exit" -command {gui_exit}
-    pack $base.exit -side right
+    ttk::button $::BASE.exit -style exit.TButton -text "exit" -command {gui_exit}
+    pack $::BASE.exit -side right
 
     if {[info exists ::env(VDEMO_alert_string)]} {
-        ttk::label $base.orlabel -style alert.TLabel -text "$env(VDEMO_alert_string)"
-        pack $base.orlabel -fill x
+        ttk::label $::BASE.orlabel -style alert.TLabel -text "$env(VDEMO_alert_string)"
+        pack $::BASE.orlabel -fill x
     } elseif {[info exists ::env(VDEMO_info_string)]} {
-        ttk::label $base.orlabel -style info.TLabel -text "no robot config loaded"
-        pack $base.orlabel -fill x
+        ttk::label $::BASE.orlabel -style info.TLabel -text "no robot config loaded"
+        pack $::BASE.orlabel -fill x
     }
 }
 
 proc gui_add_host {host} {
-    set base ""
     set lh [string tolower "$host"]
 
     # check status of screen session, but do not attempt to reconnect (avoiding infinite recursion)
@@ -363,31 +363,30 @@ proc gui_add_host {host} {
 
     set ::SCREENED_SSH($host) 0
 
-    if {[catch {$base.ssh.$lh.xterm configure -style $style}]} {
+    if {[catch {$::BASE.ssh.$lh.xterm configure -style $style}]} {
         # create buttons
-        ttk::frame  $base.ssh.$lh
-        ttk::button $base.ssh.$lh.xterm -style $style -text "$host" -command "remote_xterm $host"
-        ttk::button $base.ssh.$lh.clock -style cmd.TButton -text "⌚" -command "remote_clock $host" -width -2
-        ttk::checkbutton $base.ssh.$lh.screen -text "" -command "screen_ssh_master $host" -variable ::SCREENED_SSH($host) -onvalue 1 -offvalue 0
-        pack $base.ssh.$lh -side left -fill x -padx 3
-        pack $base.ssh.$lh.xterm  -side left -fill x
-        pack $base.ssh.$lh.clock  -side left -fill x
-        pack $base.ssh.$lh.screen -side left -fill x
+        ttk::frame  $::BASE.ssh.$lh
+        ttk::button $::BASE.ssh.$lh.xterm -style $style -text "$host" -command "remote_xterm $host"
+        ttk::button $::BASE.ssh.$lh.clock -style cmd.TButton -text "⌚" -command "remote_clock $host" -width -2
+        ttk::checkbutton $::BASE.ssh.$lh.screen -text "" -command "screen_ssh_master $host" -variable ::SCREENED_SSH($host) -onvalue 1 -offvalue 0
+        pack $::BASE.ssh.$lh -side left -fill x -padx 3
+        pack $::BASE.ssh.$lh.xterm  -side left -fill x
+        pack $::BASE.ssh.$lh.clock  -side left -fill x
+        pack $::BASE.ssh.$lh.screen -side left -fill x
     }
 }
 
 # update button status to reflect state of master ssh connection
 proc gui_update_host {host status {forceCreate 0}} {
-    set base ""
     set lh [string tolower "$host"]
     dputs "gui_update_host: status:$status  forceCreate:$forceCreate" 3
     if {$status == 0} {set style "ok.cmd.TButton"} {set style "failed.cmd.TButton"}
-    catch {$base.ssh.$lh.xterm configure -style $style}
+    catch {$::BASE.ssh.$lh.xterm configure -style $style}
 }
 
 proc clearLogger {} {
     global WATCHFILE
-    .components.group.log.text delete 1.0 end
+    $::BASE.components.group.log.text delete 1.0 end
     exec echo -n "" >> "$WATCHFILE"
 }
 
@@ -405,8 +404,8 @@ proc init_logger {filename} {
 
 proc insertLog {infile} {
     if { [gets $infile line] >= 0 } {
-        .components.group.log.text insert end "$line\n"  ;# Add a newline too
-        .components.group.log.text yview moveto 1
+        $::BASE.components.group.log.text insert end "$line\n"  ;# Add a newline too
+        $::BASE.components.group.log.text yview moveto 1
 
     } else {
         # Close the pipe - otherwise we will loop endlessly
@@ -709,7 +708,7 @@ proc component_cmd {comp cmd} {
 }
 
 proc wheelEvent { x y delta } {
-    .components.singles.comp yview scroll $delta units
+    $::BASE.components.singles.comp yview scroll $delta units
 }
 bind all <4> "+wheelEvent %X %Y -5"
 bind all <5> "+wheelEvent %X %Y  5"
@@ -1125,7 +1124,7 @@ proc gui_exit {} {
     }
 }
 
-wm protocol . WM_DELETE_WINDOW {
+wm protocol $::BASE. WM_DELETE_WINDOW {
     gui_exit
 }
 
