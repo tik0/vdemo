@@ -57,10 +57,14 @@ proc parse_options {comp} {
     global env COMPONENTS ARGS USEX TERMINAL WAIT_READY NOAUTO LOGGING GROUP DETACHTIME COMP_LEVEL EXPORTS TITLE CONT_CHECK CHECKNOWAIT_TIME TERMINATE_ON_EXIT
     set NEWARGS [list]
     set USEX($comp) 0
-    set WAIT_READY($comp) 0
-    set CHECKNOWAIT_TIME($comp) 1
-    set CONT_CHECK($comp) 0
+    # time to wait for a process to startup
+    set WAIT_READY($comp) 0 
+    # time until process is checked after start (when not waiting)
+    set CHECKNOWAIT_TIME($comp) 1 
+    # continously check for sucessful start of a component?
+    set CONT_CHECK($comp) 1
     set GROUP($comp) ""
+    # detach a component after this time
     set DETACHTIME($comp) 10
     set NOAUTO($comp) 0
     set TERMINAL($comp) "screen"
