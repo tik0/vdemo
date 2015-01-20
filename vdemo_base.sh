@@ -1,20 +1,18 @@
 function start_Xserver {
-    XPIDFILE=/tmp/VDEMO_xserver_${VDEMO_title}_${USER}.pid
-    i=0;
-    echo "trying to find an X display" >&2
-    while [ $i -lt 10 ]; do
-        if [ -e "/tmp/.X${i}-lock" ]; then
-            echo "X running on :${i}, try to use it" >&2
-            if xwininfo -display :${i} -root 1>&2; then
-                echo "found accessible X :${i}, reusing it" >&2
-                echo ":${i}"
-                return 0
-            fi
+    echo -n "Trying to find an unlocked X session ..." >&2
+	 _user_sessions=$(who | egrep "$USER :[0-9]+" | cut -f2 -d " ")
+	 _other_sessions=$(who | egrep ".* :[0-9]+" | grep -v $USER | cut -f2 -d " ")
+	 for d in $_user_sessions $_other_sessions; do
+        echo -n " $d" >&2
+        if xwininfo -display $d -root > /dev/null 2>&1; then
+				_owner=$(who | egrep ".* $d" | cut -f1 -d " ")
+				echo " ($_owner) works." >&2
+            echo "$d"
+            return 0
         fi
-        echo  "X on :${i} locked, try next..." >&2
-        i=$(expr $i + 1)
     done
-    echo "couldn't find a free display for the xserver. exiting" >&2
+	 echo >&2
+    echo "Couldn't find an unlocked X session. Consider using xhost+." >&2
     exit 2
 }
 
@@ -95,8 +93,6 @@ function vdemo_inspect {
 #   -d    use X11 DISPLAY to display the component
 # remaining arguments are treated as command line of the component to start
 function vdemo_start_component {
-    # give the component 8 seconds to startup and set up the X11 connection
-    VDEMO_wait=20
     VDEMO_title=""
     VDEMO_componentDisplay="${DISPLAY}"
     VDEMO_logging=""

@@ -588,9 +588,10 @@ proc component_cmd {comp cmd} {
             set res [ssh_command "$cmd_line" "$HOST($comp)"]
 
             if {$res == 2} {
-                puts "*** X connection failed: consider xhost + on $HOST($comp)"
+                set msg "X connection failed on $HOST($comp).\nConsider using xhost+"
                 set_status $comp failed_noscreen
                 $COMPWIDGET.$comp.start state !disabled
+                tk_messageBox -message $msg -icon warning -type ok
                 return
             }
 
