@@ -6,43 +6,43 @@ function start_Xserver {
 	# above expressions fail on Ubuntu 12.04 (Precise), list all sessions as fallback:
 	_all_sessions=$(for x in /tmp/.X*-lock; do x=${x#/tmp/.X}; echo ":${x%-lock}"; done)
 	for d in $_user_sessions $_other_sessions $_all_sessions; do
-        echo -n " $d" >&2
-        if xwininfo -display $d -root > /dev/null 2>&1; then
-				_owner=$(who | egrep ".* $d" | cut -f1 -d " ")
-				echo " ($_owner) works." >&2
-            echo "$d"
-            return 0
-        fi
-    done
-	 echo >&2
-    echo "Couldn't find an unlocked X session. Consider using xhost+." >&2
-    exit 2
+		echo -n " $d" >&2
+		if xwininfo -display $d -root > /dev/null 2>&1; then
+			_owner=$(who | egrep ".* $d" | cut -f1 -d " ")
+			echo " ($_owner) works." >&2
+			echo "$d"
+			return 0
+		fi
+	done
+	echo >&2
+	echo "Couldn't find an unlocked X session. Consider using xhost+." >&2
+	exit 2
 }
 
 function vdemo_pidFromScreen {
-    # we append underscore to distinguish between components with same prefix
-    VDEMO_title="$1_"
-    screen -ls | grep "${VDEMO_title}\s" | cut -f1 -d. | tr -d "\t "
+	# we append underscore to distinguish between components with same prefix
+	VDEMO_title="$1_"
+	screen -ls | grep "${VDEMO_title}\s" | cut -f1 -d. | tr -d "\t "
 }
 
 # check for a running component
 # $1:   title of the component
 function vdemo_check_component {
-    VDEMO_title="$1"
-    VDEMO_pid=$(vdemo_pidFromScreen ${VDEMO_title})
-    if [ "$VDEMO_pid" ]; then
-        echo "checking $VDEMO_title" >&2
-        if ps -o user,pid,stime,cmd --no-headers -p "${VDEMO_pid}"; then
-            echo "running" >&2
-            return 0
-        else
-            echo "not running" >&2
-            return 2
-        fi
-    else
+	VDEMO_title="$1"
+	VDEMO_pid=$(vdemo_pidFromScreen ${VDEMO_title})
+	if [ "$VDEMO_pid" ]; then
+		echo "checking $VDEMO_title" >&2
+		if ps -o user,pid,stime,cmd --no-headers -p "${VDEMO_pid}"; then
+			echo "running" >&2
+			return 0
+		else
+			echo "not running" >&2
+			return 2
+		fi
+	else
 		echo "no screen registered" >&2
 		return 1
-    fi
+	fi
 }
 
 # reattach to a running "screened" component
@@ -81,13 +81,13 @@ function vdemo_detach_screen {
 # show log output of a component
 # $1:   title of the component
 function vdemo_showlog {
-     xterm -fg white -bg darkblue -title "log of ${1}@${HOSTNAME}" -e \
-          less -R "$VDEMO_logfile_prefix${1}.log" &
+	xterm -fg white -bg darkblue -title "log of ${1}@${HOSTNAME}" -e \
+		less -R "$VDEMO_logfile_prefix${1}.log" &
 }
 
 function vdemo_inspect {
-     xterm -fg white -bg black -title "inspect ${1}@${HOSTNAME}" -e \
-          vdemo_inspect_cmd &
+	xterm -fg white -bg black -title "inspect ${1}@${HOSTNAME}" -e \
+		vdemo_inspect_cmd &
 }
 
 # start a component. This function has the following options:
@@ -96,64 +96,64 @@ function vdemo_inspect {
 #   -d    use X11 DISPLAY to display the component
 # remaining arguments are treated as command line of the component to start
 function vdemo_start_component {
-    VDEMO_title=""
-    VDEMO_componentDisplay="${DISPLAY}"
-    VDEMO_logging=""
-    ICONIC="-iconic"
-    COLOR="green"
-    log_rotation_command=""
-    tee_command="tee"
+	VDEMO_title=""
+	VDEMO_componentDisplay="${DISPLAY}"
+	VDEMO_logging=""
+	ICONIC="-iconic"
+	COLOR="green"
+	log_rotation_command=""
+	tee_command="tee"
 
-    while [ $# -gt 0 ]; do
-    case $1 in
-        "-n"|"--name")
-        shift
-        VDEMO_title="$1"
-        ;;
-        "-d"|"--display")
-        shift
-        VDEMO_componentDisplay="$1"
-        ;;
-        "-l"|"--logging")
-        VDEMO_logfile="${VDEMO_logfile_prefix}${VDEMO_title}.log"
-        logfiledir="${VDEMO_logfile%/*}"
-        if [ ! -d "$logfiledir" ]; then mkdir -p "$logfiledir"; fi
-        if [ "$LOG_ROTATION" == "ON" ]; then
-            tee_command="tee -a"
-            component_logrotate_configfile=${VDEMO_logfile_prefix}${VDEMO_title}.rotation.conf
-            component_logrotate_statefile=${VDEMO_logfile_prefix}${VDEMO_title}.rotation.state
+	while [ $# -gt 0 ]; do
+		case $1 in
+			"-n"|"--name")
+				shift
+				VDEMO_title="$1"
+				;;
+			"-d"|"--display")
+				shift
+				VDEMO_componentDisplay="$1"
+				;;
+			"-l"|"--logging")
+				VDEMO_logfile="${VDEMO_logfile_prefix}${VDEMO_title}.log"
+				logfiledir="${VDEMO_logfile%/*}"
+				if [ ! -d "$logfiledir" ]; then mkdir -p "$logfiledir"; fi
+				if [ "$LOG_ROTATION" == "ON" ]; then
+					tee_command="tee -a"
+					component_logrotate_configfile=${VDEMO_logfile_prefix}${VDEMO_title}.rotation.conf
+					component_logrotate_statefile=${VDEMO_logfile_prefix}${VDEMO_title}.rotation.state
 
-            echo "${VDEMO_logfile} {
-                size ${LOG_ROTATION_SIZE-50M}
-                rotate ${LOG_ROTATION_COUNT-8}
-                missingok
-                notifempty
-                copytruncate
-                ${LOG_ROTATION_OPTIONS-compress}
-            }" > ${component_logrotate_configfile}
-            log_rotation_command="(while true; do /usr/sbin/logrotate ${component_logrotate_configfile} -s ${component_logrotate_statefile}; sleep ${LOG_ROTATION_INTERVALL-300}; done)& "
-        fi
-        echo "logging to ${VDEMO_logfile}" >&2
-        VDEMO_logging="exec > >($tee_command \"${VDEMO_logfile}\"); exec 2>&1; "
-        ;;
-        --)
-        break
-        ;;
-        "--noiconic")
-        ICONIC=""
-        COLOR=white
-        ;;
-        -*)
-        echo "illegal option $1" >& 2
-        echo "$USAGE" >& 2
-        exit 1
-        ;;
-        *)
-        break
-        ;;
-    esac
-    shift
-    done
+					echo "${VDEMO_logfile} {
+	size ${LOG_ROTATION_SIZE-50M}
+	rotate ${LOG_ROTATION_COUNT-8}
+	missingok
+	notifempty
+	copytruncate
+	${LOG_ROTATION_OPTIONS-compress}
+}" > ${component_logrotate_configfile}
+					log_rotation_command="(while true; do /usr/sbin/logrotate ${component_logrotate_configfile} -s ${component_logrotate_statefile}; sleep ${LOG_ROTATION_INTERVALL-300}; done)& "
+				fi
+				echo "logging to ${VDEMO_logfile}" >&2
+				VDEMO_logging="exec > >($tee_command \"${VDEMO_logfile}\"); exec 2>&1; "
+				;;
+			--)
+				break
+				;;
+			"--noiconic")
+				ICONIC=""
+				COLOR=white
+				;;
+			-*)
+				echo "illegal option $1" >& 2
+				echo "$USAGE" >& 2
+				exit 1
+				;;
+			*)
+				break
+				;;
+		esac
+		shift
+	done
 
 	export -f component
 	rm -f ${VDEMO_logfile} # remove any old log file
@@ -192,12 +192,12 @@ function all_children {
 
 function vdemo_pidsFromComponent {
 	# pid of bash process inside screen
-    local ppid=$(ps --ppid $1 -o pid --no-headers)
-    local children=$(ps --ppid $ppid -o pid --no-headers --sort -start_time,-pid)
+	local ppid=$(ps --ppid $1 -o pid --no-headers)
+	local children=$(ps --ppid $ppid -o pid --no-headers --sort -start_time,-pid)
 
-    if [ "$LOG_ROTATION" == "ON" ]; then tee_command="tee -a"; else tee_command="tee"; fi
-    # exclude the logging process (tee)
-    for pid in $children; do
+	if [ "$LOG_ROTATION" == "ON" ]; then tee_command="tee -a"; else tee_command="tee"; fi
+	# exclude the logging process (tee)
+	for pid in $children; do
 		if [[ ! "$(ps -p $pid -o cmd=)" =~ \
 			"bash -i -c exec > >($tee_command \"/tmp/vdemo-" ]]; then
 			echo -n " $pid"
