@@ -135,14 +135,14 @@ proc parse_options {comp} {
 
 
 proc parse_env_var {} {
-    global env HOST HOSTS COMPONENTS ARGS USEX WATCHFILE COMMAND TITLE VDEMOID DEBUG_LEVEL
+    global env HOST COMPONENTS ARGS USEX WATCHFILE COMMAND TITLE VDEMOID DEBUG_LEVEL
     set VDEMOID [file tail [file rootname $env(VDEMO_demoConfig)]]
     set components_list "$env(VDEMO_components)"
     set comp [split "$components_list" ":"]
     set nCompos [llength "$comp"]
     set COMPONENTS {}
     set WATCHFILE ""
-    set HOSTS ""
+    set ::HOSTS ""
     catch {set DEBUG_LEVEL $env(VDEMO_DEBUG_LEVEL)}
     catch {set WATCHFILE $env(VDEMO_watchfile)}
     dputs "VDEMO_watchfile = $WATCHFILE"
@@ -159,7 +159,7 @@ proc parse_env_var {} {
             set TITLE($component_name) "$thisCommand"
             set COMPONENTS "$COMPONENTS $component_name"
 
-            if {"$host" != ""} {lappend HOSTS $host}
+            if {"$host" != ""} {lappend ::HOSTS $host}
             set HOST($component_name) $host
             set ARGS($component_name) [lindex $thisComp 2]
             # do not simply tokenize at spaces, but allow quoted strings ("" or '')
@@ -171,7 +171,7 @@ proc parse_env_var {} {
             error "component $i: exepected three comma separated groups in '[string trim [lindex "$comp" $i]]'"
         }
     }
-    set HOSTS [lsort -unique $HOSTS]
+    set ::HOSTS [lsort -unique $::HOSTS]
 }
 
 proc bind_wheel_sf {comp} {
@@ -194,8 +194,7 @@ proc set_group_noauto {grp} {
 }
 
 proc gui_tcl {} {
-    global HOST HOSTS COMPONENTS ARGS TERMINAL USEX LOGTEXT env NOAUTO LOGGING  GROUP SCREENED  COMP_LEVEL COMPWIDGET WATCHFILE COMMAND LEVELS TITLE TIMERDETACH
-    set root "."
+    global HOST COMPONENTS ARGS TERMINAL USEX LOGTEXT env NOAUTO LOGGING  GROUP SCREENED  COMP_LEVEL COMPWIDGET WATCHFILE COMMAND LEVELS TITLE TIMERDETACH
     set base ""
     set LOGTEXT "demo configured from '$env(VDEMO_demoConfig)'"
     wm title . "vdemo_controller: $env(VDEMO_demoConfig)"
@@ -335,8 +334,8 @@ proc gui_tcl {} {
     pack $base.ssh -side left -fill x
     ttk::label $base.ssh.label -text "ssh to"
     pack $base.ssh.label -side left
-    foreach {h} $HOSTS {
-        add_host $h
+    foreach {h} $::HOSTS {
+        gui_add_host $h
     }
 
     ttk::button $base.exit -style exit.TButton -text "exit" -command {gui_exit}
@@ -351,20 +350,39 @@ proc gui_tcl {} {
     }
 }
 
-proc add_host {host} {
-    global HOST SCREENED_SSH
+proc gui_add_host {host} {
     set base ""
     set lh [string tolower "$host"]
-    set SCREENED_SSH($host) 0
 
-    ttk::frame  $base.ssh.$lh
-    ttk::button $base.ssh.$lh.xterm -style cmd.TButton -text "$host" -command "remote_xterm $host"
-    ttk::button $base.ssh.$lh.clock -style cmd.TButton -text "⌚" -command "remote_clock $host" -width -2
-    ttk::checkbutton $base.ssh.$lh.screen -text "" -command "screen_ssh_master $host" -variable SCREENED_SSH($host) -onvalue 1 -offvalue 0
-    pack $base.ssh.$lh -side left -fill x -padx 3
-    pack $base.ssh.$lh.xterm  -side left -fill x
-    pack $base.ssh.$lh.clock  -side left -fill x
-    pack $base.ssh.$lh.screen -side left -fill x
+    # check status of screen session, but do not attempt to reconnect (avoiding infinite recursion)
+    set connection [ssh_check_connection $host 0]
+    if {$connection == 0} {set style "ok.cmd.TButton"} {set style "failed.cmd.TButton"}
+    
+    # add $host to list of known $::HOSTS if necessary
+    if {[lsearch -exact $::HOSTS $host] == -1} {lappend ::HOSTS $host}
+
+    set ::SCREENED_SSH($host) 0
+
+    if {[catch {$base.ssh.$lh.xterm configure -style $style}]} {
+        # create buttons
+        ttk::frame  $base.ssh.$lh
+        ttk::button $base.ssh.$lh.xterm -style $style -text "$host" -command "remote_xterm $host"
+        ttk::button $base.ssh.$lh.clock -style cmd.TButton -text "⌚" -command "remote_clock $host" -width -2
+        ttk::checkbutton $base.ssh.$lh.screen -text "" -command "screen_ssh_master $host" -variable ::SCREENED_SSH($host) -onvalue 1 -offvalue 0
+        pack $base.ssh.$lh -side left -fill x -padx 3
+        pack $base.ssh.$lh.xterm  -side left -fill x
+        pack $base.ssh.$lh.clock  -side left -fill x
+        pack $base.ssh.$lh.screen -side left -fill x
+    }
+}
+
+# update button status to reflect state of master ssh connection
+proc gui_update_host {host status {forceCreate 0}} {
+    set base ""
+    set lh [string tolower "$host"]
+    dputs "gui_update_host: status:$status  forceCreate:$forceCreate" 3
+    if {$status == 0} {set style "ok.cmd.TButton"} {set style "failed.cmd.TButton"}
+    catch {$base.ssh.$lh.xterm configure -style $style}
 }
 
 proc clearLogger {} {
@@ -552,7 +570,8 @@ proc component_cmd {comp cmd} {
 
             set res [ssh_command "screen -wipe | fgrep -q .$COMMAND($comp).$TITLE($comp)_" "$HOST($comp)"]
             if {$res == -1} {
-                puts "no connection to $HOST($comp)"
+                puts "no master connection to $HOST($comp)"
+                $COMPWIDGET.$comp.start state !disabled
                 return
             } elseif {$res == 0} {
                 puts "$TITLE($comp): already running, stopping first..."
@@ -595,11 +614,11 @@ proc component_cmd {comp cmd} {
             set cmd_line "$VARS $component_script $component_options stop"
             set WAIT_BREAK 1
 
-            ssh_command "$cmd_line" "$HOST($comp)"
+            set res [ssh_command "$cmd_line" "$HOST($comp)"]
             set SCREENED($comp) 0
 
             after idle $COMPWIDGET.$comp.stop state !disabled
-            after idle component_cmd $comp check
+            if {$res != -1} { after idle component_cmd $comp check }
         }
         screen {
             cancel_detach_timer $comp
@@ -642,8 +661,7 @@ proc component_cmd {comp cmd} {
                 return
             }
 
-            if {$res == -1} {puts "no ssh connection"; return}
-            if {$res == 124} {puts "ssh command timed out"; return}
+            if {$res == -1} {dputs "no master connection to $HOST($comp)"; return}
 
             set noscreen 0
             # res = 10*onCheckResult + screenResult
@@ -716,12 +734,11 @@ proc set_status {comp status} {
 # {{{ ssh and command procs
 
 proc screen_ssh_master {h} {
-    global SCREENED_SSH
     set screenid [get_master_screen_name $h]
-    if {$SCREENED_SSH($h) == 1} {
+    if {$::SCREENED_SSH($h) == 1} {
         if { [catch {exec bash -c "screen -wipe | fgrep -q .$screenid"} ] } {
             set f [get_fifo_name $h]
-            connect_host $f $h 0
+            gui_update_host $h [connect_host $f $h 0]
         }
         exec  xterm -title "MASTER SSH CONNECTION TO $h." -e screen -r -S $screenid &
     } else {
@@ -729,46 +746,59 @@ proc screen_ssh_master {h} {
     }
 }
 
-proc ssh_check_connection {hostname} {
-    global WAIT_BREAK
-    set f [get_fifo_name $hostname]
-    set screenid [get_master_screen_name $hostname]
-    
-    if { [catch {exec bash -c "screen -wipe | fgrep -q .$screenid"} ] } {
-        # need to establish connection in first place?
-        if {[file exists "$f.in"] == 0} {
-            if { [tk_messageBox -message "Establish connection to $hostname?" \
-                -type yesno -icon question] == yes} {
-                connect_host $f $hostname
-                add_host $hostname
-            } else {
-                set WAIT_BREAK 1
-                return -1
-            }
-        } else {
-            if { [tk_messageBox -message "Lost connection to $hostname. Reestablish?" \
-                -type yesno -icon question] == yes} {
-                connect_host $f $hostname 0
-            } else {
-                set WAIT_BREAK 1
-                return -1
-            }
-        }
+proc reconnect_host {host msg} {
+    # error code to indicate that user cancelled reconnection
+    set res -2
+    if { [tk_messageBox -message $msg -type yesno -icon question] == yes } {
+        # try to connect to host
+        set fifo [get_fifo_name $host]
+        set res [connect_host $fifo $host]
     }
-
-    # Issue a dummy command to check whether connection is broken. In this case we get a timeout.
-    # Without checking, reading $f.out will last forever when ssh connection is broken.
-    # The error code of the timeout is 124. Tcl creates an exception on timeout.
-    # Instead of timing out on the real ssh_command, we timeout here on a dummy, because here we
-    # know, that the command shouldn't last long. However, the real ssh_command could last rather
-    # long, e.g. stopping a difficult component. This would generate a spurious timeout.
-    catch { set res 124; set res [exec bash -c "echo 'echo 0' > $f.in; timeout 1 cat $f.out"] }
-    dputs "connection check result: $res" 2
-
-    # cat might also fetch the result of a previous, delayed ssh command. Hence, if we didn't 
-    # timed out, set the result always to zero.
-    if {$res != 124} {set res 0}
+    gui_update_host $host $res
     return $res
+}
+
+proc ssh_check_connection {hostname {connect 1}} {
+    set fifo [get_fifo_name $hostname]
+    set screenid [get_master_screen_name $hostname]
+    # error code to indicate missing master connection
+    set res -1
+    set msg ""
+    if { [catch {exec bash -c "screen -wipe | fgrep -q .$screenid"} ] } {
+        if {[file exists "$fifo.in"] == 0} {
+            # fifo not yet in place / connection never succeeded yet
+            set msg "Establish connection to $hostname?"
+        } else {
+            # fifo in place, screen session terminated or crashed
+            set msg "Lost connection to $hostname. Reconnect?"
+        }
+    } else {
+        # Issue a dummy command to check whether connection is still alive. If not, we get a timeout after 1s.
+        # Without checking, reading $fifo.out will last forever when ssh connection is broken.
+        # The error code of the timeout is 124. Tcl creates an exception on timeout.
+        # Instead of timing out on the real ssh_command, we timeout here on a dummy, because here we
+        # know, that the command shouldn't last long. However, the real ssh_command could last rather
+        # long, e.g. stopping a difficult component. This would generate a spurious timeout.
+        catch { set res 124; set res [exec bash -c "echo 'echo 0' > $fifo.in; timeout 1 cat $fifo.out"] }
+        dputs "connection check result: $res" 2
+
+        # cat might also fetch the result of a previous, delayed ssh command. Hence, if we didn't 
+        # timed out, set the result always to zero.
+        if {$res != 124} {set res 0} {set msg "Timeout on connection to $hostname. Reconnect?"}
+    }
+ 
+    # actually try to reconnect
+    if { $msg != "" && (!$connect || [reconnect_host $hostname $msg] != 0) } {
+        set ::WAIT_BREAK 1
+        return $res
+    } elseif { $msg != "" && $connect } {
+        # successfully (re)established connection
+        gui_add_host $hostname
+    } else {
+        # otherwise connection was OK anyway
+        gui_update_host $hostname 0
+    }
+    return 0
 }
 
 proc ssh_command {cmd hostname {check 1} {verbose 1}} {
@@ -778,7 +808,7 @@ proc ssh_command {cmd hostname {check 1} {verbose 1}} {
     if $check {
         set res [ssh_check_connection $hostname]
         # return on error
-        if $res { return $res; }
+        if $res { return -1 }
     }
 
     # actually issue the command
@@ -871,15 +901,13 @@ proc connect_host {fifo host {doMonitor 1}} {
 }
 
 proc connect_hosts {} {
-    global HOSTS
-
     label .vdemoinit -text "init VDemo - be patient..." -foreground darkgreen -font "helvetica 30 bold"
     label .vdemoinit2 -text "" -foreground darkred -font "helvetica 20 bold"
     pack .vdemoinit
     pack .vdemoinit2
     update
 
-    foreach {h} $HOSTS {
+    foreach {h} $::HOSTS {
         .vdemoinit2 configure -text "connect to $h"
         update
         set fifo [get_fifo_name $h]
@@ -890,16 +918,14 @@ proc connect_hosts {} {
 }
 
 proc disconnect_hosts {} {
-    global env HOSTS
-
-    foreach {h} $HOSTS {
+    foreach {h} $::HOSTS {
         dputs "disconnecting from $h"
         set screenid [get_master_screen_name $h]
         set fifo [get_fifo_name $h]
         set screenPID [exec bash -c "screen -list $screenid | grep vdemo | cut -d. -f1"]
         if {$::AUTO_SPREAD_CONF == 1 && "$screenPID" != "" && [file exists "$fifo.in"]} {
             # send ssh command, but do not wait for result
-            set cmd "rm -f $env(SPREAD_CONFIG)"
+            set cmd "rm -f $::env(SPREAD_CONFIG)"
             exec bash -c "echo 'echo \"*** RUN $cmd\" 1>&2; $cmd 1>&2; echo \$?' > $fifo.in"
         }
         catch {exec bash -c "screen -list $screenid | grep vdemo | cut -d. -f1 | xargs kill 2>&1"}
@@ -937,16 +963,14 @@ proc remove_duplicates {} {
 }
 
 proc compute_spread_segment {ip num} {
-    global env
     set octets [split $ip .]
     # use IP octets 1-4
     set seg [join [lrange $octets 1 3] .]
-    return "225.$seg:$env(SPREAD_PORT)"
+    return "225.$seg:$::env(SPREAD_PORT)"
 }
 
 proc get_autospread_filename {} {
-    global VDEMOID env
-    return "/tmp/vdemo-spread-$VDEMOID-$env(USER).conf"
+    return "/tmp/vdemo-spread-$::VDEMOID-$::env(USER).conf"
 }
 
 proc create_spread_conf {} {
@@ -1030,17 +1054,13 @@ proc create_spread_conf {} {
 }
 
 proc handle_screen_failure {chan} {
-    global MONITORCHAN_HOST SCREENED_SSH COMPONENTS HOST COMMAND TITLE COMPSTATUS WAIT_BREAK VDEMOID COMPWIDGET
+    global MONITORCHAN_HOST COMPONENTS HOST COMMAND TITLE COMPSTATUS WAIT_BREAK VDEMOID COMPWIDGET
     if {[gets $chan line] >= 0} {
         set host ""
         regexp "^\[\[:digit:]]+\.vdemo-$VDEMOID-(.*)\$" $line matched host
         if {"$host" != ""} {
-            set SCREENED_SSH($host) 0
-            if { [tk_messageBox -message "Lost connection to $host. Reestablish?" \
-                -type yesno -icon question] == yes} {
-                set f [get_fifo_name $host]
-                connect_host $f $host 0
-            }
+            set ::SCREENED_SSH($host) 0
+            reconnect_host $host "Lost connection to $host. Reconnect?"
         } else { # a component crashed
             set host $MONITORCHAN_HOST($chan)
             foreach {comp} "$COMPONENTS" {
