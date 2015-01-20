@@ -475,6 +475,8 @@ proc wait_ready {comp} {
         puts "$TITLE($comp): waiting for the process to get ready"
         set endtime [expr [clock milliseconds] + $WAIT_READY($comp) * 1000]
         set checktime [expr [clock milliseconds] + 1000]
+        # do not check too fast, otherwise screen is not *yet* started
+        sleep 500
         while {$endtime > [clock milliseconds]} {
             sleep 100
             # check every 1000ms
@@ -494,8 +496,6 @@ proc wait_ready {comp} {
         component_cmd $comp check
     } else {
         dputs "$TITLE($comp): not waiting for the process to get ready"
-        # re-enable start button
-        $COMPWIDGET.$comp.start state !disabled
         after [expr $CHECKNOWAIT_TIME($comp) * 1000] component_cmd $comp check
     }
 }
@@ -626,6 +626,8 @@ proc component_cmd {comp cmd} {
             set res [ssh_command "$cmd_line" "$HOST($comp)"]
             dputs "ssh result: $res" 2
             after idle $COMPWIDGET.$comp.check state !disabled
+            # ensure that start button is reenabled on errors
+            set enableStartTimer [after idle $COMPWIDGET.$comp.start state !disabled]
 
             if { ! [string is integer -strict $res]} {
                 puts "internal error: ssh result is not an integer: '$res'"
@@ -636,28 +638,38 @@ proc component_cmd {comp cmd} {
             if {$res == 124} {puts "ssh command timed out"; return}
 
             set noscreen 0
-            # res = 10*callResult + processResult
-            # callResult is the result from the on_check function (0 on success)
-            # processResult: 0: success, 1: no screen, 2: PID not there
-            if {[expr $res / 10] == 0} { # on_check was successful
-                if {[expr $res % 10] == 0} {
-                    set_status $comp ok_screen
-                } else {
-                    set_status $comp ok_noscreen
-                    set noscreen 1
-                }
-            } elseif { [$COMPWIDGET.$comp.start instate disabled] } {
-                set_status $comp starting
+            # res = 10*onCheckResult + screenResult
+            # onCheckResult is the result from the on_check function (0 on success)
+            # screenResult: 0: success, 1: no screen, 2: PID not there
+            set onCheckResult [expr $res / 10]
+            set screenResult  [expr $res % 10]
+            set s unknown
+            if {$onCheckResult == 0} { # on_check was successful
+                if {$screenResult == 0} { set s ok_screen } { set s ok_noscreen }
             } else { # on_check failed
-                if {[expr $res % 10] != 0} {
-                    set_status $comp failed_noscreen
-                    set noscreen 1
+                if {$screenResult == 0} { set s failed_check } { set s failed_noscreen }
+            }
+            if { [$::COMPWIDGET.$comp.start instate disabled] } {
+                # component is starting
+                if { [string is digit $::WAIT_READY($comp)] && $::WAIT_READY($comp) > 0 } {
+                    # check was triggered by wait_ready()
+                    # if onCheck not (yet) successful, stay in starting
+                    if {$onCheckResult != 0} {set s starting}
                 } else {
-                    set_status $comp failed_check
+                    if {$::CONT_CHECK($comp) && $onCheckResult != 0} {
+                        # when CONT_CHECK was requested: stay in starting and retrigger check
+                        set s starting
+                        after 1000 component_cmd $comp check
+                    }
                 }
             }
-            if {$noscreen} {
-                dputs "$comp not running: cancel detach timer"
+            set_status $comp $s
+            # re-enable start button and cancel enableStartTimer
+            if {"$s" != "starting"} {$COMPWIDGET.$comp.start state !disabled}
+            after cancel $enableStartTimer
+
+            if {$screenResult != 0} {
+                dputs "$comp not running: cancel detach timer" 2
                 cancel_detach_timer $comp
                 set SCREENED($comp) 0
             }
