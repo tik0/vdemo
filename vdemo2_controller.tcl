@@ -759,7 +759,7 @@ proc ssh_check_connection {hostname} {
     # know, that the command shouldn't last long. However, the real ssh_command could last rather
     # long, e.g. stopping a difficult component. This would generate a spurious timeout.
     catch { set res 124; set res [exec bash -c "echo 'echo 0' > $f.in; timeout 1 cat $f.out"] }
-    dputs "connection check result: $res"
+    dputs "connection check result: $res" 2
 
     # cat might also fetch the result of a previous, delayed ssh command. Hence, if we didn't 
     # timed out, set the result always to zero.
@@ -780,7 +780,7 @@ proc ssh_command {cmd hostname {check 1} {verbose 1}} {
     # actually issue the command
     set cmd [string trim "$cmd"]
     if {$verbose > 0} {
-        puts "run '$cmd' on host '$hostname'"
+        dputs "run '$cmd' on host '$hostname'"
         set verbose "echo 1>&2; date +\"*** %X %a, %x ***********************\" 1>&2; echo \"*** RUN $cmd\" 1>&2;"
     } else {set verbose ""}
 
