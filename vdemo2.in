@@ -18,6 +18,7 @@ vdemo starter
  options:
   -h  --help           this help text
   -a  --auto           automatically start all components
+  -r  --logrotate      enable log rotation
   -d  --debug [level]  set debug [level]
   -Q  --quit <components> space separated list of components to quit vdemo on
 
@@ -37,6 +38,11 @@ while [ $# -gt 0 ]; do
     "-a"|"--auto")
         echo "Automatically starting all components"
         export VDEMO_autostart="true"
+        ;;
+    "-r"|"--logrotate")
+        echo "Enable log rotation"
+        export LOG_ROTATION="ON"
+        export VDEMO_exports="$VDEMO_exports LOG_ROTATION"
         ;;
     "-d"|"--debug")
         export VDEMO_DEBUG_LEVEL=1
