@@ -53,8 +53,11 @@ proc dputs {args {level 1}} {
     }
 }
 
+set VDEMO_QUIT_COMPONENTS [list]
+if {[info exists ::env(VDEMO_QUIT_COMPONENTS)]} {set VDEMO_QUIT_COMPONENTS [split $::env(VDEMO_QUIT_COMPONENTS)]}
+puts $VDEMO_QUIT_COMPONENTS
 proc parse_options {comp} {
-    global env COMPONENTS ARGS USEX TERMINAL WAIT_READY NOAUTO LOGGING GROUP DETACHTIME COMP_LEVEL EXPORTS TITLE CONT_CHECK CHECKNOWAIT_TIME RESTART TERMINATE_ON_EXIT
+    global env COMPONENTS ARGS USEX TERMINAL WAIT_READY NOAUTO LOGGING GROUP DETACHTIME COMP_LEVEL EXPORTS TITLE CONT_CHECK CHECKNOWAIT_TIME RESTART
     set NEWARGS [list]
     set USEX($comp) 0
     # time to wait for a process to startup
@@ -72,7 +75,6 @@ proc parse_options {comp} {
     set COMP_LEVEL($comp) ""
     set EXPORTS($comp) ""
     set RESTART($comp) 0
-    set TERMINATE_ON_EXIT($comp) 0
 
     for {set i 0} \$i<[llength $ARGS($comp)] {incr i} {
         set arg [lindex $ARGS($comp) $i]; set val [lindex $ARGS($comp) [expr $i+1]]
@@ -121,7 +123,7 @@ proc parse_options {comp} {
                 incr i
             }
             -Q {
-                set TERMINATE_ON_EXIT($comp) 1
+                lappend ::VDEMO_QUIT_COMPONENTS $comp
             }
             default {
                 set NEWARGS [lappend NEWARGS $arg]
@@ -192,12 +194,12 @@ proc set_group_noauto {grp} {
 }
 
 proc gui_tcl {} {
-    global HOST HOSTS COMPONENTS ARGS TERMINAL USEX LOGTEXT env NOAUTO LOGGING  GROUP SCREENED  COMP_LEVEL COMPWIDGET WATCHFILE COMMAND LEVELS TITLE TIMERDETACH TERMINATE_ON_EXIT
+    global HOST HOSTS COMPONENTS ARGS TERMINAL USEX LOGTEXT env NOAUTO LOGGING  GROUP SCREENED  COMP_LEVEL COMPWIDGET WATCHFILE COMMAND LEVELS TITLE TIMERDETACH
     set root "."
     set base ""
     set LOGTEXT "demo configured from '$env(VDEMO_demoConfig)'"
     wm title . "vdemo_controller: $env(VDEMO_demoConfig)"
-    wm geometry . "960x600"
+    wm geometry . "875x600"
 
     set groups ""
     set LEVELS ""
@@ -218,7 +220,7 @@ proc gui_tcl {} {
         ttk::frame $COMPWIDGET.$c -style groove.TFrame
         pack $COMPWIDGET.$c -side top -fill both -expand yes
         ttk::label $COMPWIDGET.$c.level -style level.TLabel -text "$COMP_LEVEL($c)"
-        ttk::label $COMPWIDGET.$c.label -width 25 -style label.TLabel -text "$TITLE($c)@"
+        ttk::label $COMPWIDGET.$c.label -width 20 -style label.TLabel -text "$TITLE($c)@"
         ttk::entry $COMPWIDGET.$c.host  -width 10 -textvariable HOST($c)
         # disable host field for spreaddaemon: cannot add/change hosts in spread config
         if {"$COMMAND($c)" == "spreaddaemon"} { $COMPWIDGET.$c.host state disabled }
@@ -229,7 +231,6 @@ proc gui_tcl {} {
         ttk::button $COMPWIDGET.$c.stop  -style cmd.TButton -text "stop" -command "component_cmd $c stop"
         ttk::button $COMPWIDGET.$c.check -style cmd.TButton -text "check" -command "component_cmd $c check"
         ttk::checkbutton $COMPWIDGET.$c.noauto -text "no auto" -variable NOAUTO($c)
-        ttk::checkbutton $COMPWIDGET.$c.terminate -text "exit" -variable TERMINATE_ON_EXIT($c)
         ttk::checkbutton $COMPWIDGET.$c.ownx   -text "own X" -variable USEX($c)
         ttk::checkbutton $COMPWIDGET.$c.logging -text "logging" -variable LOGGING($c)
         ttk::button $COMPWIDGET.$c.viewlog -style cmd.TButton -text "view log" -command "component_cmd $c showlog"
@@ -245,7 +246,6 @@ proc gui_tcl {} {
         pack $COMPWIDGET.$c.group -side left -fill x
 
         pack $COMPWIDGET.$c.ownx -side right -padx 3
-        pack $COMPWIDGET.$c.terminate -side right
         pack $COMPWIDGET.$c.inspect -side right
         pack $COMPWIDGET.$c.viewlog -side right
         pack $COMPWIDGET.$c.logging -side right
@@ -1030,7 +1030,7 @@ proc create_spread_conf {} {
 }
 
 proc handle_screen_failure {chan} {
-    global MONITORCHAN_HOST SCREENED_SSH COMPONENTS HOST COMMAND TITLE COMPSTATUS WAIT_BREAK VDEMOID TERMINATE_ON_EXIT COMPWIDGET
+    global MONITORCHAN_HOST SCREENED_SSH COMPONENTS HOST COMMAND TITLE COMPSTATUS WAIT_BREAK VDEMOID COMPWIDGET
     if {[gets $chan line] >= 0} {
         set host ""
         regexp "^\[\[:digit:]]+\.vdemo-$VDEMOID-(.*)\$" $line matched host
@@ -1052,8 +1052,9 @@ proc handle_screen_failure {chan} {
                         # component was stopping or starting -> ignore event
                     } else {
                         # if this is not a user initiated stop, exit the system if requested
-                        if {$TERMINATE_ON_EXIT($comp)} {
-                            puts "$comp finished on $host: stopping vdemo"
+                        if {[lsearch -exact $::VDEMO_QUIT_COMPONENTS $comp] >= 0 || \
+                            [lsearch -exact $::VDEMO_QUIT_COMPONENTS "$::TITLE($comp)"] >= 0} {
+                            puts "$::TITLE($comp) finished on $host: quitting vdemo"
                             allcomponents_cmd "stop"
                             finish
                         } else {
@@ -1137,6 +1138,7 @@ signal trap SIGHUP finish
 
 setup_temp_dir
 parse_env_var
+if {"$::VDEMO_QUIT_COMPONENTS" != ""} {puts "quitting on exit of: $::VDEMO_QUIT_COMPONENTS"}
 remove_duplicates
 
 if {![info exists ::env(LD_LIBRARY_PATH)]} {

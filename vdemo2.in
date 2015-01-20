@@ -19,8 +19,9 @@ vdemo starter
   -h  --help           this help text
   -a  --auto           automatically start all components
   -d  --debug [level]  set debug [level]
+  -Q  --quit <components> space separated list of components to quit vdemo on
 
- author: Marc Hanheide ($RCS_ID)
+ authors: Marc Hanheide, Robert Haschke
 "
 
 # exit script on all non-zero return values
@@ -44,6 +45,10 @@ while [ $# -gt 0 ]; do
             shift
         fi
         echo "Using debug level $VDEMO_DEBUG_LEVEL"
+        ;;
+    "-Q"|"--quit")
+        export VDEMO_QUIT_COMPONENTS=$2
+        shift
         ;;
     -*)
         echo "illegal option $1" >& 2
