@@ -54,7 +54,7 @@ proc dputs {args {level 1}} {
 }
 
 proc parse_options {comp} {
-    global env COMPONENTS ARGS USEX TERMINAL WAIT_READY NOAUTO LOGGING GROUP DETACHTIME COMP_LEVEL EXPORTS TITLE CONT_CHECK CHECKNOWAIT_TIME TERMINATE_ON_EXIT
+    global env COMPONENTS ARGS USEX TERMINAL WAIT_READY NOAUTO LOGGING GROUP DETACHTIME COMP_LEVEL EXPORTS TITLE CONT_CHECK CHECKNOWAIT_TIME RESTART TERMINATE_ON_EXIT
     set NEWARGS [list]
     set USEX($comp) 0
     # time to wait for a process to startup
@@ -71,6 +71,7 @@ proc parse_options {comp} {
     set LOGGING($comp) 0
     set COMP_LEVEL($comp) ""
     set EXPORTS($comp) ""
+    set RESTART($comp) 0
     set TERMINATE_ON_EXIT($comp) 0
 
     for {set i 0} \$i<[llength $ARGS($comp)] {incr i} {
@@ -86,6 +87,9 @@ proc parse_options {comp} {
             }
             -c {
                 set CONT_CHECK($comp) 1
+            }
+            -R {
+                set RESTART($comp) 1
             }
             -d {
                 set DETACHTIME($comp) "$val"
@@ -1053,12 +1057,16 @@ proc handle_screen_failure {chan} {
                             allcomponents_cmd "stop"
                             finish
                         } else {
-                            set ans [tk_messageBox -message \
-                                     "$TITLE($comp) crashed on $host.\nRestart?" \
-                                     -type yesno -icon warning]
                             # trigger stop: eventually on_stop() does some cleanup
                             component_cmd $comp stop
-                            if {"$ans" == "yes"} { component_cmd $comp start }
+
+                            if {$::RESTART($comp) || \
+                                [tk_messageBox -message \
+                                    "$TITLE($comp) crashed on $host.\nRestart?" \
+                                    -type yesno -icon warning] == "yes"} {
+                                puts "$TITLE($comp) crashed on $host. Restarting it."
+                                component_cmd $comp start 
+                            }
                         }
                     }
                     break
