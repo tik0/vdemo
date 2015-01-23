@@ -53,10 +53,12 @@ proc dputs {args {level 1}} {
 }
 
 set VDEMO_QUIT_COMPONENTS [list]
-if {[info exists ::env(VDEMO_QUIT_COMPONENTS)]} {set VDEMO_QUIT_COMPONENTS [split $::env(VDEMO_QUIT_COMPONENTS)]}
-puts $VDEMO_QUIT_COMPONENTS
+if {[info exists ::env(VDEMO_QUIT_COMPONENTS)]} {
+    set VDEMO_QUIT_COMPONENTS [split $::env(VDEMO_QUIT_COMPONENTS)]
+}
+
 proc parse_options {comp} {
-    global env COMPONENTS ARGS USEX TERMINAL WAIT_READY NOAUTO LOGGING GROUP DETACHTIME COMP_LEVEL EXPORTS TITLE CONT_CHECK CHECKNOWAIT_TIME RESTART
+    global COMPONENTS ARGS USEX TERMINAL WAIT_READY NOAUTO LOGGING GROUP DETACHTIME COMP_LEVEL EXPORTS TITLE CONT_CHECK CHECKNOWAIT_TIME RESTART
     set NEWARGS [list]
     set USEX($comp) 0
     # time to wait for a process to startup
@@ -215,6 +217,7 @@ proc gui_tcl {} {
         set groups "$groups $GROUP($c)"
         set LEVELS "$LEVELS $COMP_LEVEL($c)"
         set TIMERDETACH($c) 0
+        set ::LAST_GUI_INTERACTION($c) 0
 
         ttk::frame $COMPWIDGET.$c -style groove.TFrame
         pack $COMPWIDGET.$c -side top -fill both -expand yes
@@ -610,6 +613,7 @@ proc component_cmd {comp cmd} {
                 set TIMERDETACH($comp) [after $detach_after component_cmd $comp detach]
             }
             wait_ready $comp
+            set ::LAST_GUI_INTERACTION($comp) [clock seconds]
         }
         stop {
             if { [$COMPWIDGET.$comp.stop instate disabled] } {
@@ -617,6 +621,7 @@ proc component_cmd {comp cmd} {
                 return
             }
             $COMPWIDGET.$comp.stop state disabled
+            set ::LAST_GUI_INTERACTION($comp) [clock seconds]
             set_status $comp unknown
             cancel_detach_timer $comp
 
@@ -626,6 +631,7 @@ proc component_cmd {comp cmd} {
             set res [ssh_command "$cmd_line" "$HOST($comp)"]
             set SCREENED($comp) 0
 
+            set ::LAST_GUI_INTERACTION($comp) [clock seconds]
             after idle $COMPWIDGET.$comp.stop state !disabled
             if {$res != -1} { after idle component_cmd $comp check }
         }
@@ -747,7 +753,9 @@ proc screen_ssh_master {h} {
     if {$::SCREENED_SSH($h) == 1} {
         if { [catch {exec bash -c "screen -wipe | fgrep -q .$screenid"} ] } {
             set f [get_fifo_name $h]
-            gui_update_host $h [connect_host $f $h 0]
+            set res [connect_host $f $h 0]
+            gui_update_host $h $res
+            if {$res} {set ::SCREENED_SSH($h) 0}
         }
         exec  xterm -title "MASTER SSH CONNECTION TO $h." -e screen -r -S $screenid &
     } else {
@@ -1064,7 +1072,7 @@ proc create_spread_conf {} {
 }
 
 proc handle_screen_failure {chan} {
-    global MONITORCHAN_HOST COMPONENTS HOST COMMAND TITLE COMPSTATUS WAIT_BREAK VDEMOID COMPWIDGET
+    global MONITORCHAN_HOST COMPONENTS COMMAND TITLE COMPSTATUS WAIT_BREAK VDEMOID COMPWIDGET
     if {[gets $chan line] >= 0} {
         set host ""
         regexp "^\[\[:digit:]]+\.vdemo-$VDEMOID-(.*)\$" $line matched host
@@ -1074,12 +1082,15 @@ proc handle_screen_failure {chan} {
         } else { # a component crashed
             set host $MONITORCHAN_HOST($chan)
             foreach {comp} "$COMPONENTS" {
-                if {$HOST($comp) == $host && \
+                if {$::HOST($comp) == $host && \
                     [string match "*.$COMMAND($comp).$TITLE($comp)_" "$line"]} {
                     dputs "$comp closed its screen session on $host" 2
                     if {[$COMPWIDGET.$comp.stop  instate disabled] || \
-                        [$COMPWIDGET.$comp.start instate disabled]} {
-                        # component was stopping or starting -> ignore event
+                        [$COMPWIDGET.$comp.start instate disabled] ||
+                        [expr [clock seconds] - $::LAST_GUI_INTERACTION($comp) < 2]} {
+                        # component was stopped or just started via gui -> ignore event
+                        # trigger stop: component's on_stop() might do some cleanup
+                        component_cmd $comp stop
                     } else {
                         # if this is not a user initiated stop, exit the system if requested
                         if {[lsearch -exact $::VDEMO_QUIT_COMPONENTS $comp] >= 0 || \
@@ -1088,7 +1099,7 @@ proc handle_screen_failure {chan} {
                             allcomponents_cmd "stop"
                             finish
                         } else {
-                            # trigger stop: eventually on_stop() does some cleanup
+                            # trigger stop: component's on_stop() might do some cleanup
                             component_cmd $comp stop
 
                             if {$::RESTART($comp) || \
