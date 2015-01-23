@@ -47,8 +47,7 @@ ttk::style configure log.TLabel -justify left -anchor e -relief sunken -foregrou
 # debugging puts
 set DEBUG_LEVEL 0
 proc dputs {args {level 1}} {
-    global DEBUG_LEVEL
-    if [expr $level <= $DEBUG_LEVEL] {
+    if [expr $level <= $::DEBUG_LEVEL] {
         puts stderr "-- $args"
     }
 }
@@ -587,11 +586,21 @@ proc component_cmd {comp cmd} {
             set cmd_line "$VARS $component_script $component_options start"
             set res [ssh_command "$cmd_line" "$HOST($comp)"]
 
-            if {$res == 2} {
-                set msg "X connection failed on $HOST($comp).\nConsider using xhost+"
+            # handle some typical errors:
+            switch $res {
+                  0 { set msg "" }
+                  2 { set msg "X connection failed on $HOST($comp).\nConsider using xhost+" }
+                126 { set msg "component_$COMMAND($comp) start: permission denied" }
+                default { set msg "component_$COMMAND($comp) start: unknown error $res" }
+            }
+            if {$msg != ""} {
+                if [expr $::DEBUG_LEVEL >= 0] {
+                    tk_messageBox -message $msg -icon warning -type ok
+                } else {
+                    puts $msg
+                }
                 set_status $comp failed_noscreen
                 $COMPWIDGET.$comp.start state !disabled
-                tk_messageBox -message $msg -icon warning -type ok
                 return
             }
 
