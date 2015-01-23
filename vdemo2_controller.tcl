@@ -758,7 +758,8 @@ proc screen_ssh_master {h} {
 proc reconnect_host {host msg} {
     # error code to indicate that user cancelled reconnection
     set res -2
-    if { [tk_messageBox -message $msg -type yesno -icon question] == yes } {
+    if { $::DEBUG_LEVEL >= 0 && \
+         [tk_messageBox -message $msg -type yesno -icon question] == yes } {
         # try to connect to host
         set fifo [get_fifo_name $host]
         set res [connect_host $fifo $host]
@@ -1091,10 +1092,10 @@ proc handle_screen_failure {chan} {
                             component_cmd $comp stop
 
                             if {$::RESTART($comp) || \
-                                [tk_messageBox -message \
-                                    "$TITLE($comp) crashed on $host.\nRestart?" \
-                                    -type yesno -icon warning] == "yes"} {
-                                puts "$TITLE($comp) crashed on $host. Restarting it."
+                                ($::DEBUG_LEVEL >= 0 && [tk_messageBox -message \
+                                    "$TITLE($comp) stopped on $host.\nRestart?" \
+                                    -type yesno -icon warning] == "yes")} {
+                                puts "$TITLE($comp) stopped on $host. Restarting it."
                                 component_cmd $comp start 
                             }
                         }
