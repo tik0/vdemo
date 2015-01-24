@@ -753,7 +753,7 @@ proc screen_ssh_master {h} {
     if {$::SCREENED_SSH($h) == 1} {
         if { [catch {exec bash -c "screen -wipe | fgrep -q .$screenid"} ] } {
             set f [get_fifo_name $h]
-            set res [connect_host $f $h 0]
+            set res [connect_host $f $h]
             gui_update_host $h $res
             if {$res} {set ::SCREENED_SSH($h) 0}
         }
@@ -851,7 +851,7 @@ proc get_fifo_name {hostname} {
     return "$TEMPDIR/vdemo-$VDEMOID-ssh-$env(USER)-$hostname"
 }
 
-proc connect_host {fifo host {doMonitor 1}} {
+proc connect_host {fifo host} {
     global env SSHOPTS DEBUG_LEVEL
     exec rm -f "$fifo.in"
     exec rm -f "$fifo.out"
@@ -909,7 +909,7 @@ proc connect_host {fifo host {doMonitor 1}} {
     # detach screen / close xterm
     catch { exec screen -dS $screenid }
 
-    if $doMonitor {connect_screenmonitoring $host}
+    connect_screen_monitoring $host
 
     if {$::AUTO_SPREAD_CONF == 1} {
         set content [exec cat $::env(SPREAD_CONFIG)]
@@ -931,11 +931,15 @@ proc connect_hosts {} {
         set fifo [get_fifo_name $h]
         connect_host $fifo $h
     }
+    # establish screen monitoring locally (for master connections)
+    connect_screen_monitoring localhost
     destroy .vdemoinit
     destroy .vdemoinit2
 }
 
 proc disconnect_hosts {} {
+    disconnect_screen_monitoring localhost
+
     foreach {h} $::HOSTS {
         dputs "disconnecting from $h"
         set screenid [get_master_screen_name $h]
@@ -949,18 +953,14 @@ proc disconnect_hosts {} {
         catch {exec bash -c "screen -list $screenid | grep vdemo | cut -d. -f1 | xargs kill 2>&1"}
         exec rm -f "$fifo.in"
         exec rm -f "$fifo.out"
+
+        disconnect_screen_monitoring $h
     }
 }
 
 proc finish {} {
-    global MONITORCHAN_HOST TEMPDIR
-    foreach ch [chan names] {
-        if { [info exists MONITORCHAN_HOST($ch)] } {
-            exec kill -HUP [lindex [pid $ch] 0]
-        }
-    }
     disconnect_hosts
-    catch {exec rmdir "$TEMPDIR"}
+    catch {exec rmdir "$::TEMPDIR"}
     exit
 }
 
@@ -1071,64 +1071,107 @@ proc create_spread_conf {} {
     exec cat $filename
 }
 
-proc handle_screen_failure {chan} {
-    global MONITORCHAN_HOST COMPONENTS COMMAND TITLE COMPSTATUS WAIT_BREAK VDEMOID COMPWIDGET
-    if {[gets $chan line] >= 0} {
-        set host ""
-        regexp "^\[\[:digit:]]+\.vdemo-$VDEMOID-(.*)\$" $line matched host
-        if {"$host" != ""} {
-            set ::SCREENED_SSH($host) 0
-            reconnect_host $host "Lost connection to $host. Reconnect?"
-        } else { # a component crashed
-            set host $MONITORCHAN_HOST($chan)
-            foreach {comp} "$COMPONENTS" {
-                if {$::HOST($comp) == $host && \
-                    [string match "*.$COMMAND($comp).$TITLE($comp)_" "$line"]} {
-                    dputs "$comp closed its screen session on $host" 2
-                    if {[$COMPWIDGET.$comp.stop  instate disabled] || \
-                        [$COMPWIDGET.$comp.start instate disabled] ||
-                        [expr [clock seconds] - $::LAST_GUI_INTERACTION($comp) < 2]} {
-                        # component was stopped or just started via gui -> ignore event
-                        # trigger stop: component's on_stop() might do some cleanup
-                        component_cmd $comp stop
-                    } else {
-                        # if this is not a user initiated stop, exit the system if requested
-                        if {[lsearch -exact $::VDEMO_QUIT_COMPONENTS $comp] >= 0 || \
-                            [lsearch -exact $::VDEMO_QUIT_COMPONENTS "$::TITLE($comp)"] >= 0} {
-                            puts "$::TITLE($comp) finished on $host: quitting vdemo"
-                            allcomponents_cmd "stop"
-                            finish
-                        } else {
-                            # trigger stop: component's on_stop() might do some cleanup
-                            component_cmd $comp stop
+proc handle_screen_failure {chan host} {
+    gets $chan line
+    dputs "screen failure: $host $chan: $line" 3
 
-                            if {$::RESTART($comp) || \
-                                ($::DEBUG_LEVEL >= 0 && [tk_messageBox -message \
-                                    "$TITLE($comp) stopped on $host.\nRestart?" \
-                                    -type yesno -icon warning] == "yes")} {
-                                puts "$TITLE($comp) stopped on $host. Restarting it."
-                                component_cmd $comp start 
-                            }
-                        }
-                    }
-                    break
-                }
-            }
+    if {[eof $chan] && ! [string match "err:*" $::MONITOR_CHAN($host)]} {
+        puts "component monitoring failed on $host: Is inotifywait installed?"
+        close $chan
+        set ::MONITOR_CHAN($host) "err: no inotify"
+        return
+    }
+
+    # check for lost master connections only on localhost
+    if {$host == "localhost"} {
+        set remoteHost ""
+        regexp "^\[\[:digit:]]+\.vdemo-$::VDEMOID-(.*)\$" $line matched remoteHost
+        if {"$remoteHost" != ""} {
+            set ::SCREENED_SSH($remoteHost) 0
+            reconnect_host $remoteHost "Lost connection to $remoteHost. Reconnect?"
+            return
         }
     }
-    if {[eof $chan]} {
-        puts "screen monitoring failed on $MONITORCHAN_HOST($chan) (received EOF): install inotifywait?"
-        close $chan
+
+    # a component crashed
+    foreach {comp} "$::COMPONENTS" {
+        if {$::HOST($comp) == $host && \
+            [string match "*.$::COMMAND($comp).$::TITLE($comp)_" "$line"]} {
+            dputs "$comp closed its screen session on $host" 2
+            if {[$::COMPWIDGET.$comp.stop  instate disabled] || \
+                [$::COMPWIDGET.$comp.start instate disabled] ||
+                [expr [clock seconds] - $::LAST_GUI_INTERACTION($comp) < 2]} {
+                # component was stopped or just started via gui -> ignore event
+                # trigger stop: component's on_stop() might do some cleanup
+                component_cmd $comp stop
+            } else {
+                # if this is not a user initiated stop, exit the system if requested
+                if {[lsearch -exact $::VDEMO_QUIT_COMPONENTS $comp] >= 0 || \
+                    [lsearch -exact $::VDEMO_QUIT_COMPONENTS "$::TITLE($comp)"] >= 0} {
+                    puts "$::TITLE($comp) finished on $host: quitting vdemo"
+                    allcomponents_cmd "stop"
+                    finish
+                } else {
+                    if {$::RESTART($comp) || \
+                        ($::DEBUG_LEVEL >= 0 && [tk_messageBox -message \
+                            "$::TITLE($comp) stopped on $host.\nRestart?" \
+                            -type yesno -icon warning] == "yes")} {
+                        puts "$::TITLE($comp) stopped on $host. Restarting it."
+                        component_cmd $comp start 
+                    } else {
+                        # trigger stop: component's on_stop() might do some cleanup
+                        component_cmd $comp stop
+                    }
+                }
+            }
+            return
+        }
     }
+    puts "on $host: $line"
 }
 
 # setup inotifywait on remote hosts to monitor deletions in screen-directory
-proc connect_screenmonitoring {host} {
-    global MONITORCHAN_HOST COMPONENTS HOST env SSHOPTS
-    set chan [open "|ssh $SSHOPTS -tt $host inotifywait -e delete -qm --format %f /var/run/screen/S-$env(USER)" "r+"]
-    set MONITORCHAN_HOST($chan) $host
+proc connect_screen_monitoring {host} {
+    if { [info exists ::MONITOR_CHAN($host)] } {
+        # disconnect old monitoring channel first
+        disconnect_screen_monitoring $host
+
+        # do not attempt to call inotify again, if it was previously not found
+        if {[string match "err: no inotify" $::MONITOR_CHAN($host)]} return
+    }
+
+    set cmd "inotifywait -e delete -qm --format %f /var/run/screen/S-$::env(USER)"
+    # remote hosts require monitoring through ssh connection
+    if {$host != "localhost"} {
+        set cmd "ssh $::SSHOPTS -tt $host $cmd" 
+        # If there was never a screen executed on the remote machine, 
+        # the directory /var/run/screen/S-$USER doesn't yet exist
+        # Hence, call screen at least once:
+        ssh_command "screen -ls > /dev/null" $host 0 $::DEBUG_LEVEL
+    }
+
+    # pipe-open monitor connection: cmd may fail due to missing ssh or inotifywait
+    if { [ catch {set chan [open "|$cmd" "r+"]} ] } {
+        puts "failed to monitor master connections: Is inotifywait installed?"
+        set ::MONITOR_CHAN($host) "err: no inotify"
+        return
+    }
+    set ::MONITOR_CHAN($host) $chan
     fconfigure $chan -blocking 0 -buffering line -translation auto
-    fileevent $chan readable [list handle_screen_failure $chan]
+    fileevent $chan readable [list handle_screen_failure $chan $host]
+}
+
+proc disconnect_screen_monitoring {host} {
+    if {! [info exists ::MONITOR_CHAN($host)]} return
+    set chan $::MONITOR_CHAN($host)
+    if {[string match "err:*" $chan]} return
+
+    dputs "disconnecting monitor channel $chan for host $host" 2
+    exec kill -HUP [lindex [pid $chan] 0]
+    close $chan
+
+    # indicate, that we are not monitoring anymore
+    set ::MONITOR_CHAN($host) "err:disconnected"
 }
 
 proc gui_exit {} {
