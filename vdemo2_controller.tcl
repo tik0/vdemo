@@ -522,10 +522,10 @@ proc wait_ready {comp} {
                 set checktime [expr [clock milliseconds] + 1000]
             }
             if {[string match "ok_*" $COMPSTATUS($comp)] || $WAIT_BREAK} {
-                break
+                return
             }
         }
-        dputs "$TITLE($comp): finished waiting"
+        dputs "$TITLE($comp): waiting timeout"
 
         # first re-enable start button
         $COMPWIDGET.$comp.start state !disabled
