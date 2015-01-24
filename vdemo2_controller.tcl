@@ -528,13 +528,15 @@ proc wait_ready {comp} {
 }
 
 proc remote_xterm {host} {
-    global env
-    set cmd_line "xterm -fg white -bg black -title $host -e \"LD_LIBRARY_PATH=$env(LD_LIBRARY_PATH) bash\" &"
+    # source both, .bashrc and $VDEMO_demoConfig file
+    # However, --rcfile loads a single file only, hence we open a temporary pipe
+    # sourcing both files:
+    set bash_init "test -r ~/.bashrc && . ~/.bashrc; . $::env(VDEMO_demoConfig)"
+    set cmd_line "xterm -fg white -bg black -title $host -e \"bash --rcfile <(echo \\\"$bash_init\\\")\" &"
     ssh_command "$cmd_line" $host
 }
 
 proc remote_clock {host} {
-    global env
     set cmd_line "xclock -fg white -bg black -geometry 250x30 -title $host -digital -update 1 &"
     ssh_command "$cmd_line" "$host"
 }
@@ -638,8 +640,10 @@ proc component_cmd {comp cmd} {
         screen {
             cancel_detach_timer $comp
             if {$SCREENED($comp)} {
-                set cmd_line "$VARS xterm -fg white -bg black -title \"$comp@$HOST($comp) - detach by \[C-a d\]\" -e $component_script $component_options screen &"
-                ssh_command "$cmd_line" "$HOST($comp)"
+                set cmd_line "$component_script $component_options screen"
+                set title "$::TITLE($comp)@$::HOST($comp) - detach by \[C-a d\]"
+                set cmd_line "xterm -fg white -bg black -title \"$title\" -e $cmd_line &"
+                ssh_command "$VARS $cmd_line" "$HOST($comp)"
                 after idle component_cmd $comp check
             } else {
                 set cmd_line "$VARS $component_script $component_options detach"
@@ -852,7 +856,6 @@ proc get_fifo_name {hostname} {
 }
 
 proc connect_host {fifo host} {
-    global env SSHOPTS DEBUG_LEVEL
     exec rm -f "$fifo.in"
     exec rm -f "$fifo.out"
     exec mkfifo "$fifo.in"
@@ -862,7 +865,7 @@ proc connect_host {fifo host} {
     # the remote bash (over ssh) and the result is read again and piped into $fifo.out.
     # This way, the remote stdout goes into $fifo.out, while remote stderr is displayed here.
     set screenid [get_master_screen_name $host]   
-    exec screen -dmS $screenid bash -c "tail -s 0.1 -n 10000 -f $fifo.in | ssh $SSHOPTS -Y $host bash | while read s; do echo \$s > $fifo.out; done"
+    exec screen -dmS $screenid bash -c "tail -s 0.1 -n 10000 -f $fifo.in | ssh $::SSHOPTS -Y $host bash | while read s; do echo \$s > $fifo.out; done"
 
     # Wait until connection is established. 
     # Issue a echo command on remote host that only returns if a connection was established. 
@@ -897,14 +900,16 @@ proc connect_host {fifo host} {
     }
 
     dputs "issuing remote initialization commands" 2
-    if {[info exists env(VDEMO_exports)]} {
-        foreach {var} "$env(VDEMO_exports)" {
-            if {[info exists env($var)]} {
-                ssh_command "export $var=$env($var)" $host 0 $DEBUG_LEVEL
+    set res [ssh_command "source $::env(VDEMO_demoConfig)" $host 0 $::DEBUG_LEVEL]
+    if {$res} {puts "on $host: failed to source $::env(VDEMO_demoConfig)"}
+
+    if {[info exists ::env(VDEMO_exports)]} {
+        foreach {var} "$::env(VDEMO_exports)" {
+            if {[info exists ::env($var)]} {
+                ssh_command "export $var=$::env($var)" $host 0 $::DEBUG_LEVEL
             }
         }
     }
-    ssh_command "source $env(VDEMO_demoConfig)" $host 0 $DEBUG_LEVEL
 
     # detach screen / close xterm
     catch { exec screen -dS $screenid }
@@ -1052,7 +1057,7 @@ proc create_spread_conf {} {
     set num 1
     foreach {seg} "$segments" {
         if {[string match "127.*" $seg]} {
-            set sp_seg "$seg.255:$env(SPREAD_PORT)"
+            set sp_seg "$seg.255:$::env(SPREAD_PORT)"
         } else {
             set sp_seg [compute_spread_segment $IP([lindex $hosts($seg) 0]) $num]
             set num [expr $num + 1]
@@ -1236,10 +1241,6 @@ setup_temp_dir
 parse_env_var
 if {"$::VDEMO_QUIT_COMPONENTS" != ""} {puts "quitting on exit of: $::VDEMO_QUIT_COMPONENTS"}
 remove_duplicates
-
-if {![info exists ::env(LD_LIBRARY_PATH)]} {
-    set ::env(LD_LIBRARY_PATH) ""
-}
 create_spread_conf
 
 # cleanup dangling connections first
@@ -1250,7 +1251,7 @@ gui_tcl
 update
 
 # autostart
-if {[info exists env(VDEMO_autostart)] && $env(VDEMO_autostart) == "true"} {
+if {[info exists ::env(VDEMO_autostart)] && $::env(VDEMO_autostart) == "true"} {
     puts "Starting all components due to autostart request"
     allcomponents_cmd "start"
 }
