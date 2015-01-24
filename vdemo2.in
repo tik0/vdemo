@@ -19,8 +19,10 @@ vdemo starter
   -h  --help           this help text
   -a  --auto           automatically start all components
   -r  --logrotate      enable log rotation
-  -d  --debug [level]  set debug [level]
-  -Q  --quit <components> space separated list of components to quit vdemo on
+  -v  --verbose [level]    set verbosity [level]
+                           >0: increasing verbosity
+                           -1: also suppress message boxes
+  -Q  --quit <components>  space separated list of components to quit vdemo on
 
  authors: Marc Hanheide, Robert Haschke
 "
@@ -44,13 +46,13 @@ while [ $# -gt 0 ]; do
         export LOG_ROTATION="ON"
         export VDEMO_exports="$VDEMO_exports LOG_ROTATION"
         ;;
-    "-d"|"--debug")
+    "-v"|"--verbose")
         export VDEMO_DEBUG_LEVEL=1
         if [[ $2 =~ ^-?[0-9]+$ ]] ; then
             export VDEMO_DEBUG_LEVEL=$2
             shift
         fi
-        echo "Using debug level $VDEMO_DEBUG_LEVEL"
+        echo "Using verbosity level $VDEMO_DEBUG_LEVEL"
         ;;
     "-Q"|"--quit")
         export VDEMO_QUIT_COMPONENTS=$2
