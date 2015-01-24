@@ -1184,9 +1184,21 @@ proc gui_exit {} {
             break
         }
     }
-    if {$quickexit || [tk_messageBox -message "Really quit?" -type yesno -icon question] == yes} {
-        finish
+    if {!$quickexit} {
+        if [expr $::DEBUG_LEVEL >= 0] {
+            set ans [tk_messageBox -message \
+                "There are still running components.\nStop them before quitting?" \
+                -type yesnocancel -default yes -icon question]
+        } else {
+            puts "Stopping remaining components before quitting."
+            set ans yes
+        }
+        switch $ans {
+            yes {allcomponents_cmd stop}
+            cancel {return}
+        }
     }
+    finish
 }
 
 wm protocol $::BASE. WM_DELETE_WINDOW {
