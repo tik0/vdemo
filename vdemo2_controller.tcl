@@ -44,21 +44,32 @@ ttk::style configure alert.TLabel -foreground blue -background yellow
 ttk::style configure info.TLabel -foreground blue -background yellow
 ttk::style configure log.TLabel -justify left -anchor e -relief sunken -foreground gray30
 
-# debugging puts
+# debugging puts()
 set DEBUG_LEVEL 0
+catch {set DEBUG_LEVEL $::env(VDEMO_DEBUG_LEVEL)}
 proc dputs {args {level 1}} {
     if [expr $level <= $::DEBUG_LEVEL] {
         puts stderr "-- $args"
     }
 }
 
+# set some default values from environment variables
+if { ! [info exists ::env(VDEMO_LOGGING)] || \
+     ! [string is integer -strict $::env(VDEMO_LOGGING)] } \
+    {set ::env(VDEMO_LOGGING) 0}
+dputs "default logging: $::env(VDEMO_LOGGING)" 3
+
+if { ! [info exists ::env(VDEMO_DETACH_TIME)] || \
+     ! [string is integer -strict $::env(VDEMO_DETACH_TIME)] } \
+    {set ::env(VDEMO_DETACH_TIME) 0}
+dputs "default detach time: $::env(VDEMO_DETACH_TIME)" 3
+
 set VDEMO_QUIT_COMPONENTS [list]
-if {[info exists ::env(VDEMO_QUIT_COMPONENTS)]} {
-    set VDEMO_QUIT_COMPONENTS [split $::env(VDEMO_QUIT_COMPONENTS)]
-}
+catch {set VDEMO_QUIT_COMPONENTS [split $::env(VDEMO_QUIT_COMPONENTS)]}
 
 proc parse_options {comp} {
     global COMPONENTS ARGS USEX TERMINAL WAIT_READY NOAUTO LOGGING GROUP DETACHTIME COMP_LEVEL EXPORTS TITLE CONT_CHECK CHECKNOWAIT_TIME RESTART
+
     set NEWARGS [list]
     set USEX($comp) 0
     # time to wait for a process to startup
@@ -69,10 +80,10 @@ proc parse_options {comp} {
     set CONT_CHECK($comp) 1
     set GROUP($comp) ""
     # detach a component after this time
-    set DETACHTIME($comp) 10
+    set DETACHTIME($comp) $::env(VDEMO_DETACH_TIME)
     set NOAUTO($comp) 0
     set TERMINAL($comp) "screen"
-    set LOGGING($comp) 0
+    set LOGGING($comp) $::env(VDEMO_LOGGING)
     set COMP_LEVEL($comp) ""
     set EXPORTS($comp) ""
     set RESTART($comp) 0
@@ -136,16 +147,15 @@ proc parse_options {comp} {
 
 
 proc parse_env_var {} {
-    global env HOST COMPONENTS ARGS USEX WATCHFILE COMMAND TITLE VDEMOID DEBUG_LEVEL
-    set VDEMOID [file tail [file rootname $env(VDEMO_demoConfig)]]
-    set components_list "$env(VDEMO_components)"
+    global HOST COMPONENTS ARGS USEX WATCHFILE COMMAND TITLE VDEMOID
+    set VDEMOID [file tail [file rootname $::env(VDEMO_demoConfig)]]
+    set components_list "$::env(VDEMO_components)"
     set comp [split "$components_list" ":"]
     set nCompos [llength "$comp"]
     set COMPONENTS {}
     set WATCHFILE ""
     set ::HOSTS ""
-    catch {set DEBUG_LEVEL $env(VDEMO_DEBUG_LEVEL)}
-    catch {set WATCHFILE $env(VDEMO_watchfile)}
+    catch {set ::WATCHFILE $::env(VDEMO_watchfile)}
     dputs "VDEMO_watchfile = $WATCHFILE"
     dputs "COMPONENTS: "
     for {set i 0} { $i < $nCompos } {incr i} {
@@ -197,9 +207,9 @@ proc set_group_noauto {grp} {
 # base prefix for gui components
 set ::BASE ""
 proc gui_tcl {} {
-    global HOST COMPONENTS ARGS TERMINAL USEX LOGTEXT env NOAUTO LOGGING  GROUP SCREENED  COMP_LEVEL COMPWIDGET WATCHFILE COMMAND LEVELS TITLE TIMERDETACH
-    set LOGTEXT "demo configured from '$env(VDEMO_demoConfig)'"
-    wm title . "vdemo_controller: $env(VDEMO_demoConfig)"
+    global HOST COMPONENTS ARGS TERMINAL USEX LOGTEXT NOAUTO LOGGING  GROUP SCREENED  COMP_LEVEL COMPWIDGET WATCHFILE COMMAND LEVELS TITLE TIMERDETACH
+    set LOGTEXT "demo configured from '$::env(VDEMO_demoConfig)'"
+    wm title . "vdemo_controller: $::env(VDEMO_demoConfig)"
     wm geometry $::BASE. "875x600"
 
     set groups ""
@@ -345,10 +355,10 @@ proc gui_tcl {} {
     pack $::BASE.exit -side right
 
     if {[info exists ::env(VDEMO_alert_string)]} {
-        ttk::label $::BASE.orlabel -style alert.TLabel -text "$env(VDEMO_alert_string)"
+        ttk::label $::BASE.orlabel -style alert.TLabel -text $::env(VDEMO_alert_string)
         pack $::BASE.orlabel -fill x
     } elseif {[info exists ::env(VDEMO_info_string)]} {
-        ttk::label $::BASE.orlabel -style info.TLabel -text "no robot config loaded"
+        ttk::label $::BASE.orlabel -style info.TLabel -text $::env(VDEMO_info_string)
         pack $::BASE.orlabel -fill x
     }
 }
@@ -550,8 +560,8 @@ proc cancel_detach_timer {comp} {
 }
 
 proc component_cmd {comp cmd} {
-    global env HOST COMPONENTS ARGS TERMINAL USEX WAIT_READY LOGGING WAIT_BREAK SCREENED DETACHTIME COMPWIDGET COMMAND EXPORTS TITLE COMPSTATUS TIMERDETACH
-    set cpath "$env(VDEMO_componentPath)"
+    global HOST COMPONENTS ARGS TERMINAL USEX WAIT_READY LOGGING WAIT_BREAK SCREENED DETACHTIME COMPWIDGET COMMAND EXPORTS TITLE COMPSTATUS TIMERDETACH
+    set cpath "$::env(VDEMO_componentPath)"
     set component_script "$cpath/component_$COMMAND($comp)"
     set component_options "-t $TITLE($comp)"
     if {$USEX($comp)} {
@@ -585,9 +595,8 @@ proc component_cmd {comp cmd} {
             set_status $comp starting
             cancel_detach_timer $comp
 
-            if {$DETACHTIME($comp) < 0} {
-                set component_options "$component_options --noiconic"
-            }
+            # don't detach when detach time == 0
+            if {$DETACHTIME($comp) == 0} { set component_options "$component_options -D" }
             set cmd_line "$VARS $component_script $component_options start"
             set res [ssh_command "$cmd_line" "$HOST($comp)"]
 
@@ -610,9 +619,11 @@ proc component_cmd {comp cmd} {
             }
 
             set SCREENED($comp) 1
-            if {$DETACHTIME($comp) >= 0} {
+            if {$DETACHTIME($comp) > 0} {
                 set detach_after [expr $DETACHTIME($comp) * 1000]
                 set TIMERDETACH($comp) [after $detach_after component_cmd $comp detach]
+            } elseif {$DETACHTIME($comp) == 0} {
+                set SCREENED($comp) 0
             }
             wait_ready $comp
             set ::LAST_GUI_INTERACTION($comp) [clock seconds]
@@ -675,7 +686,7 @@ proc component_cmd {comp cmd} {
             # ensure that start button is reenabled on errors
             set enableStartTimer [after idle $COMPWIDGET.$comp.start state !disabled]
 
-            if { ! [string is integer -strict $res]} {
+            if { ! [string is integer -strict $res] } {
                 puts "internal error: ssh result is not an integer: '$res'"
                 return
             }
@@ -851,8 +862,7 @@ proc get_master_screen_name { hostname } {
 }
 
 proc get_fifo_name {hostname} {
-    global COMPONENTS HOST TEMPDIR VDEMOID env
-    return "$TEMPDIR/vdemo-$VDEMOID-ssh-$env(USER)-$hostname"
+    return "$::TEMPDIR/vdemo-$::VDEMOID-ssh-$::env(USER)-$hostname"
 }
 
 proc connect_host {fifo host} {
@@ -997,7 +1007,7 @@ proc get_autospread_filename {} {
 }
 
 proc create_spread_conf {} {
-    global COMPONENTS COMMAND HOST env
+    global COMPONENTS COMMAND HOST
     set ::AUTO_SPREAD_CONF 0
 
     # If SPREAD_CONFIG was defined in environment, we are already done

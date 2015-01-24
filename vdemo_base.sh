@@ -93,20 +93,22 @@ function vdemo_inspect {
 #   -n    title of the component (name to identify it by other functions, 
 #         needs not to be the program name)
 #   -d    use X11 DISPLAY to display the component
+#   -l    enable logging
+#   -D    start detached
 # remaining arguments are treated as command line of the component to start
 function vdemo_start_component {
-	VDEMO_title=""
 	VDEMO_componentDisplay="${DISPLAY}"
-	VDEMO_logging=""
-	ICONIC="-iconic"
-	COLOR="green"
-	log_rotation_command=""
+	VDEMO_startDetached="no"
+	COLOR="white"
 
 	while [ $# -gt 0 ]; do
 		case $1 in
 			"-n"|"--name")
 				shift
 				VDEMO_title="$1"
+				;;
+			"-D"|"--detached")
+				VDEMO_startDetached="yes"
 				;;
 			"-d"|"--display")
 				shift
@@ -137,10 +139,6 @@ function vdemo_start_component {
 			--)
 				break
 				;;
-			"--noiconic")
-				ICONIC=""
-				COLOR=white
-				;;
 			-*)
 				echo "illegal option $1" >&2
 				echo "$USAGE" >&2
@@ -162,9 +160,14 @@ function vdemo_start_component {
 
 	cmd="${VDEMO_logging} ${log_rotation_command} LD_LIBRARY_PATH=${LD_LIBRARY_PATH} DISPLAY=${VDEMO_componentDisplay} component"
 
-	xterm -fg $COLOR -bg black $ICONIC -title "starting $VDEMO_title" -e \
-		screen -t "$VDEMO_title" -S "${VDEMO_title}_" \
-		stdbuf -oL bash -c "$cmd" &
+	if [ "x$VDEMO_startDetached" == "xno" ]; then
+		xterm -fg $COLOR -bg black -title "starting $VDEMO_title" -e \
+			screen -t "$VDEMO_title" -S "${VDEMO_title}_" \
+			stdbuf -oL bash -c "$cmd" &
+	else
+		screen -t "$VDEMO_title" -S "${VDEMO_title}_" -d -m \
+			stdbuf -oL bash -c "$cmd"
+	fi
 }
 
 # get all direct and indirect children of a process (including process itself)

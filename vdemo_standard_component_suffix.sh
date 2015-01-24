@@ -15,14 +15,13 @@ usage: $vdemo_component_scriptname [options] start|stop|check
  options:
   -h  --help               this help text
   -x  --xserver            start own xserver
-
+  -t  --title <title>      define component title
+  -l  --logging            enable logging
+  -D  --detached           start detached
  author: Marc Hanheide ($RCS_ID)
 "
 
 # option checks
-vdemo_start_XSERVER=""
-vdemo_start_LOGGING=""
-vdemo_start_ICONIC=""
 title="${vdemo_component_scriptname#component_}"
 
 while [ $# -gt 0 ]; do
@@ -45,8 +44,8 @@ while [ $# -gt 0 ]; do
 			title="$title.$1"
 		fi
 		;;
-	"--noiconic")
-	    vdemo_start_ICONIC="--noiconic"
+	"-D"|"--detached")
+	    vdemo_start_DETACHED="-D"
 	    ;;
 	-*)
 	    echo "illegal option '$1'" >& 2
@@ -111,11 +110,11 @@ case "$1" in
 
 	if [ "${vdemo_start_XSERVER}" ]; then
 	    comp_display=$(start_Xserver)
-		if [ $? == 2 ]; then exit 2; fi
+		 if [ $? == 2 ]; then exit 2; fi
 	    echo "DISPLAY: $comp_display" >&2
-	    vdemo_start_component -n $title $vdemo_start_LOGGING $vdemo_start_ICONIC -d $comp_display
+	    vdemo_start_component -n $title $vdemo_start_LOGGING $vdemo_start_DETACHED -d $comp_display
 	else
-	    vdemo_start_component -n $title $vdemo_start_LOGGING $vdemo_start_ICONIC
+	    vdemo_start_component -n $title $vdemo_start_LOGGING $vdemo_start_DETACHED
 	fi
 	;;
     stop)

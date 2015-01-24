@@ -16,9 +16,13 @@ usage: $SCRIPTNAME [options] <Config file>
 vdemo starter
 
  options:
-  -h  --help           this help text
-  -a  --auto           automatically start all components
-  -r  --logrotate      enable log rotation
+  -h  --help               display this help
+  -a  --auto               automatically start all components
+  -l  --log                enable logging for all components
+  -d  --detach time        set default detach time in seconds
+                            0: start detached
+                           <0: never detach
+  -r  --logrotate          enable log rotation
   -v  --verbose [level]    set verbosity [level]
                            >0: increasing verbosity
                            -1: also suppress message boxes
@@ -40,6 +44,17 @@ while [ $# -gt 0 ]; do
     "-a"|"--auto")
         echo "Automatically starting all components"
         export VDEMO_autostart="true"
+        ;;
+    "-l"|"--log")
+        export VDEMO_LOGGING=1
+        ;;
+    "-d"|"--detach")
+        if [[ $2 =~ ^-?[0-9]+$ ]] ; then
+            export VDEMO_DETACH_TIME=$2
+            shift
+        else
+            echo "invalid detach time: $2"
+        fi
         ;;
     "-r"|"--logrotate")
         echo "Enable log rotation"
