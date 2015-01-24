@@ -31,8 +31,7 @@ function vdemo_check_component {
 	VDEMO_title="$1"
 	VDEMO_pid=$(vdemo_pidFromScreen ${VDEMO_title})
 	if [ "$VDEMO_pid" ]; then
-		echo "checking $VDEMO_title" >&2
-		if ps -o user,pid,stime,cmd --no-headers -p "${VDEMO_pid}"; then
+		if ps -p "${VDEMO_pid}" > /dev/null; then
 			echo "running" >&2
 			return 0
 		else
@@ -92,7 +91,7 @@ function vdemo_inspect {
 
 # start a component. This function has the following options:
 #   -n    title of the component (name to identify it by other functions, 
-#           needs not to be the program name)
+#         needs not to be the program name)
 #   -d    use X11 DISPLAY to display the component
 # remaining arguments are treated as command line of the component to start
 function vdemo_start_component {
@@ -102,7 +101,6 @@ function vdemo_start_component {
 	ICONIC="-iconic"
 	COLOR="green"
 	log_rotation_command=""
-	tee_command="tee"
 
 	while [ $# -gt 0 ]; do
 		case $1 in
@@ -119,7 +117,6 @@ function vdemo_start_component {
 				logfiledir="${VDEMO_logfile%/*}"
 				if [ ! -d "$logfiledir" ]; then mkdir -p "$logfiledir"; fi
 				if [ "$LOG_ROTATION" == "ON" ]; then
-					tee_command="tee -a"
 					component_logrotate_configfile=${VDEMO_logfile_prefix}${VDEMO_title}.rotation.conf
 					component_logrotate_statefile=${VDEMO_logfile_prefix}${VDEMO_title}.rotation.state
 
@@ -134,7 +131,8 @@ function vdemo_start_component {
 					log_rotation_command="(while true; do /usr/sbin/logrotate ${component_logrotate_configfile} -s ${component_logrotate_statefile}; sleep ${LOG_ROTATION_INTERVALL-300}; done)& "
 				fi
 				echo "logging to ${VDEMO_logfile}" >&2
-				VDEMO_logging="exec > >($tee_command \"${VDEMO_logfile}\"); exec 2>&1; "
+				# exec allows to redirect output of current shell
+				VDEMO_logging="exec 1> >(tee -a \"${VDEMO_logfile}\") 2>&1;"
 				;;
 			--)
 				break
@@ -144,8 +142,8 @@ function vdemo_start_component {
 				COLOR=white
 				;;
 			-*)
-				echo "illegal option $1" >& 2
-				echo "$USAGE" >& 2
+				echo "illegal option $1" >&2
+				echo "$USAGE" >&2
 				exit 1
 				;;
 			*)
@@ -156,12 +154,17 @@ function vdemo_start_component {
 	done
 
 	export -f component
-	rm -f ${VDEMO_logfile} # remove any old log file
+	rm -f ${VDEMO_logfile} # remove any previous log file
+
+	test -n "${VDEMO_logging}" && \
+	echo "starting $VDEMO_title with component function:"$'\n'"$(declare -f component)" \
+		>> ${VDEMO_logfile}
+
 	cmd="${VDEMO_logging} ${log_rotation_command} LD_LIBRARY_PATH=${LD_LIBRARY_PATH} DISPLAY=${VDEMO_componentDisplay} component"
-	echo "starting $VDEMO_title with component function:"$'\n'"$(declare -f component)" >&2
+
 	xterm -fg $COLOR -bg black $ICONIC -title "starting $VDEMO_title" -e \
 		screen -t "$VDEMO_title" -S "${VDEMO_title}_" \
-		stdbuf -oL bash -i -c "$cmd" "$VDEMO_title" &
+		stdbuf -oL bash -c "$cmd" &
 }
 
 # get all direct and indirect children of a process (including process itself)
@@ -195,11 +198,10 @@ function vdemo_pidsFromComponent {
 	local ppid=$(ps --ppid $1 -o pid --no-headers)
 	local children=$(ps --ppid $ppid -o pid --no-headers --sort -start_time,-pid)
 
-	if [ "$LOG_ROTATION" == "ON" ]; then tee_command="tee -a"; else tee_command="tee"; fi
 	# exclude the logging process (tee)
 	for pid in $children; do
 		if [[ ! "$(ps -p $pid -o cmd=)" =~ \
-			"bash -i -c exec > >($tee_command \"/tmp/vdemo-" ]]; then
+			"bash -c exec 1> >(tee -a \"/tmp/vdemo-" ]]; then
 			echo -n " $pid"
 		fi
 	done
