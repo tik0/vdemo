@@ -397,16 +397,14 @@ proc gui_update_host {host status {forceCreate 0}} {
 }
 
 proc clearLogger {} {
-    global WATCHFILE
     $::BASE.components.group.log.text delete 1.0 end
-    exec echo -n "" >> "$WATCHFILE"
+    exec echo -n "" >> "$::WATCHFILE"
 }
 
 proc init_logger {filename} {
-    global mypid
-     exec mkdir -p [file dirname $filename]
-     exec touch $filename
-    if { [catch {open "|tail -n 5 --pid=$mypid -F $filename"} infile] } {
+    exec mkdir -p [file dirname $filename]
+    exec touch $filename
+    if { [catch {open "|tail -n 5 --pid=$::mypid -F $filename"} infile] } {
         puts  "Could not open $filename for reading."
     } else {
         fconfigure $infile -blocking no -buffering line
@@ -418,7 +416,6 @@ proc insertLog {infile} {
     if { [gets $infile line] >= 0 } {
         $::BASE.components.group.log.text insert end "$line\n"  ;# Add a newline too
         $::BASE.components.group.log.text yview moveto 1
-
     } else {
         # Close the pipe - otherwise we will loop endlessly
         close $infile
@@ -634,7 +631,6 @@ proc component_cmd {comp cmd} {
                 return
             }
             $COMPWIDGET.$comp.stop state disabled
-            set ::LAST_GUI_INTERACTION($comp) [clock seconds]
             set_status $comp unknown
             cancel_detach_timer $comp
 
@@ -721,7 +717,10 @@ proc component_cmd {comp cmd} {
             }
             set_status $comp $s
             # re-enable start button and cancel enableStartTimer
-            if {"$s" != "starting"} {$COMPWIDGET.$comp.start state !disabled}
+            if {"$s" != "starting"} {
+                set ::LAST_GUI_INTERACTION($comp) [clock seconds]
+                $COMPWIDGET.$comp.start state !disabled
+            }
             after cancel $enableStartTimer
 
             if {$screenResult != 0} {
@@ -865,17 +864,31 @@ proc get_fifo_name {hostname} {
     return "$::TEMPDIR/vdemo-$::VDEMOID-ssh-$::env(USER)-$hostname"
 }
 
+set MONITOR_IGNORE_HOSTS [list]
+proc disable_monitoring {host} {
+    lappend ::MONITOR_IGNORE_HOSTS $host
+}
+proc enable_monitoring {host} {
+    set ::MONITOR_IGNORE_HOSTS [lsearch -inline -all -not -exact $::MONITOR_IGNORE_HOSTS $host]
+}
+proc monitoring_disabled {host} {
+    return [expr [lsearch -exact $::MONITOR_IGNORE_HOSTS $host] >= 0]
+}
+
 proc connect_host {fifo host} {
     exec rm -f "$fifo.in"
     exec rm -f "$fifo.out"
     exec mkfifo "$fifo.in"
     exec mkfifo "$fifo.out"
 
+    # temporarily ignore failed connections on this host 
+    disable_monitoring $host
+
     # Here we establish the master connection. Commands pushed into $fifo.in get piped into
     # the remote bash (over ssh) and the result is read again and piped into $fifo.out.
     # This way, the remote stdout goes into $fifo.out, while remote stderr is displayed here.
     set screenid [get_master_screen_name $host]   
-    exec screen -dmS $screenid bash -c "tail -s 0.1 -n 10000 -f $fifo.in | ssh $::SSHOPTS -Y $host bash | while read s; do echo \$s > $fifo.out; done"
+    exec screen -dmS $screenid bash -c "tail -s 0.1 -f $fifo.in | ssh $::SSHOPTS -Y $host bash | while read s; do echo \$s > $fifo.out; done"
 
     # Wait until connection is established. 
     # Issue a echo command on remote host that only returns if a connection was established. 
@@ -890,7 +903,7 @@ proc connect_host {fifo host} {
         # continue waiting on timeout (124), otherwise break from loop
         if {$res == 124} { puts -nonewline "."; flush stdout } { break }
         # break from loop, when screen session was stopped
-        if {$noScreen} {set res "aborted"; break}
+        if {$noScreen} {set res -2; break}
 
         # show screen session in xterm after 1s (allow entering password, etc.)
         if { ! $xterm_shown } {
@@ -898,10 +911,19 @@ proc connect_host {fifo host} {
             set xterm_shown 1
         }
     }
+
+    # re-enable monitoring of master connection on this host
+    after [expr $::SCREEN_FAILURE_DELAY * 1000] enable_monitoring $host
+
+    # handle connection errors
     if {[string match "connected*" $res]} {
         puts " OK"
     } else { # some failure
-        if {$res == 124} {puts " timeout"} {puts " error: $res"}
+        switch $res {
+            124 {puts " timeout"} 
+             -2 {puts " aborted"}
+            default {puts "error: $res"; set res -2}
+        }
         # quit screen session
         catch {exec screen -XS $screenid quit}
         exec rm -f "$fifo.in"
@@ -1086,6 +1108,7 @@ proc create_spread_conf {} {
     exec cat $filename
 }
 
+set SCREEN_FAILURE_DELAY 2
 proc handle_screen_failure {chan host} {
     gets $chan line
     dputs "screen failure: $host $chan: $line" 3
@@ -1097,15 +1120,15 @@ proc handle_screen_failure {chan host} {
         return
     }
 
-    # check for lost master connections only on localhost
-    if {$host == "localhost"} {
-        set remoteHost ""
-        regexp "^\[\[:digit:]]+\.vdemo-$::VDEMOID-(.*)\$" $line matched remoteHost
-        if {"$remoteHost" != ""} {
-            set ::SCREENED_SSH($remoteHost) 0
-            reconnect_host $remoteHost "Lost connection to $remoteHost. Reconnect?"
-            return
-        }
+    # check for a lost master connection
+    set remoteHost ""
+    regexp "^\[\[:digit:]]+\.vdemo-$::VDEMOID-(.*)\$" $line matched remoteHost
+    if {"$remoteHost" != ""} {
+        set ::SCREENED_SSH($remoteHost) 0
+        # only ask for reconnection when $host == localhost && monitoring is enabled
+        if {$host != "localhost" || [monitoring_disabled $remoteHost]} return
+        reconnect_host $remoteHost "Lost connection to $remoteHost. Reconnect?"
+        return
     }
 
     # a component crashed
@@ -1115,7 +1138,7 @@ proc handle_screen_failure {chan host} {
             dputs "$comp closed its screen session on $host" 2
             if {[$::COMPWIDGET.$comp.stop  instate disabled] || \
                 [$::COMPWIDGET.$comp.start instate disabled] ||
-                [expr [clock seconds] - $::LAST_GUI_INTERACTION($comp) < 2]} {
+                [expr [clock seconds] - $::LAST_GUI_INTERACTION($comp) < $::SCREEN_FAILURE_DELAY]} {
                 # component was stopped or just started via gui -> ignore event
                 # trigger stop: component's on_stop() might do some cleanup
                 component_cmd $comp stop
