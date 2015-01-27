@@ -933,6 +933,7 @@ proc connect_host {fifo host} {
 
     dputs "issuing remote initialization commands" 2
     set res [ssh_command "source $::env(VDEMO_demoConfig)" $host 0 $::DEBUG_LEVEL]
+    set res [ssh_command "ls \$VDEMO_root > /dev/null" $host 0 $::DEBUG_LEVEL]
     if {$res} {puts "on $host: failed to source $::env(VDEMO_demoConfig)"}
 
     if {[info exists ::env(VDEMO_exports)]} {
