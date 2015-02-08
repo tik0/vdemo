@@ -576,7 +576,6 @@ proc component_cmd {comp cmd} {
                 return
             }
             $COMPWIDGET.$comp.start state disabled
-            update
 
             set res [ssh_command "screen -wipe | fgrep -q .$COMMAND($comp).$TITLE($comp)_" "$HOST($comp)"]
             if {$res == -1} {
@@ -586,6 +585,7 @@ proc component_cmd {comp cmd} {
             } elseif {$res == 0} {
                 puts "$TITLE($comp): already running, stopping first..."
                 component_cmd $comp stop
+                $COMPWIDGET.$comp.start state disabled
             }
 
             set WAIT_BREAK 0
@@ -631,6 +631,7 @@ proc component_cmd {comp cmd} {
                 return
             }
             $COMPWIDGET.$comp.stop state disabled
+            $COMPWIDGET.$comp.start state !disabled
             set_status $comp unknown
             cancel_detach_timer $comp
 
@@ -679,15 +680,18 @@ proc component_cmd {comp cmd} {
             set res [ssh_command "$cmd_line" "$HOST($comp)"]
             dputs "ssh result: $res" 2
             after idle $COMPWIDGET.$comp.check state !disabled
-            # ensure that start button is reenabled on errors
-            set enableStartTimer [after idle $COMPWIDGET.$comp.start state !disabled]
 
             if { ! [string is integer -strict $res] } {
                 puts "internal error: ssh result is not an integer: '$res'"
+                $COMPWIDGET.$comp.start state !disabled
                 return
             }
 
-            if {$res == -1} {dputs "no master connection to $HOST($comp)"; return}
+            if {$res == -1} {
+                dputs "no master connection to $HOST($comp)"; 
+                $COMPWIDGET.$comp.start state !disabled
+                return
+            }
 
             set noscreen 0
             # res = 10*onCheckResult + screenResult
@@ -716,12 +720,11 @@ proc component_cmd {comp cmd} {
                 }
             }
             set_status $comp $s
-            # re-enable start button and cancel enableStartTimer
+            # re-enable start button?
             if {"$s" != "starting"} {
                 set ::LAST_GUI_INTERACTION($comp) [clock seconds]
                 $COMPWIDGET.$comp.start state !disabled
             }
-            after cancel $enableStartTimer
 
             if {$screenResult != 0} {
                 dputs "$comp not running: cancel detach timer" 2
@@ -1166,7 +1169,7 @@ proc handle_screen_failure {chan host} {
             return
         }
     }
-    puts "on $host: $line"
+    dputs "on $host: $line"
 }
 
 # setup inotifywait on remote hosts to monitor deletions in screen-directory
