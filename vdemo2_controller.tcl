@@ -1217,11 +1217,9 @@ proc disconnect_screen_monitoring {host} {
 }
 
 proc gui_exit {} {
-    global COMPONENTS COMPSTATUS
     set quickexit 1
-    foreach {comp} "$COMPONENTS" {
-        if { [string match *_screen $COMPSTATUS($comp)] || \
-             $COMPSTATUS($comp) == "starting"} {
+    foreach {comp} "$::COMPONENTS" {
+        if { [lsearch [list starting ok_screen failed_check] $::COMPSTATUS($comp)] >= 0 } {
             set quickexit 0
             break
         }
