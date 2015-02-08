@@ -58,8 +58,9 @@ function vdemo_reattach_screen {
 	fi
 
 	if [ $failure == 1 ] ; then
-		# change title of xterm
-		echo -ne "\033]0;${1}@${HOSTNAME}\007"
+		# change title and color of xterm
+		echo -ne "\033]0;log of ${1}@${HOSTNAME}\007"
+		echo -ne "\033]11;darkblue\007"
 		file="$VDEMO_logfile_prefix${1}.log"
 		if [ -f $file ] ; then
 			less $file
