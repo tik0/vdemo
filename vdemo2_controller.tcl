@@ -933,7 +933,7 @@ proc connect_host {fifo host} {
 
     dputs "issuing remote initialization commands" 2
     set res [ssh_command "source $::env(VDEMO_demoConfig)" $host 0 $::DEBUG_LEVEL]
-    set res [ssh_command "ls \$VDEMO_root > /dev/null" $host 0 $::DEBUG_LEVEL]
+    set res [ssh_command "ls \$VDEMO_root 2> /dev/null" $host 0 $::DEBUG_LEVEL]
     if {$res} {puts "on $host: failed to source $::env(VDEMO_demoConfig)"}
 
     if {[info exists ::env(VDEMO_exports)]} {
@@ -1186,7 +1186,7 @@ proc connect_screen_monitoring {host} {
         # If there was never a screen executed on the remote machine, 
         # the directory /var/run/screen/S-$USER doesn't yet exist
         # Hence, call screen at least once:
-        ssh_command "screen -ls > /dev/null" $host 0 $::DEBUG_LEVEL
+        ssh_command "screen -ls 2> /dev/null" $host 0 $::DEBUG_LEVEL
     }
 
     # pipe-open monitor connection: cmd may fail due to missing ssh or inotifywait
