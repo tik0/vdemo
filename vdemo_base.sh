@@ -159,7 +159,9 @@ function vdemo_start_component {
 	echo "starting $VDEMO_title with component function:"$'\n'"$(declare -f component)" \
 		>> ${VDEMO_logfile}
 
-	cmd="${VDEMO_logging} ${log_rotation_command} LD_LIBRARY_PATH=${LD_LIBRARY_PATH} DISPLAY=${VDEMO_componentDisplay} component"
+	# Hm. For some reason the last line of the output doesn't enter the log.
+	# Adding a small sleep seems to fix this issue.
+	cmd="${VDEMO_logging} ${log_rotation_command} LD_LIBRARY_PATH=${LD_LIBRARY_PATH} DISPLAY=${VDEMO_componentDisplay} component; sleep 0.01"
 
 	if [ "x$VDEMO_startDetached" == "xno" ]; then
 		xterm -fg $COLOR -bg black -title "starting $VDEMO_title" -e \
