@@ -274,9 +274,9 @@ proc gui_tcl {} {
     ttk::frame $::BASE.components.all -style groove.TFrame
     pack $::BASE.components.all -side top -fill x
     ttk::label $::BASE.components.all.label -style TLabel -text "ALL COMPONENTS"
-    ttk::button $::BASE.components.all.start -style cmd.TButton -text "start" -command "allcomponents_cmd start"
-    ttk::button $::BASE.components.all.stop  -style cmd.TButton -text "stop"  -command "allcomponents_cmd stop"
-    ttk::button $::BASE.components.all.check -style cmd.TButton -text "check" -command "allcomponents_cmd check"
+    ttk::button $::BASE.components.all.start -style cmd.TButton -text "start" -command "all_cmd start"
+    ttk::button $::BASE.components.all.stop  -style cmd.TButton -text "stop"  -command "all_cmd stop"
+    ttk::button $::BASE.components.all.check -style cmd.TButton -text "check" -command "all_cmd check"
     pack $::BASE.components.all.label -side left
     pack $::BASE.components.all.start -side left
     pack $::BASE.components.all.stop  -side left
@@ -292,18 +292,18 @@ proc gui_tcl {} {
     set LEVELS [lsort -unique "$LEVELS"]
     ttk::frame $::BASE.components.group.level
     pack $::BASE.components.group.level -side left -fill both
-    foreach {g} "$LEVELS" {
-        ttk::frame $::BASE.components.group.level.$g -style groove.TFrame
-        pack $::BASE.components.group.level.$g -side top -fill x
+    foreach {l} "$LEVELS" {
+        ttk::frame $::BASE.components.group.level.$l -style groove.TFrame
+        pack $::BASE.components.group.level.$l -side top -fill x
 
-        ttk::label $::BASE.components.group.level.$g.label  -text "$g"
-        ttk::button $::BASE.components.group.level.$g.start -style cmd.TButton -text "start" -command "level_cmd start $g"
-        ttk::button $::BASE.components.group.level.$g.stop  -style cmd.TButton -text "stop"  -command "level_cmd stop $g"
-        ttk::button $::BASE.components.group.level.$g.check -style cmd.TButton -text "check" -command "level_cmd check $g"
-        pack $::BASE.components.group.level.$g.label -side left -padx 5 -fill x
-        pack $::BASE.components.group.level.$g.start -side left
-        pack $::BASE.components.group.level.$g.stop  -side left
-        pack $::BASE.components.group.level.$g.check -side left
+        ttk::label $::BASE.components.group.level.$l.label  -text "$l"
+        ttk::button $::BASE.components.group.level.$l.start -style cmd.TButton -text "start" -command "level_cmd start $l"
+        ttk::button $::BASE.components.group.level.$l.stop  -style cmd.TButton -text "stop"  -command "level_cmd stop  $l"
+        ttk::button $::BASE.components.group.level.$l.check -style cmd.TButton -text "check" -command "level_cmd check $l"
+        pack $::BASE.components.group.level.$l.label -side left -padx 5 -fill x
+        pack $::BASE.components.group.level.$l.start -side left
+        pack $::BASE.components.group.level.$l.stop  -side left
+        pack $::BASE.components.group.level.$l.check -side left
     }
     # button for group control:
     set groups [lsort -unique "$groups"]
@@ -313,9 +313,9 @@ proc gui_tcl {} {
         ttk::frame $::BASE.components.group.named.$g -style groove.TFrame
         pack $::BASE.components.group.named.$g -side top -fill x
         ttk::label $::BASE.components.group.named.$g.label  -style group.TLabel -text "$g" -width 10 -anchor e
-        ttk::button $::BASE.components.group.named.$g.start -style cmd.TButton -text "start" -command "group_cmd start $g"
-        ttk::button $::BASE.components.group.named.$g.stop  -style cmd.TButton -text "stop"  -command "group_cmd stop $g"
-        ttk::button $::BASE.components.group.named.$g.check -style cmd.TButton -text "check" -command "group_cmd check $g"
+        ttk::button $::BASE.components.group.named.$g.start -style cmd.TButton -text "start" -command "all_cmd start [list $::LEVELS] $g"
+        ttk::button $::BASE.components.group.named.$g.stop  -style cmd.TButton -text "stop"  -command "all_cmd stop  [list $::LEVELS] $g"
+        ttk::button $::BASE.components.group.named.$g.check -style cmd.TButton -text "check" -command "all_cmd check [list $::LEVELS] $g"
         ttk::checkbutton $::BASE.components.group.named.$g.noauto -text "no auto" -command "set_group_noauto $g" -variable GNOAUTO($g) -onvalue 1 -offvalue 0
 
         pack $::BASE.components.group.named.$g.label -side left -padx 2
@@ -422,83 +422,53 @@ proc insertLog {infile} {
     }
 }
 
-
-proc allcomponents_cmd {cmd} {
-    global HOST COMPONENTS ARGS TERMINAL USEX WAIT_READY WAIT_BREAK NOAUTO LEVELS
+proc all_cmd {cmd {levels $::LEVELS} {group ""} {lazy 1}} {
     if {"$cmd" == "stop"} {
-        set WAIT_BREAK 1
-        foreach {level} "[lreverse [lsort $LEVELS]]" {
-            level_cmd $cmd $level
+        set ::WAIT_BREAK 1
+        foreach {level} "[lreverse $::LEVELS]" {
+            level_cmd $cmd $level $group $lazy
         }
     } else {
-        set WAIT_BREAK 0
-        foreach {level} "$LEVELS" {
-            if {$WAIT_BREAK} {
-                # if WAIT_BREAK was set to 1 somewhere, we stop the loop
-                break
-            }
-            level_cmd $cmd $level
+        set ::WAIT_BREAK 0
+        foreach {level} "$::LEVELS" {
+            # if WAIT_BREAK was set to 1 somewhere, we stop the loop
+            if {$::WAIT_BREAK} { break }
+            level_cmd $cmd $level $group $lazy
         }
     }
 }
 
-proc group_cmd {cmd grp} {
-    global HOST COMPONENTS ARGS GROUP TERMINAL USEX WAIT_READY NOAUTO WAIT_BREAK
-    if {"$cmd" == "stop"} {
-        set WAIT_BREAK 1
-        foreach {comp} "[lreverse $COMPONENTS]" {
-            if {$GROUP($comp) == $grp} {
+proc level_cmd {cmd level {group ""} {lazy 0} } {
+    switch $cmd {
+    stop {
+        set ::WAIT_BREAK 1
+        foreach {comp} "[lreverse $::COMPONENTS]" {
+            if {$::COMP_LEVEL($comp) == $level && \
+                ($group == "" || $::GROUP($comp) == $group)} {
+                if { !$lazy || [running $comp] } { component_cmd $comp $cmd }
+            }
+        }
+    }
+    check {
+        foreach {comp} "$::COMPONENTS" {
+            if {$::COMP_LEVEL($comp) == $level && \
+                ($group == "" || $::GROUP($comp) == $group)} {
                 component_cmd $comp $cmd
             }
         }
-    } elseif {"$cmd" == "check"} {
-        foreach {comp} "$COMPONENTS" {
-            if {$GROUP($comp) == $grp} {
-                component_cmd $comp $cmd
-            }
-        }
-    } else {
-        set WAIT_BREAK 0
-        foreach {comp} "$COMPONENTS" {
-            if {$GROUP($comp) == $grp} {
-                if {$WAIT_BREAK} {
-                    break
-                }
-                if {! $NOAUTO($comp)} {
+    }
+    start {
+        set ::WAIT_BREAK 0
+        foreach {comp} "$::COMPONENTS" {
+            if {$::COMP_LEVEL($comp) == $level && \
+                ($group == "" || $::GROUP($comp) == $group)} {
+                if {$::WAIT_BREAK} { break }
+                if {! $::NOAUTO($comp)} {
                     component_cmd $comp $cmd
                 }
             }
         }
     }
-}
-
-proc level_cmd {cmd level} {
-    global HOST COMPONENTS ARGS GROUP TERMINAL USEX WAIT_READY NOAUTO WAIT_BREAK COMP_LEVEL
-    if {"$cmd" == "stop"} {
-        set WAIT_BREAK 1
-        foreach {comp} "[lreverse $COMPONENTS]" {
-            if {$COMP_LEVEL($comp) == $level} {
-                component_cmd $comp $cmd
-            }
-        }
-    } elseif {"$cmd" == "check"} {
-        foreach {comp} "$COMPONENTS" {
-            if {$COMP_LEVEL($comp) == $level} {
-                component_cmd $comp $cmd
-            }
-        }
-    } else {
-        set WAIT_BREAK 0
-        foreach {comp} "$COMPONENTS" {
-            if {$COMP_LEVEL($comp) == $level} {
-                if {$WAIT_BREAK} {
-                    break
-                }
-                if {! $NOAUTO($comp)} {
-                    component_cmd $comp $cmd
-                }
-            }
-        }
     }
 }
 
@@ -1151,7 +1121,7 @@ proc handle_screen_failure {chan host} {
                 if {[lsearch -exact $::VDEMO_QUIT_COMPONENTS $comp] >= 0 || \
                     [lsearch -exact $::VDEMO_QUIT_COMPONENTS "$::TITLE($comp)"] >= 0} {
                     puts "$::TITLE($comp) finished on $host: quitting vdemo"
-                    allcomponents_cmd "stop"
+                    all_cmd "stop"
                     finish
                 } else {
                     if {$::RESTART($comp) || \
@@ -1216,10 +1186,14 @@ proc disconnect_screen_monitoring {host} {
     set ::MONITOR_CHAN($host) "err:disconnected"
 }
 
+proc running {comp} {
+    return [expr [lsearch [list starting ok_screen failed_check] $::COMPSTATUS($comp)] >= 0]
+}
+
 proc gui_exit {} {
     set quickexit 1
     foreach {comp} "$::COMPONENTS" {
-        if { [lsearch [list starting ok_screen failed_check] $::COMPSTATUS($comp)] >= 0 } {
+        if { [running $comp] } {
             set quickexit 0
             break
         }
@@ -1234,7 +1208,7 @@ proc gui_exit {} {
             set ans yes
         }
         switch $ans {
-            yes {allcomponents_cmd stop}
+            yes {all_cmd stop $::LEVELS "" 1}
             cancel {return}
         }
     }
@@ -1288,5 +1262,5 @@ update
 # autostart
 if {[info exists ::env(VDEMO_autostart)] && $::env(VDEMO_autostart) == "true"} {
     puts "Starting all components due to autostart request"
-    allcomponents_cmd "start"
+    all_cmd "start"
 }
