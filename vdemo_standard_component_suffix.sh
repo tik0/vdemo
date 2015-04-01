@@ -23,6 +23,7 @@ usage: $vdemo_component_scriptname [options] start|stop|check
 
 # option checks
 title="${vdemo_component_scriptname#component_}"
+export VDEMO_component_title="$title"
 
 while [ $# -gt 0 ]; do
     case $1 in
@@ -42,6 +43,7 @@ while [ $# -gt 0 ]; do
 			title="$1"
 		else
 			title="$title.$1"
+            export VDEMO_component_title="$1"
 		fi
 		;;
 	"-D"|"--detached")
