@@ -91,7 +91,7 @@ function vdemo_inspect {
 }
 
 # start a component. This function has the following options:
-#   -n    title of the component (name to identify it by other functions, 
+#   -n    title of the component (name to identify it by other functions,
 #         needs not to be the program name)
 #   -d    use X11 DISPLAY to display the component
 #   -l    enable logging
