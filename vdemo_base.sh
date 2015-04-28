@@ -119,6 +119,7 @@ function vdemo_start_component {
 				logfiledir="${VDEMO_logfile%/*}"
 				if [ ! -d "$logfiledir" ]; then mkdir -p "$logfiledir"; fi
 				if [ "$LOG_ROTATION" == "ON" ]; then
+					echo "logrotation is enabled." >&2
 					tee_command="tee -a"
 					component_logrotate_configfile=${VDEMO_logfile_prefix}${VDEMO_title}.rotation.conf
 					component_logrotate_statefile=${VDEMO_logfile_prefix}${VDEMO_title}.rotation.state
@@ -156,7 +157,9 @@ function vdemo_start_component {
 	done
 
 	export -f component
-	rm -f ${VDEMO_logfile} # remove any old log file
+	if [ ! "$LOG_ROTATION" == "ON" ]; then
+		rm -f ${VDEMO_logfile} # remove any old log file
+	fi
 	cmd="${VDEMO_logging} ${log_rotation_command} LD_LIBRARY_PATH=${LD_LIBRARY_PATH} DISPLAY=${VDEMO_componentDisplay} component"
 	echo "starting $VDEMO_title with component function:"$'\n'"$(declare -f component)" >&2
 	xterm -fg $COLOR -bg black $ICONIC -title "starting $VDEMO_title" -e \
