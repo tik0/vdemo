@@ -121,18 +121,9 @@ function vdemo_start_component {
 				if [ ! -d "$logfiledir" ]; then mkdir -p "$logfiledir"; fi
 				if [ "$LOG_ROTATION" == "ON" ]; then
 					echo "logrotation is enabled." >&2
-					component_logrotate_configfile=${VDEMO_logfile_prefix}${VDEMO_title}.rotation.conf
-					component_logrotate_statefile=${VDEMO_logfile_prefix}${VDEMO_title}.rotation.state
-
-					echo "${VDEMO_logfile} {
-	size ${LOG_ROTATION_SIZE-50M}
-	rotate ${LOG_ROTATION_COUNT-8}
-	missingok
-	notifempty
-	copytruncate
-	${LOG_ROTATION_OPTIONS-compress}
-}" > ${component_logrotate_configfile}
-					log_rotation_command="(while true; do /usr/sbin/logrotate ${component_logrotate_configfile} -s ${component_logrotate_statefile}; sleep ${LOG_ROTATION_INTERVALL-300}; done)& "
+					export -f launch_logrotation
+					export -f vdemo_pidFromScreen
+					log_rotation_command="(launch_logrotation $VDEMO_logfile ${VDEMO_title})& "
 				fi
 				echo "logging to ${VDEMO_logfile}" >&2
 				# exec allows to redirect output of current shell
@@ -156,6 +147,18 @@ function vdemo_start_component {
 	export -f component
 	if [ ! "$LOG_ROTATION" == "ON" ]; then
 		rm -f ${VDEMO_logfile} # remove any old log file
+	else
+		cat >> ${VDEMO_logfile} <<- EOX
+			
+			
+			#################################
+			new VDEMO component start
+			component name: ${VDEMO_title}
+			`date`
+			#################################
+			
+			
+		EOX
 	fi
 
 	test -n "${VDEMO_logging}" && \
@@ -174,6 +177,55 @@ function vdemo_start_component {
 		screen -t "$VDEMO_title" -S "${VDEMO_title}_" -d -m \
 			stdbuf -oL bash -c "$cmd"
 	fi
+}
+
+# creates a logrotation configuration file and enters a logrotate loop until
+# the process dies
+#
+# $1 : logfile to rotate
+# $2 : $VDEMO_title of process which is responsible (makes sure logrotation loop
+#      is ended if process dies)
+#
+# Note: start this function in the background using &
+function launch_logrotation {
+	echo "[VDEMO_LOGROTATE] initiating logrotation for component $2 - file to watch: $1" >&2
+
+	# Create the configuration files
+	component_logrotate_configfile=$1.rotation.conf
+	component_logrotate_statefile=$1.rotation.state
+	cat > ${component_logrotate_configfile} <<- EOX
+		$1 {
+		    size ${LOG_ROTATION_SIZE-50M}
+		    rotate ${LOG_ROTATION_COUNT-8}
+		    missingok
+		    notifempty
+		    copytruncate
+		    ${LOG_ROTATION_OPTIONS-compress}
+		}
+	EOX
+
+	# wait a bit until the process is up in a screen session (we have time here)
+	sleep 10
+
+	# obtain the pid of screen session
+	initial_VDEMO_pid=$(vdemo_pidFromScreen $2)
+
+	# loop until process dies
+	#echo "[VDEMO_LOGROTATE] entering logrotation loop ($2 - $1)" >&2
+	while true
+	do
+
+		# check if there was a component death/restart
+		if ! ps -p ${initial_VDEMO_pid} > /dev/null; then
+			echo "[VDEMO_LOGROTATE] vdemo log rotation stops for $2 - component seems to have died/restarted/crashed (pid $initial_VDEMO_pid is gone)" >&2
+			break
+		fi
+
+		# rotate the logfile
+		echo "[VDEMO_LOGROTATE] logrotatting file '$1' now (component '$2')" >&2
+		/usr/sbin/logrotate ${component_logrotate_configfile} -s ${component_logrotate_statefile}
+		sleep ${LOG_ROTATION_INTERVALL-300}
+	done
 }
 
 # get all direct and indirect children of a process (including process itself)
