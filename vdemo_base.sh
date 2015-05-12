@@ -185,7 +185,8 @@ function vdemo_start_component {
 #
 # Note: start this function in the background using &
 function launch_logrotation {
-	echo "[VDEMO_LOGROTATE] initiating logrotation for component $2 - file to watch: $1" >&2
+	# disabled for now
+	# echo "[VDEMO_LOGROTATE] initiating logrotation for component $2 - file to watch: $1" >&2
 
 	# Create the configuration files
 	component_logrotate_configfile=$1.rotation.conf
