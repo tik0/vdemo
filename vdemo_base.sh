@@ -209,7 +209,7 @@ function launch_logrotation {
 	initial_VDEMO_pid=$(vdemo_pidFromScreen $2)
 
 	# loop until process dies
-	#echo "[VDEMO_LOGROTATE] entering logrotation loop ($2 - $1)" >&2
+	echo "[VDEMO_LOGROTATE] entering logrotation loop ($2 - $1)" >&2
 	while true
 	do
 
@@ -220,7 +220,7 @@ function launch_logrotation {
 		fi
 
 		# rotate the logfile
-		echo "[VDEMO_LOGROTATE] logrotatting file '$1' now (component '$2')" >&2
+		# echo "[VDEMO_LOGROTATE] logrotatting file '$1' now (component '$2')" >&2
 		/usr/sbin/logrotate ${component_logrotate_configfile} -s ${component_logrotate_statefile}
 		sleep ${LOG_ROTATION_INTERVALL-300}
 	done
