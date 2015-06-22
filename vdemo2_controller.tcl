@@ -731,10 +731,35 @@ proc set_status {comp status} {
         default  {set style "cmd.TButton"}
     }
     dputs "change status of $comp to $status: $style" 2
+    blink_stop $COMPWIDGET.$comp.check
     $COMPWIDGET.$comp.check configure -style $style
     update
 }
 
+proc blink_start {widget interval} {
+  global _blink_data
+  set _blink_data($widget.styles) [list [$widget cget -style] "cmd.TButton"]
+  set _blink_data($widget.active) 1
+  set _blink_data($widget.interval) $interval
+  set _blink_data($widget.current) 0
+  after $interval blink_cycle $widget
+}
+
+proc blink_cycle {widget} {
+  global _blink_data
+  if {$_blink_data($widget.active) == 0} {
+    return
+  }
+  set style [lindex $_blink_data($widget.styles) $_blink_data($widget.current)]
+  $widget configure -style $style
+  set _blink_data($widget.current) [expr "($_blink_data($widget.current) + 1) % [llength $_blink_data($widget.styles)]"]
+  after $_blink_data($widget.interval) blink_cycle $widget
+}
+
+proc blink_stop {widget} {
+  global _blink_data
+  set _blink_data($widget.active) 0
+}
 
 # {{{ ssh and command procs
 
@@ -1137,6 +1162,7 @@ proc handle_screen_failure {chan host} {
                     } else {
                         # trigger stop: component's on_stop() might do some cleanup
                         component_cmd $comp stop
+                        blink_start $::COMPWIDGET.$comp.check 500
                     }
                 }
             }
