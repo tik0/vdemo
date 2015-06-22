@@ -102,8 +102,11 @@ proc parse_options {comp} {
             -c {
                 set CONT_CHECK($comp) 1
             }
-            -R {
+            -r {
                 set RESTART($comp) 1
+            }
+            -R {
+                set RESTART($comp) 2
             }
             -d {
                 set DETACHTIME($comp) "$val"
@@ -1124,12 +1127,13 @@ proc handle_screen_failure {chan host} {
                     all_cmd "stop"
                     finish
                 } else {
-                    if {$::RESTART($comp) || \
-                        ($::DEBUG_LEVEL >= 0 && [tk_messageBox -message \
+                    dputs "$::TITLE($comp) died on $host." 0
+                    if {$::RESTART($comp) == 2 || \
+                        ($::RESTART($comp) == 1 && [tk_messageBox -message \
                             "$::TITLE($comp) stopped on $host.\nRestart?" \
                             -type yesno -icon warning] == "yes")} {
-                        puts "$::TITLE($comp) stopped on $host. Restarting it."
-                        component_cmd $comp start 
+                        dputs "Restarting $::TITLE($comp)." 0
+                        component_cmd $comp start
                     } else {
                         # trigger stop: component's on_stop() might do some cleanup
                         component_cmd $comp stop
