@@ -242,10 +242,9 @@ proc gui_tcl {} {
         ttk::checkbutton $COMPWIDGET.$c.ownx   -text "own X" -variable USEX($c)
         ttk::checkbutton $COMPWIDGET.$c.logging -text "logging" -variable LOGGING($c)
         ttk::button $COMPWIDGET.$c.viewlog -style cmd.TButton -text "view log" -command "component_cmd $c showlog"
-        frame $COMPWIDGET.$c.terminal
 
         set SCREENED($c) 0
-        ttk::checkbutton $COMPWIDGET.$c.terminal.screen -text "show term" -command "component_cmd $c screen" -variable SCREENED($c) -onvalue 1 -offvalue 0
+        ttk::checkbutton $COMPWIDGET.$c.screen -text "show term" -command "component_cmd $c screen" -variable SCREENED($c) -onvalue 1 -offvalue 0
         ttk::button $COMPWIDGET.$c.inspect -style cmd.TButton -text "inspect" -command "component_cmd $c inspect"
 
         pack $COMPWIDGET.$c.level -side left
@@ -257,8 +256,7 @@ proc gui_tcl {} {
         pack $COMPWIDGET.$c.inspect -side right
         pack $COMPWIDGET.$c.viewlog -side right
         pack $COMPWIDGET.$c.logging -side right
-        pack $COMPWIDGET.$c.terminal -side right
-        pack $COMPWIDGET.$c.terminal.screen -side right
+        pack $COMPWIDGET.$c.screen -side right
         pack $COMPWIDGET.$c.noauto -side right -padx 2
         pack $COMPWIDGET.$c.check -side right
         pack $COMPWIDGET.$c.stop -side right
