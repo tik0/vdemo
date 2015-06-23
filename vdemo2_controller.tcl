@@ -150,7 +150,7 @@ proc parse_options {comp} {
 
 
 proc parse_env_var {} {
-    global HOST COMPONENTS ARGS USEX WATCHFILE COMMAND TITLE VDEMOID
+    global HOST COMPONENTS ARGS USEX WATCHFILE COMMAND TITLE VDEMOID TAB
     set VDEMOID [file tail [file rootname $::env(VDEMO_demoConfig)]]
     set components_list "$::env(VDEMO_components)"
     set comp [split "$components_list" ":"]
@@ -158,11 +158,13 @@ proc parse_env_var {} {
     set COMPONENTS {}
     set WATCHFILE ""
     set ::HOSTS ""
+    set tab "default"
     catch {set ::WATCHFILE $::env(VDEMO_watchfile)}
     dputs "VDEMO_watchfile = $WATCHFILE"
     dputs "COMPONENTS: "
     for {set i 0} { $i < $nCompos } {incr i} {
-        set thisComp [split [string trim [lindex "$comp" $i]] ","]
+        set component_def [string trim [lindex "$comp" $i]]
+        set thisComp [split $component_def ","]
         if {[llength "$thisComp"] == 3} {
             set component_name [lindex "$thisComp" 0]
             set component_name [string map "{ } {}" $component_name]
@@ -172,7 +174,7 @@ proc parse_env_var {} {
             set COMMAND($component_name) "$thisCommand"
             set TITLE($component_name) "$thisCommand"
             set COMPONENTS "$COMPONENTS $component_name"
-
+            set TAB($component_name) "$tab"
             if {"$host" != ""} {lappend ::HOSTS $host}
             set HOST($component_name) $host
             set ARGS($component_name) [lindex $thisComp 2]
@@ -181,8 +183,10 @@ proc parse_env_var {} {
             dputs [format "%-20s HOST: %-13s ARGS: %s" $component_name $HOST($component_name) $ARGS($component_name)]
             # parse options known by the script and remove them from them the list
             parse_options "$component_name"
-        } elseif {[string length [string trim [lindex "$comp" $i]]] != 0} {
-            error "component $i: exepected three comma separated groups in '[string trim [lindex "$comp" $i]]'"
+        } elseif {[llength "$thisComp"] == 1} { # this is a new tab definition
+            set tab [lindex "$thisComp" 0]
+        } elseif {[string length $component_def] != 0} {
+            error "component $i: expected three comma separated groups in '$component_def'"
         }
     }
     set ::HOSTS [lsort -unique $::HOSTS]
@@ -191,6 +195,15 @@ proc parse_env_var {} {
 proc bind_wheel_sf {widget} {
     bind all <4> [list $widget yview scroll -5 units]
     bind all <5> [list $widget yview scroll  5 units]
+}
+
+proc get_tab_list {} {
+    set tabs [list]
+    foreach {c} "$::COMPONENTS" {
+        set tab $::TAB($c)
+        if {[lsearch -exact $tabs $tab] == -1} {lappend tabs $tab}
+    }
+    return $tabs
 }
 
 proc set_group_noauto {grp} {
@@ -202,8 +215,16 @@ proc set_group_noauto {grp} {
     }
 }
 
+proc get_tab {name} {
+    if {[winfo exists $name] == 0} {
+        ttk::frame $name
+        pack $name -side top -fill both -expand yes
+    }
+    return $name
+}
+
 proc gui_tcl {} {
-    global HOST COMPONENTS ARGS TERMINAL USEX LOGTEXT NOAUTO LOGGING  GROUP SCREENED  COMP_LEVEL COMPWIDGET WATCHFILE COMMAND LEVELS TITLE TIMERDETACH
+    global HOST COMPONENTS ARGS TERMINAL USEX LOGTEXT NOAUTO LOGGING  GROUP SCREENED  COMP_LEVEL WATCHFILE COMMAND LEVELS TITLE TIMERDETACH TAB WIDGET COMPONENTS_WIDGET
     set LOGTEXT "demo configured from '$::env(VDEMO_demoConfig)'"
     wm title . "vdemo_controller: $::env(VDEMO_demoConfig)"
     wm geometry . "875x600"
@@ -214,10 +235,22 @@ proc gui_tcl {} {
     # main gui frame
     ttk::frame .main
     # scrollable frame
-    iwidgets::scrolledframe .main.components -vscrollmode dynamic -hscrollmode dynamic
-    bind_wheel_sf .main.components
-    set COMPWIDGET [.main.components childsite]
-    pack .main.components -side top -fill both -expand yes
+    iwidgets::scrolledframe .main.scrollable -vscrollmode dynamic -hscrollmode none
+    bind_wheel_sf .main.scrollable
+    pack .main.scrollable -side top -fill both -expand yes
+
+    set COMPONENTS_WIDGET [.main.scrollable childsite].components
+
+    # to create either a notebook or frame as parent widget for single components
+    # we need to know the number of tabs
+    set tabs [get_tab_list]
+
+    if {[llength $tabs] > 1} {
+        ttk::notebook $COMPONENTS_WIDGET
+    } else {
+        ttk::frame $COMPONENTS_WIDGET
+    }
+    pack $COMPONENTS_WIDGET -side top -fill both -expand yes
 
     foreach {c} "$COMPONENTS" {
         set groups "$groups $GROUP($c)"
@@ -225,43 +258,54 @@ proc gui_tcl {} {
         set TIMERDETACH($c) 0
         set ::LAST_GUI_INTERACTION($c) 0
 
-        ttk::frame $COMPWIDGET.$c -style groove.TFrame
-        pack $COMPWIDGET.$c -side top -fill both -expand yes
-        ttk::label $COMPWIDGET.$c.level -style level.TLabel -text "$COMP_LEVEL($c)"
-        ttk::label $COMPWIDGET.$c.label -width 20 -style label.TLabel -text "$TITLE($c)@"
-        ttk::entry $COMPWIDGET.$c.host  -width 10 -textvariable HOST($c)
+        # get the frame widget where this component should go to
+        set w [get_tab $COMPONENTS_WIDGET.$TAB($c)]
+
+        ttk::frame $w.$c -style groove.TFrame
+        pack $w.$c -side top -fill both
+        set WIDGET($c) $w.$c
+
+        ttk::label $w.$c.level -style level.TLabel -text "$COMP_LEVEL($c)"
+        ttk::label $w.$c.label -width 20 -style label.TLabel -text "$TITLE($c)@"
+        ttk::entry $w.$c.host  -width 10 -textvariable HOST($c)
         # disable host field for spreaddaemon: cannot add/change hosts in spread config
-        if {"$COMMAND($c)" == "spreaddaemon"} { $COMPWIDGET.$c.host state disabled }
+        if {"$COMMAND($c)" == "spreaddaemon"} { $w.$c.host state disabled }
 
-        ttk::label $COMPWIDGET.$c.group -style group.TLabel -text "$GROUP($c)"
+        ttk::label $w.$c.group -style group.TLabel -text "$GROUP($c)"
 
-        ttk::button $COMPWIDGET.$c.start -style cmd.TButton -text "start" -command "component_cmd $c start"
-        ttk::button $COMPWIDGET.$c.stop  -style cmd.TButton -text "stop" -command "component_cmd $c stop"
-        ttk::button $COMPWIDGET.$c.check -style cmd.TButton -text "check" -command "component_cmd $c check"
-        ttk::checkbutton $COMPWIDGET.$c.noauto -text "no auto" -variable NOAUTO($c)
-        ttk::checkbutton $COMPWIDGET.$c.ownx   -text "own X" -variable USEX($c)
-        ttk::checkbutton $COMPWIDGET.$c.logging -text "logging" -variable LOGGING($c)
-        ttk::button $COMPWIDGET.$c.viewlog -style cmd.TButton -text "view log" -command "component_cmd $c showlog"
+        ttk::button $w.$c.start -style cmd.TButton -text "start" -command "component_cmd $c start"
+        ttk::button $w.$c.stop  -style cmd.TButton -text "stop" -command "component_cmd $c stop"
+        ttk::button $w.$c.check -style cmd.TButton -text "check" -command "component_cmd $c check"
+        ttk::checkbutton $w.$c.noauto -text "no auto" -variable NOAUTO($c)
+        ttk::checkbutton $w.$c.ownx   -text "own X" -variable USEX($c)
+        ttk::checkbutton $w.$c.logging -text "logging" -variable LOGGING($c)
+        ttk::button $w.$c.viewlog -style cmd.TButton -text "view log" -command "component_cmd $c showlog"
 
         set SCREENED($c) 0
-        ttk::checkbutton $COMPWIDGET.$c.screen -text "show term" -command "component_cmd $c screen" -variable SCREENED($c) -onvalue 1 -offvalue 0
-        ttk::button $COMPWIDGET.$c.inspect -style cmd.TButton -text "inspect" -command "component_cmd $c inspect"
+        ttk::checkbutton $w.$c.screen -text "show term" -command "component_cmd $c screen" -variable SCREENED($c) -onvalue 1 -offvalue 0
+        ttk::button $w.$c.inspect -style cmd.TButton -text "inspect" -command "component_cmd $c inspect"
 
-        pack $COMPWIDGET.$c.level -side left
-        pack $COMPWIDGET.$c.label -side left -fill x
-        pack $COMPWIDGET.$c.host -side left
-        pack $COMPWIDGET.$c.group -side left -fill x
+        pack $w.$c.level -side left
+        pack $w.$c.label -side left -fill x
+        pack $w.$c.host -side left
+        pack $w.$c.group -side left -fill x
 
-        pack $COMPWIDGET.$c.ownx -side right -padx 3
-        pack $COMPWIDGET.$c.inspect -side right
-        pack $COMPWIDGET.$c.viewlog -side right
-        pack $COMPWIDGET.$c.logging -side right
-        pack $COMPWIDGET.$c.screen -side right
-        pack $COMPWIDGET.$c.noauto -side right -padx 2
-        pack $COMPWIDGET.$c.check -side right
-        pack $COMPWIDGET.$c.stop -side right
-        pack $COMPWIDGET.$c.start -side right
+        pack $w.$c.ownx -side right -padx 3
+        pack $w.$c.inspect -side right
+        pack $w.$c.viewlog -side right
+        pack $w.$c.logging -side right
+        pack $w.$c.screen -side right
+        pack $w.$c.noauto -side right -padx 2
+        pack $w.$c.check -side right
+        pack $w.$c.stop -side right
+        pack $w.$c.start -side right
         set_status $c unknown
+    }
+
+    if {[llength $tabs] > 1} {
+        foreach {tab} $tabs {
+            $COMPONENTS_WIDGET add $COMPONENTS_WIDGET.$tab -text $tab
+        }
     }
 
     # buttons to control ALL components
@@ -467,7 +511,7 @@ proc level_cmd {cmd level {group ""} {lazy 0} } {
 }
 
 proc wait_ready {comp} {
-    global WAIT_READY WAIT_BREAK COMPSTATUS CONT_CHECK WAIT_BREAK TITLE CHECKNOWAIT_TIME COMPWIDGET
+    global WAIT_READY WAIT_BREAK COMPSTATUS CONT_CHECK WAIT_BREAK TITLE CHECKNOWAIT_TIME WIDGET
     set WAIT_BREAK 0
     if {[string is digit $WAIT_READY($comp)] && $WAIT_READY($comp) > 0} {
         puts "$TITLE($comp): waiting for the process to get ready"
@@ -489,7 +533,7 @@ proc wait_ready {comp} {
         dputs "$TITLE($comp): waiting timeout"
 
         # first re-enable start button
-        $COMPWIDGET.$comp.start state !disabled
+        $WIDGET($comp).start state !disabled
         # and then check component a last time to reflect final state
         component_cmd $comp check
     } else {
@@ -521,7 +565,7 @@ proc cancel_detach_timer {comp} {
 }
 
 proc component_cmd {comp cmd} {
-    global HOST COMPONENTS ARGS TERMINAL USEX WAIT_READY LOGGING WAIT_BREAK SCREENED DETACHTIME COMPWIDGET COMMAND EXPORTS TITLE COMPSTATUS TIMERDETACH
+    global HOST COMPONENTS ARGS TERMINAL USEX WAIT_READY LOGGING WAIT_BREAK SCREENED DETACHTIME WIDGET COMMAND EXPORTS TITLE COMPSTATUS TIMERDETACH
     set cpath "$::env(VDEMO_componentPath)"
     set component_script "$cpath/component_$COMMAND($comp)"
     set component_options "-t $TITLE($comp)"
@@ -535,21 +579,21 @@ proc component_cmd {comp cmd} {
 
     switch $cmd {
         start {
-            if { [$COMPWIDGET.$comp.start instate disabled] } {
+            if { [$WIDGET($comp).start instate disabled] } {
                 puts "$TITLE($comp): not ready, still waiting for the process"
                 return
             }
-            $COMPWIDGET.$comp.start state disabled
+            $WIDGET($comp).start state disabled
 
             set res [ssh_command "screen -wipe | fgrep -q .$COMMAND($comp).$TITLE($comp)_" "$HOST($comp)"]
             if {$res == -1} {
                 puts "no master connection to $HOST($comp)"
-                $COMPWIDGET.$comp.start state !disabled
+                $WIDGET($comp).start state !disabled
                 return
             } elseif {$res == 0} {
                 puts "$TITLE($comp): already running, stopping first..."
                 component_cmd $comp stop
-                $COMPWIDGET.$comp.start state disabled
+                $WIDGET($comp).start state disabled
             }
 
             set WAIT_BREAK 0
@@ -575,7 +619,7 @@ proc component_cmd {comp cmd} {
                     puts $msg
                 }
                 set_status $comp failed_noscreen
-                $COMPWIDGET.$comp.start state !disabled
+                $WIDGET($comp).start state !disabled
                 return
             }
 
@@ -590,12 +634,12 @@ proc component_cmd {comp cmd} {
             set ::LAST_GUI_INTERACTION($comp) [clock seconds]
         }
         stop {
-            if { [$COMPWIDGET.$comp.stop instate disabled] } {
+            if { [$WIDGET($comp).stop instate disabled] } {
                 dputs "$TITLE($comp): already stopping"
                 return
             }
-            $COMPWIDGET.$comp.stop state disabled
-            $COMPWIDGET.$comp.start state !disabled
+            $WIDGET($comp).stop state disabled
+            $WIDGET($comp).start state !disabled
             set_status $comp unknown
             cancel_detach_timer $comp
 
@@ -606,7 +650,7 @@ proc component_cmd {comp cmd} {
             set SCREENED($comp) 0
 
             set ::LAST_GUI_INTERACTION($comp) [clock seconds]
-            after idle $COMPWIDGET.$comp.stop state !disabled
+            after idle $WIDGET($comp).stop state !disabled
             if {$res != -1} { after idle component_cmd $comp check }
         }
         screen {
@@ -633,27 +677,27 @@ proc component_cmd {comp cmd} {
             ssh_command "$cmd_line" "$HOST($comp)"
         }
         check {
-            if { [$COMPWIDGET.$comp.check instate disabled] } {
+            if { [$WIDGET($comp).check instate disabled] } {
                 dputs "$TITLE($comp): already checking"
                 return
             }
-            $COMPWIDGET.$comp.check state disabled
+            $WIDGET($comp).check state disabled
             set_status $comp unknown
 
             set cmd_line "$VARS $component_script $component_options check"
             set res [ssh_command "$cmd_line" "$HOST($comp)"]
             dputs "ssh result: $res" 2
-            after idle $COMPWIDGET.$comp.check state !disabled
+            after idle $WIDGET($comp).check state !disabled
 
             if { ! [string is integer -strict $res] } {
                 puts "internal error: ssh result is not an integer: '$res'"
-                $COMPWIDGET.$comp.start state !disabled
+                $WIDGET($comp).start state !disabled
                 return
             }
 
             if {$res == -1} {
                 dputs "no master connection to $HOST($comp)"; 
-                $COMPWIDGET.$comp.start state !disabled
+                $WIDGET($comp).start state !disabled
                 return
             }
 
@@ -669,7 +713,7 @@ proc component_cmd {comp cmd} {
             } else { # on_check failed
                 if {$screenResult == 0} { set s failed_check } { set s failed_noscreen }
             }
-            if { [$::COMPWIDGET.$comp.start instate disabled] } {
+            if { [$::WIDGET($comp).start instate disabled] } {
                 # component is starting
                 if { [string is digit $::WAIT_READY($comp)] && $::WAIT_READY($comp) > 0 } {
                     # check was triggered by wait_ready()
@@ -687,7 +731,7 @@ proc component_cmd {comp cmd} {
             # re-enable start button?
             if {"$s" != "starting"} {
                 set ::LAST_GUI_INTERACTION($comp) [clock seconds]
-                $COMPWIDGET.$comp.start state !disabled
+                $WIDGET($comp).start state !disabled
             }
 
             if {$screenResult != 0} {
@@ -705,7 +749,7 @@ proc component_cmd {comp cmd} {
 }
 
 proc set_status {comp status} {
-    global COMPWIDGET COMPSTATUS
+    global WIDGET COMPSTATUS
     set COMPSTATUS($comp) $status
     switch -- $status {
         starting {set style "starting.cmd.TButton"}
@@ -716,8 +760,8 @@ proc set_status {comp status} {
         default  {set style "cmd.TButton"}
     }
     dputs "change status of $comp to $status: $style" 2
-    blink_stop $COMPWIDGET.$comp.check
-    $COMPWIDGET.$comp.check configure -style $style
+    blink_stop $WIDGET($comp).check
+    $WIDGET($comp).check configure -style $style
     update
 }
 
@@ -1123,8 +1167,8 @@ proc handle_screen_failure {chan host} {
         if {$::HOST($comp) == $host && \
             [string match "*.$::COMMAND($comp).$::TITLE($comp)_" "$line"]} {
             dputs "$comp closed its screen session on $host" 2
-            if {[$::COMPWIDGET.$comp.stop  instate disabled] || \
-                [$::COMPWIDGET.$comp.start instate disabled] ||
+            if {[$::WIDGET($comp).stop  instate disabled] || \
+                [$::WIDGET($comp).start instate disabled] ||
                 [expr [clock seconds] - $::LAST_GUI_INTERACTION($comp) < $::SCREEN_FAILURE_DELAY]} {
                 # component was stopped or just started via gui -> ignore event
                 # trigger stop: component's on_stop() might do some cleanup
@@ -1147,7 +1191,7 @@ proc handle_screen_failure {chan host} {
                     } else {
                         # trigger stop: component's on_stop() might do some cleanup
                         component_cmd $comp stop
-                        blink_start $::COMPWIDGET.$comp.check 500
+                        blink_start $::WIDGET($comp).check 500
                     }
                 }
             }
