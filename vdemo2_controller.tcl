@@ -11,9 +11,9 @@ package require Tclx
 set SSHOPTS "-oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -oConnectTimeout=15"
 
 # Theme settings
-proc define_theme_color {style defaultBgnd mapping} {
-    ttk::style configure $style -background $defaultBgnd
-    ttk::style map $style -background $mapping
+proc define_theme_color {stylePrefix defaultBgnd mapping} {
+    ttk::style configure $stylePrefix.cmd.TButton -background $defaultBgnd
+    ttk::style map $stylePrefix.cmd.TButton -background $mapping
 }
 
 set FONT "helvetica 9"
@@ -25,11 +25,11 @@ ttk::style configure TButton -font "$FONT bold" -padding "2 -1"
 ttk::style configure TCheckbutton -padding "2 -1"
 ttk::style configure cmd.TButton -padding "2 -1" -width -5
 
-define_theme_color ok.cmd.TButton green3 [list active green2]
-define_theme_color noscreen.ok.cmd.TButton orange2 [list active orange]
-define_theme_color failed.cmd.TButton red2 [list active red]
-define_theme_color check.failed.cmd.TButton pink [list active pink2]
-define_theme_color starting.cmd.TButton yellow2 [list active yellow]
+define_theme_color ok green3 [list active green2]
+define_theme_color noscreen.ok orange2 [list active orange]
+define_theme_color failed red2 [list active red]
+define_theme_color check.failed pink [list active pink2]
+define_theme_color starting yellow2 [list active yellow]
 
 ttk::style configure clock.TButton -font "$FONT"
 ttk::style configure exit.TButton
