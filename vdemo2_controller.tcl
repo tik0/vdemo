@@ -188,14 +188,9 @@ proc parse_env_var {} {
     set ::HOSTS [lsort -unique $::HOSTS]
 }
 
-proc bind_wheel_sf {comp} {
-    set can [$comp component canvas]
-    set vsb [$comp component vertsb]
-    set wid [$comp childsite]
-    foreach w_ [list $can $vsb $wid] {
-        bind $w_ <4> [list $can yview scroll -1 units]
-        bind $w_ <5> [list $can yview scroll +1 units]
-    }
+proc bind_wheel_sf {widget} {
+    bind all <4> [list $widget yview scroll -5 units]
+    bind all <5> [list $widget yview scroll  5 units]
 }
 
 proc set_group_noauto {grp} {
@@ -712,12 +707,6 @@ proc component_cmd {comp cmd} {
     }
     update
 }
-
-proc wheelEvent { x y delta } {
-    $::BASE.components.singles.comp yview scroll $delta units
-}
-bind all <4> "+wheelEvent %X %Y -5"
-bind all <5> "+wheelEvent %X %Y  5"
 
 proc set_status {comp status} {
     global COMPWIDGET COMPSTATUS
