@@ -169,13 +169,15 @@ function vdemo_start_component {
 	# Adding a small sleep seems to fix this issue.
 	cmd="${VDEMO_logging} ${log_rotation_command} LD_LIBRARY_PATH=${LD_LIBRARY_PATH} DISPLAY=${VDEMO_componentDisplay} component; sleep 0.01"
 
+    # bash needs to be started in in interactive mode to have job control available
+    # --norc is used to prevent inclusion of the use configuration in the execution.
 	if [ "x$VDEMO_startDetached" == "xno" ]; then
 		xterm -fg $COLOR -bg black -title "starting $VDEMO_title" -e \
 			screen -t "$VDEMO_title" -S "${VDEMO_title}_" \
-			stdbuf -oL bash -c "$cmd" &
+			stdbuf -oL bash --norc -i -c "$cmd" &
 	else
 		screen -t "$VDEMO_title" -S "${VDEMO_title}_" -d -m \
-			stdbuf -oL bash -c "$cmd"
+			stdbuf -oL bash --norc -i -c "$cmd"
 	fi
 }
 
@@ -188,7 +190,8 @@ function vdemo_start_component {
 #
 # Note: start this function in the background using &
 function launch_logrotation {
-	echo "[VDEMO_LOGROTATE] initiating logrotation for component $2 - file to watch: $1" >&2
+	# disabled for now
+	# echo "[VDEMO_LOGROTATE] initiating logrotation for component $2 - file to watch: $1" >&2
 
 	# Create the configuration files
 	component_logrotate_configfile=$1.rotation.conf
@@ -211,7 +214,7 @@ function launch_logrotation {
 	initial_VDEMO_pid=$(vdemo_pidFromScreen $2)
 
 	# loop until process dies
-	#echo "[VDEMO_LOGROTATE] entering logrotation loop ($2 - $1)" >&2
+	echo "[VDEMO_LOGROTATE] entering logrotation loop ($2 - $1)" >&2
 	while true
 	do
 
@@ -222,7 +225,7 @@ function launch_logrotation {
 		fi
 
 		# rotate the logfile
-		echo "[VDEMO_LOGROTATE] logrotatting file '$1' now (component '$2')" >&2
+		# echo "[VDEMO_LOGROTATE] logrotatting file '$1' now (component '$2')" >&2
 		/usr/sbin/logrotate ${component_logrotate_configfile} -s ${component_logrotate_statefile}
 		sleep ${LOG_ROTATION_INTERVALL-300}
 	done
