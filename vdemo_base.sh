@@ -169,13 +169,15 @@ function vdemo_start_component {
 	# Adding a small sleep seems to fix this issue.
 	cmd="${VDEMO_logging} ${log_rotation_command} LD_LIBRARY_PATH=${LD_LIBRARY_PATH} DISPLAY=${VDEMO_componentDisplay} component; sleep 0.01"
 
+    # bash needs to be started in in interactive mode to have job control available
+    # --norc is used to prevent inclusion of the use configuration in the execution.
 	if [ "x$VDEMO_startDetached" == "xno" ]; then
 		xterm -fg $COLOR -bg black -title "starting $VDEMO_title" -e \
 			screen -t "$VDEMO_title" -S "${VDEMO_title}_" \
-			stdbuf -oL bash -c "$cmd" &
+			stdbuf -oL bash --norc -i -c "$cmd" &
 	else
 		screen -t "$VDEMO_title" -S "${VDEMO_title}_" -d -m \
-			stdbuf -oL bash -c "$cmd"
+			stdbuf -oL bash --norc -i -c "$cmd"
 	fi
 }
 
