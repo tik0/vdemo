@@ -38,7 +38,10 @@ ttk::style configure TLabel -padding "2 -1"
 ttk::style configure level.TLabel -foreground darkblue -width 5
 ttk::style configure label.TLabel -width 15 -anchor e
 ttk::style configure group.TLabel -foreground darkblue -width 10 -anchor e
-ttk::style configure host.TEntry  -width 5
+
+# for search
+ttk::style configure hilite.label.TLabel -background yellow
+ttk::style configure failed.TEntry -fieldbackground pink
 
 ttk::style configure alert.TLabel -foreground blue -background yellow
 ttk::style configure info.TLabel -foreground blue -background yellow
@@ -207,6 +210,53 @@ proc bind_wheel_sf {widget} {
     bind all <5> [list $widget yview scroll  5 units]
 }
 
+proc find_component {what} {
+    global _SEARCH COMPONENTS_ON_TAB
+    set what "*[string trim $what]*"
+    if {$what == "**"} {return}
+
+    if {![info exists _SEARCH(string)] || $_SEARCH(string) != $what} {
+        set _SEARCH(string) "$what"
+        # get name of currently selected tab: will fail if simple frame is used
+        if { ! [ catch {set curTab [$::COMPONENTS_WIDGET select]} ] } {
+            set _SEARCH(start_idx) [$::COMPONENTS_WIDGET index $curTab]
+            set _SEARCH(end_idx) [$::COMPONENTS_WIDGET index end]
+            set _SEARCH(cur_tab) [$::COMPONENTS_WIDGET tab $curTab -text]
+        } else {
+            set _SEARCH(start_idx) 0
+            set _SEARCH(end_idx) 1
+            set _SEARCH(cur_tab) "default"
+        }
+        set _SEARCH(cur_idx) $_SEARCH(start_idx)
+        set _SEARCH(index) -1
+        set _SEARCH(found) [lsearch -all $COMPONENTS_ON_TAB($_SEARCH(cur_tab)) $_SEARCH(string)]
+    }
+    while 1 {
+        set _SEARCH(index) [expr $_SEARCH(index) + 1]
+        if {$_SEARCH(index) < [llength $_SEARCH(found)]} {
+            # found on current tab
+            set index [lindex $_SEARCH(found) $_SEARCH(index)]
+            set comp [lindex $COMPONENTS_ON_TAB($_SEARCH(cur_tab)) $index]
+            show_component $comp
+            hilite_component $comp
+            .main.all.searchText configure -style TEntry
+            break
+        }
+        # if not found, try on next tab
+        set _SEARCH(cur_idx) [expr ($_SEARCH(cur_idx) + 1) % $_SEARCH(end_idx)]
+        catch { set _SEARCH(cur_tab) [$::COMPONENTS_WIDGET tab $_SEARCH(cur_idx) -text] }
+        # do the search
+        set _SEARCH(index) -1
+        set _SEARCH(found) [lsearch -all $COMPONENTS_ON_TAB($_SEARCH(cur_tab)) $_SEARCH(string)]
+        # reached initial tab again? -> indicate failure
+        if {$_SEARCH(cur_idx) == $_SEARCH(start_idx)} {
+            hilite_component ""
+            .main.all.searchText configure -style failed.TEntry
+            break
+        }
+    }
+}
+
 proc show_component {comp} {
     catch {
         # show tab widget containing the component
@@ -214,6 +264,17 @@ proc show_component {comp} {
     }
     set pos [lsearch -exact $::COMPONENTS_ON_TAB($::TAB($comp)) $comp]
     .main.scrollable yview moveto [expr double($pos)/$::MAX_NUM]
+}
+
+set _LAST_HILITED ""
+proc hilite_component {comp} {
+    if {$::_LAST_HILITED != ""} {
+        $::WIDGET($::_LAST_HILITED).label configure -style label.TLabel
+    }
+    set ::_LAST_HILITED $comp
+    if {$::_LAST_HILITED != ""} {
+        $::WIDGET($::_LAST_HILITED).label configure -style hilite.label.TLabel
+    }
 }
 
 proc set_group_noauto {grp} {
@@ -332,6 +393,12 @@ proc gui_tcl {} {
     # clear logger button
     ttk::button .main.all.clearLogger -text "clear logger" -command "clearLogger"
     pack .main.all.clearLogger -side right -ipadx 15
+
+    # search widgets
+    ttk::entry  .main.all.searchText -textvariable SEARCH_STRING
+    bind .main.all.searchText <Return> {find_component $SEARCH_STRING}
+    ttk::button .main.all.searchBtn -style cmd.TButton -text "search" -command {find_component $SEARCH_STRING}
+    pack .main.all.searchText .main.all.searchBtn -side right -ipadx 15
 
     ttk::frame .main.group
     pack .main.group -side top -fill x
