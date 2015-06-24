@@ -150,7 +150,7 @@ proc parse_options {comp} {
 
 
 proc parse_env_var {} {
-    global HOST COMPONENTS ARGS USEX WATCHFILE COMMAND TITLE VDEMOID TAB
+    global HOST COMPONENTS ARGS USEX WATCHFILE COMMAND TITLE VDEMOID TABS TAB COMPONENTS_ON_TAB
     set VDEMOID [file tail [file rootname $::env(VDEMO_demoConfig)]]
     set components_list "$::env(VDEMO_components)"
     set comp [split "$components_list" ":"]
@@ -159,6 +159,10 @@ proc parse_env_var {} {
     set WATCHFILE ""
     set ::HOSTS ""
     set tab "default"
+    set TABS [list $tab]
+    set COMPONENTS_ON_TAB($tab) [list]
+    set components_on_tab_list COMPONENTS_ON_TAB($tab)
+
     catch {set ::WATCHFILE $::env(VDEMO_watchfile)}
     dputs "VDEMO_watchfile = $WATCHFILE"
     dputs "COMPONENTS: "
@@ -175,6 +179,7 @@ proc parse_env_var {} {
             set TITLE($component_name) "$thisCommand"
             set COMPONENTS "$COMPONENTS $component_name"
             set TAB($component_name) "$tab"
+            lappend $components_on_tab_list $component_name
             if {"$host" != ""} {lappend ::HOSTS $host}
             set HOST($component_name) $host
             set ARGS($component_name) [lindex $thisComp 2]
@@ -185,6 +190,11 @@ proc parse_env_var {} {
             parse_options "$component_name"
         } elseif {[llength "$thisComp"] == 1} { # this is a new tab definition
             set tab [lindex "$thisComp" 0]
+            if {[lsearch -exact $TABS $tab] == -1} { # new tab
+                lappend TABS $tab
+                set COMPONENTS_ON_TAB($tab) [list]
+            }
+            set components_on_tab_list COMPONENTS_ON_TAB($tab)
         } elseif {[string length $component_def] != 0} {
             error "component $i: expected three comma separated groups in '$component_def'"
         }
@@ -197,13 +207,13 @@ proc bind_wheel_sf {widget} {
     bind all <5> [list $widget yview scroll  5 units]
 }
 
-proc get_tab_list {} {
-    set tabs [list]
-    foreach {c} "$::COMPONENTS" {
-        set tab $::TAB($c)
-        if {[lsearch -exact $tabs $tab] == -1} {lappend tabs $tab}
+proc show_component {comp} {
+    catch {
+        # show tab widget containing the component
+        $::COMPONENTS_WIDGET select $::COMPONENTS_WIDGET.$::TAB($comp)
     }
-    return $tabs
+    set pos [lsearch -exact $::COMPONENTS_ON_TAB($::TAB($comp)) $comp]
+    .main.scrollable yview moveto [expr double($pos)/$::MAX_NUM]
 }
 
 proc set_group_noauto {grp} {
@@ -232,6 +242,12 @@ proc gui_tcl {} {
     set groups ""
     set LEVELS ""
 
+    # determine max number of components in tabs
+    set ::MAX_NUM 1
+    foreach tab $::TABS {
+        set ::MAX_NUM [ expr max($::MAX_NUM, [llength $::COMPONENTS_ON_TAB($tab)]) ]
+    }
+
     # main gui frame
     ttk::frame .main
     # scrollable frame
@@ -241,11 +257,7 @@ proc gui_tcl {} {
 
     set COMPONENTS_WIDGET [.main.scrollable childsite].components
 
-    # to create either a notebook or frame as parent widget for single components
-    # we need to know the number of tabs
-    set tabs [get_tab_list]
-
-    if {[llength $tabs] > 1} {
+    if {[llength $::TABS] > 1} {
         ttk::notebook $COMPONENTS_WIDGET
     } else {
         ttk::frame $COMPONENTS_WIDGET
@@ -302,8 +314,8 @@ proc gui_tcl {} {
         set_status $c unknown
     }
 
-    if {[llength $tabs] > 1} {
-        foreach {tab} $tabs {
+    if {[llength $::TABS] > 1} {
+        foreach {tab} $::TABS {
             $COMPONENTS_WIDGET add $COMPONENTS_WIDGET.$tab -text $tab
         }
     }
@@ -315,10 +327,7 @@ proc gui_tcl {} {
     ttk::button .main.all.start -style cmd.TButton -text "start" -command "all_cmd start"
     ttk::button .main.all.stop  -style cmd.TButton -text "stop"  -command "all_cmd stop"
     ttk::button .main.all.check -style cmd.TButton -text "check" -command "all_cmd check"
-    pack .main.all.label -side left
-    pack .main.all.start -side left
-    pack .main.all.stop  -side left
-    pack .main.all.check -side left
+    pack .main.all.label .main.all.start .main.all.stop .main.all.check -side left
 
     # clear logger button
     ttk::button .main.all.clearLogger -text "clear logger" -command "clearLogger"
@@ -1033,7 +1042,7 @@ proc finish {} {
 }
 
 proc remove_duplicates {} {
-    global COMPONENTS TITLE HOST
+    global COMPONENTS TITLE HOST COMPONENTS_ON_TAB TAB
 
     set _COMPONENTS {}
     foreach {c} "$COMPONENTS" {
@@ -1043,6 +1052,7 @@ proc remove_duplicates {} {
             set _COMPONENTS "$_COMPONENTS $c"
         } else {
             dputs "duplicate component title: $TITLE($c):$HOST($c)"
+            set COMPONENTS_ON_TAB($TAB($c)) [lsearch -all -inline -not -exact $COMPONENTS_ON_TAB($TAB($c)) $c]
         }
     }
     set COMPONENTS $_COMPONENTS
@@ -1192,6 +1202,7 @@ proc handle_screen_failure {chan host} {
                         # trigger stop: component's on_stop() might do some cleanup
                         component_cmd $comp stop
                         blink_start $::WIDGET($comp).check 500
+                        show_component $comp
                     }
                 }
             }
