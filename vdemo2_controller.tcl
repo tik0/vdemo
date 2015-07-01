@@ -151,12 +151,38 @@ proc parse_options {comp} {
     set ARGS($comp) $NEWARGS
 }
 
+proc psplit { str seps {protector "\\"}} {
+    set out [list]
+    set prev ""
+    set current ""
+    foreach c [split $str ""] {
+        if { [string first $c $seps] >= 0 } {
+            if { $prev eq $protector } {
+                set current [string range $current 0 end-1]
+                append current $c
+            } else {
+                lappend out $current
+                set current ""
+            }
+            set prev ""
+        } else {
+            append current $c
+            set prev $c
+        }
+    }
+    
+    if { $current ne "" } {
+        lappend out $current
+    }
+
+    return $out
+}
 
 proc parse_env_var {} {
     global HOST COMPONENTS ARGS USEX WATCHFILE COMMAND TITLE VDEMOID TABS TAB COMPONENTS_ON_TAB
     set VDEMOID [file tail [file rootname $::env(VDEMO_demoConfig)]]
     set components_list "$::env(VDEMO_components)"
-    set comp [split "$components_list" ":"]
+    set comp [psplit "$components_list" ":"]
     set nCompos [llength "$comp"]
     set COMPONENTS {}
     set WATCHFILE ""
