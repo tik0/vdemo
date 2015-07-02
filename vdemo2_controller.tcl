@@ -76,9 +76,9 @@ proc parse_options {comp} {
     set NEWARGS [list]
     set USEX($comp) 0
     # time to wait for a process to startup
-    set WAIT_READY($comp) 0 
+    set WAIT_READY($comp) 0
     # time until process is checked after start (when not waiting)
-    set CHECKNOWAIT_TIME($comp) 1 
+    set CHECKNOWAIT_TIME($comp) 1
     # continously check for sucessful start of a component?
     set CONT_CHECK($comp) 1
     set GROUP($comp) ""
@@ -151,31 +151,20 @@ proc parse_options {comp} {
     set ARGS($comp) $NEWARGS
 }
 
-proc psplit { str seps {protector "\\"}} {
-    set out [list]
-    set prev ""
-    set current ""
-    foreach c [split $str ""] {
-        if { [string first $c $seps] >= 0 } {
-            if { $prev eq $protector } {
-                set current [string range $current 0 end-1]
-                append current $c
-            } else {
-                lappend out $current
-                set current ""
-            }
-            set prev ""
+# split $str on $sep, but don't split when $sep is preceeded by $protector
+proc psplit { str sep {protector "\\"}} {
+    set result [list]
+    # accumulate next item (from oversegmented substrings)
+    foreach s [split $str $sep] {
+        append cur $s
+        if { [string range $s end end] == $protector } {
+            append cur $sep
         } else {
-            append current $c
-            set prev $c
+            lappend result $cur
+            set cur ""
         }
     }
-    
-    if { $current ne "" } {
-        lappend out $current
-    }
-
-    return $out
+    return $result
 }
 
 proc parse_env_var {} {
@@ -509,7 +498,7 @@ proc gui_add_host {host} {
     # check status of screen session, but do not attempt to reconnect (avoiding infinite recursion)
     set connection [ssh_check_connection $host 0]
     if {$connection == 0} {set style "ok.cmd.TButton"} {set style "failed.cmd.TButton"}
-    
+
     # add $host to list of known $::HOSTS if necessary
     if {[lsearch -exact $::HOSTS $host] == -1} {lappend ::HOSTS $host}
 
@@ -798,7 +787,7 @@ proc component_cmd {comp cmd} {
             }
 
             if {$res == -1} {
-                dputs "no master connection to $HOST($comp)"; 
+                dputs "no master connection to $HOST($comp)";
                 $WIDGET($comp).start state !disabled
                 return
             }
@@ -946,11 +935,11 @@ proc ssh_check_connection {hostname {connect 1}} {
         catch { set res 124; set res [exec bash -c "echo 'echo 0' > $fifo.in; timeout 1 cat $fifo.out"] }
         dputs "connection check result: $res" 2
 
-        # cat might also fetch the result of a previous, delayed ssh command. Hence, if we didn't 
+        # cat might also fetch the result of a previous, delayed ssh command. Hence, if we didn't
         # timed out, set the result always to zero.
         if {$res != 124} {set res 0} {set msg "Timeout on connection to $hostname. Reconnect?"}
     }
- 
+
     # actually try to reconnect
     if { $msg != "" && (!$connect || [reconnect_host $hostname $msg] != 0) } {
         set ::WAIT_BREAK 1
@@ -1013,17 +1002,17 @@ proc connect_host {fifo host} {
     exec mkfifo "$fifo.in"
     exec mkfifo "$fifo.out"
 
-    # temporarily ignore failed connections on this host 
+    # temporarily ignore failed connections on this host
     disable_monitoring $host
 
     # Here we establish the master connection. Commands pushed into $fifo.in get piped into
     # the remote bash (over ssh) and the result is read again and piped into $fifo.out.
     # This way, the remote stdout goes into $fifo.out, while remote stderr is displayed here.
-    set screenid [get_master_screen_name $host]   
+    set screenid [get_master_screen_name $host]
     exec screen -dmS $screenid bash -c "tail -s 0.1 -f $fifo.in | ssh $::SSHOPTS -Y $host bash | while read s; do echo \$s > $fifo.out; done"
 
-    # Wait until connection is established. 
-    # Issue a echo command on remote host that only returns if a connection was established. 
+    # Wait until connection is established.
+    # Issue a echo command on remote host that only returns if a connection was established.
     puts -nonewline "connecting to $host: "; flush stdout
     exec bash -c "echo 'echo connected' > $fifo.in"
     # timeout: 30s (should be enough to enter ssh password if necessary)
@@ -1052,7 +1041,7 @@ proc connect_host {fifo host} {
         puts " OK"
     } else { # some failure
         switch $res {
-            124 {puts " timeout"} 
+            124 {puts " timeout"}
              -2 {puts " aborted"}
             default {puts "error: $res"; set res -2}
         }
@@ -1060,7 +1049,7 @@ proc connect_host {fifo host} {
         catch {exec screen -XS $screenid quit}
         exec rm -f "$fifo.in"
         exec rm -f "$fifo.out"
-        return $res 
+        return $res
     }
 
     dputs "issuing remote initialization commands" 2
@@ -1318,8 +1307,8 @@ proc connect_screen_monitoring {host} {
     set cmd "inotifywait -e delete -qm --format %f /var/run/screen/S-$::env(USER)"
     # remote hosts require monitoring through ssh connection
     if {$host != "localhost"} {
-        set cmd "ssh $::SSHOPTS -tt $host $cmd" 
-        # If there was never a screen executed on the remote machine, 
+        set cmd "ssh $::SSHOPTS -tt $host $cmd"
+        # If there was never a screen executed on the remote machine,
         # the directory /var/run/screen/S-$USER doesn't yet exist
         # Hence, call screen at least once:
         ssh_command "screen -ls 2> /dev/null" $host 0 $::DEBUG_LEVEL
