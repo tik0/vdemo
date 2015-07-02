@@ -145,6 +145,8 @@ function vdemo_start_component {
 	done
 
 	export -f component
+
+	# remove old log file if we do not want to rotate/append
 	if [ ! "$LOG_ROTATION" == "ON" ]; then
 		rm -f ${VDEMO_logfile} # remove any old log file
 	else
@@ -183,6 +185,7 @@ function vdemo_start_component {
 
 # creates a logrotation configuration file and enters a logrotate loop until
 # the process dies
+#
 #
 # $1 : logfile to rotate
 # $2 : $VDEMO_title of process which is responsible (makes sure logrotation loop
