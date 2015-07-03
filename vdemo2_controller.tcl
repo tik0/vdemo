@@ -391,9 +391,14 @@ proc gui_tcl {} {
     }
 
     if {[llength $::TABS] > 1} {
+        set tabs [list]
         foreach {tab} $::TABS {
-            $COMPONENTS_WIDGET add $COMPONENTS_WIDGET.$tab -text $tab
+            if { [llength $::COMPONENTS_ON_TAB($tab)] > 0 } {
+                $COMPONENTS_WIDGET add $COMPONENTS_WIDGET.$tab -text $tab
+                lappend tabs $tab
+            }
         }
+        set ::TABS $tabs
     }
 
     # buttons to control ALL components
