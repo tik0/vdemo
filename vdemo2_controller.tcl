@@ -158,6 +158,7 @@ proc psplit { str sep {protector "\\"}} {
     foreach s [split $str $sep] {
         append cur $s
         if { [string range $s end end] == $protector } {
+            set cur [string range $cur 0 end-1]
             append cur $sep
         } else {
             lappend result $cur
