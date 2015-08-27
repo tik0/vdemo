@@ -1398,6 +1398,48 @@ proc setup_temp_dir { } {
     set TEMPDIR [exec mktemp -d /tmp/vdemo.XXXXXXXXXX]
 }
 
+proc handle_ctrl_fifo { infile } {
+    if { [gets $infile line] >= 0 } {
+        set args [regexp -all -inline {\S+} $line]
+        set cmd [lindex $args 0]
+        set comp [lindex $args 1]
+        if {[lsearch -exact [list "start" "stop" "check"] $cmd] == -1} {
+            puts "unknown remote control command: $cmd"
+            return
+        }
+        foreach {c} "$::COMPONENTS" {
+            if {$c == $comp} {
+                component_cmd $comp $cmd
+                return
+            } elseif {$::GROUP($c) == $comp} {
+                all_cmd $cmd [list $::LEVELS] $comp
+                return
+            } elseif {$comp == "ALL"} {
+                all_cmd $cmd [list $::LEVELS]
+                return
+            }
+        }
+        puts "unknown component or group: $comp"
+    } else {
+        close $infile
+    }
+}
+
+proc setup_ctrl_fifo { filename  } {
+    if {[string length $filename] == 0} return
+    exec mkdir -p [file dirname $filename]
+    exec rm -f $filename
+    exec mkfifo $filename
+
+    if { [ catch { open "|tail -n 5 --pid=[pid] -F $filename"} infile] } {
+        puts "failed creating control fifo $filename"
+    } else {
+        fconfigure $infile -blocking no -buffering line
+        fileevent $infile readable [list handle_ctrl_fifo $infile]
+        puts "connected to remote control fifo $filename"
+    }
+}
+
 set mypid [pid]
 puts "My process id is $mypid"
 
@@ -1416,9 +1458,14 @@ connect_hosts
 update
 gui_tcl
 update
+setup_ctrl_fifo "$::env(VDEMO_CONTROL_FIFO)"
 
 # autostart
 if {[info exists ::env(VDEMO_autostart)] && $::env(VDEMO_autostart) == "true"} {
     puts "Starting all components due to autostart request"
     all_cmd "start"
 }
+
+# Local Variables:
+# mode: tcl
+# End:

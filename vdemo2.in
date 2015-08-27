@@ -26,6 +26,9 @@ vdemo starter
   -v  --verbose [level]    set verbosity [level]
                            >0: increasing verbosity
                            -1: also suppress message boxes
+  -f  --fifo <file>        fifo for text-based remote-control of vdemo gui
+                           accepting:
+                           (start | stop | check) (component | group | ALL)
   -Q  --quit <components>  space separated list of components to quit vdemo on
 
  authors: Marc Hanheide, Robert Haschke
@@ -69,6 +72,10 @@ while [ $# -gt 0 ]; do
         fi
         echo "Using verbosity level $VDEMO_DEBUG_LEVEL"
         ;;
+    "-f"|"--fifo")
+        export VDEMO_CONTROL_FIFO=$2
+        shift
+        ;;
     "-Q"|"--quit")
         export VDEMO_QUIT_COMPONENTS=$2
         shift
@@ -87,7 +94,7 @@ done
 
 # obligatory arguments check
 if [ $# -lt 1 ]; then
-    echo "obligatory argument(s) missing. $USAGE" >&2 
+    echo "obligatory argument(s) missing. $USAGE" >&2
     exit 1
 fi
 
