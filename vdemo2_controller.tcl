@@ -79,7 +79,7 @@ proc number {val type} {
 }
 
 proc parse_options {comp} {
-    global COMPONENTS ARGS USEX TERMINAL WAIT_READY NOAUTO LOGGING GROUP DETACHTIME COMP_LEVEL EXPORTS TITLE CONT_CHECK CHECKNOWAIT_TIME RESTART
+    global COMPONENTS ARGS USEX TERMINAL WAIT_READY NOAUTO LOGGING GROUP DETACHTIME COMP_LEVEL EXPORTS TITLE CHECK_TIME CHECKNOWAIT_TIME RESTART
 
     set NEWARGS [list]
     set USEX($comp) 0
@@ -87,8 +87,8 @@ proc parse_options {comp} {
     set WAIT_READY($comp) 0
     # time until process is checked after start (when not waiting)
     set CHECKNOWAIT_TIME($comp) 1
-    # continously check for sucessful start of a component?
-    set CONT_CHECK($comp) 1
+    # period for continous checks after start of component: <= 0: don't auto-check
+    set CHECK_TIME($comp) 1000
     set GROUP($comp) ""
     # detach a component after this time
     set DETACHTIME($comp) $::env(VDEMO_DETACH_TIME)
@@ -111,7 +111,7 @@ proc parse_options {comp} {
                 incr i
             }
             -c {
-                set CONT_CHECK($comp) 1
+                set CHECK_TIME($comp) [expr 1000 * [number $val double]]
             }
             -r {
                 set RESTART($comp) 1
@@ -619,20 +619,19 @@ proc level_cmd {cmd level {group ""} {lazy 0} } {
 }
 
 proc wait_ready {comp} {
-    global WAIT_READY WAIT_BREAK COMPSTATUS CONT_CHECK WAIT_BREAK TITLE CHECKNOWAIT_TIME WIDGET
+    global WAIT_READY WAIT_BREAK COMPSTATUS CHECK_TIME WAIT_BREAK TITLE CHECKNOWAIT_TIME WIDGET
     set WAIT_BREAK 0
     if { $WAIT_READY($comp) > 0 } {
         puts "$TITLE($comp): waiting for the process to get ready"
         set endtime [expr [clock milliseconds] + $WAIT_READY($comp) * 1000]
-        set checktime [expr [clock milliseconds] + 1000]
+        set checktime [expr [clock milliseconds] + $CHECK_TIME($comp)]
         # do not check too fast, otherwise screen is not *yet* started
         sleep 500
         while {$endtime > [clock milliseconds]} {
             sleep 100
-            # check every 1000ms
-            if {$CONT_CHECK($comp) && $checktime < [clock milliseconds]} {
+            if {$CHECK_TIME($comp) > 0 && $checktime < [clock milliseconds]} {
                 component_cmd $comp check
-                set checktime [expr [clock milliseconds] + 1000]
+                set checktime [expr [clock milliseconds] + $CHECK_TIME($comp)]
             }
             if {[string match "ok_*" $COMPSTATUS($comp)] || $WAIT_BREAK} {
                 return
@@ -828,10 +827,10 @@ proc component_cmd {comp cmd} {
                     # if onCheck not (yet) successful, stay in starting
                     if {$onCheckResult != 0} {set s starting}
                 } else {
-                    if {$::CONT_CHECK($comp) && $onCheckResult != 0} {
-                        # when CONT_CHECK was requested: stay in starting and retrigger check
+                    if {$::CHECK_TIME($comp) > 0 && $onCheckResult != 0} {
+                        # when CHECK_TIME was requested: stay in starting and retrigger check
                         set s starting
-                        after 1000 component_cmd $comp check
+                        after $::CHECK_TIME($comp) component_cmd $comp check
                     }
                 }
             }
