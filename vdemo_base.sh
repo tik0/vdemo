@@ -101,6 +101,7 @@ function vdemo_start_component {
 	VDEMO_componentDisplay="${DISPLAY}"
 	VDEMO_startDetached="no"
 	COLOR="white"
+	VDEMO_logfile="${VDEMO_logfile_prefix}${VDEMO_title}.log"
 
 	while [ $# -gt 0 ]; do
 		case $1 in
@@ -116,7 +117,6 @@ function vdemo_start_component {
 				VDEMO_componentDisplay="$1"
 				;;
 			"-l"|"--logging")
-				VDEMO_logfile="${VDEMO_logfile_prefix}${VDEMO_title}.log"
 				logfiledir="${VDEMO_logfile%/*}"
 				if [ ! -d "$logfiledir" ]; then mkdir -p "$logfiledir"; fi
 				if [ "$LOG_ROTATION" == "ON" ]; then
@@ -148,18 +148,18 @@ function vdemo_start_component {
 
 	# remove old log file if we do not want to rotate/append
 	if [ ! "$LOG_ROTATION" == "ON" ]; then
-		rm -f ${VDEMO_logfile} # remove any old log file
+		rm -f "${VDEMO_logfile}" # remove any old log file
 	else
 		cat >> ${VDEMO_logfile} <<- EOX
-			
-			
+
+
 			#################################
 			new VDEMO component start
 			component name: ${VDEMO_title}
 			`date`
 			#################################
-			
-			
+
+
 		EOX
 	fi
 
