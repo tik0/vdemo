@@ -1409,12 +1409,15 @@ proc handle_ctrl_fifo { infile } {
         }
         foreach {c} "$::COMPONENTS" {
             if {$c == $comp} {
+                puts "remote cmd: ${cmd}ing component $comp"
                 component_cmd $comp $cmd
                 return
             } elseif {$::GROUP($c) == $comp} {
+                puts "remote cmd: ${cmd}ing group $comp"
                 all_cmd $cmd [list $::LEVELS] $comp
                 return
             } elseif {$comp == "ALL"} {
+                puts "remote cmd: ${cmd}ing all components"
                 all_cmd $cmd [list $::LEVELS]
                 return
             }
