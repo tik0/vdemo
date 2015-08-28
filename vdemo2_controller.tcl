@@ -203,7 +203,7 @@ proc parse_env_var {} {
             set component_name [lindex "$thisComp" 0]
             set component_name [string map "{ } {}" $component_name]
             set thisCommand "$component_name"
-            set host [lindex "$thisComp" 1]
+            set host [string trim [lindex "$thisComp" 1]]
             set component_name "${i}_${component_name}"
             set COMMAND($component_name) "$thisCommand"
             set TITLE($component_name) "$thisCommand"
