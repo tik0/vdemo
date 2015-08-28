@@ -63,7 +63,7 @@ if { ! [info exists ::env(VDEMO_LOGGING)] || \
 dputs "default logging: $::env(VDEMO_LOGGING)" 3
 
 if { ! [info exists ::env(VDEMO_DETACH_TIME)] || \
-     ! [string is integer -strict $::env(VDEMO_DETACH_TIME)] } \
+     ! [string is double -strict $::env(VDEMO_DETACH_TIME)] } \
     {set ::env(VDEMO_DETACH_TIME) 0}
 dputs "default detach time: $::env(VDEMO_DETACH_TIME)" 3
 
@@ -86,12 +86,12 @@ proc parse_options {comp} {
     # time to wait for a process to startup
     set WAIT_READY($comp) 0
     # time until process is checked after start (when not waiting)
-    set CHECKNOWAIT_TIME($comp) 1
+    set CHECKNOWAIT_TIME($comp) 1000
     # period for continous checks after start of component: <= 0: don't auto-check
     set CHECK_TIME($comp) 1000
     set GROUP($comp) ""
     # detach a component after this time
-    set DETACHTIME($comp) $::env(VDEMO_DETACH_TIME)
+    set DETACHTIME($comp) [expr 1000 * $::env(VDEMO_DETACH_TIME)]
     set NOAUTO($comp) 0
     set TERMINAL($comp) "screen"
     set LOGGING($comp) $::env(VDEMO_LOGGING)
@@ -103,11 +103,11 @@ proc parse_options {comp} {
         set arg [lindex $ARGS($comp) $i]; set val [lindex $ARGS($comp) [expr $i+1]]
         if { [catch {switch -glob -- $arg {
             -w {
-                set WAIT_READY($comp) [number $val double]
+                set WAIT_READY($comp) [expr 1000 * [number $val double]]
                 incr i
             }
             -W {
-                set CHECKNOWAIT_TIME($comp) [number $val double]
+                set CHECKNOWAIT_TIME($comp) [expr 1000 * [number $val double]]
                 incr i
             }
             -c {
@@ -120,7 +120,7 @@ proc parse_options {comp} {
                 set RESTART($comp) 2
             }
             -d {
-                set DETACHTIME($comp) [number $val double]
+                set DETACHTIME($comp) [expr 1000 * [number $val double]]
                 incr i
             }
             -g {
@@ -623,7 +623,7 @@ proc wait_ready {comp} {
     set WAIT_BREAK 0
     if { $WAIT_READY($comp) > 0 } {
         puts "$TITLE($comp): waiting for the process to get ready"
-        set endtime [expr [clock milliseconds] + $WAIT_READY($comp) * 1000]
+        set endtime [expr [clock milliseconds] + $WAIT_READY($comp)]
         set checktime [expr [clock milliseconds] + $CHECK_TIME($comp)]
         # do not check too fast, otherwise screen is not *yet* started
         sleep 500
@@ -645,7 +645,7 @@ proc wait_ready {comp} {
         component_cmd $comp check
     } else {
         dputs "$TITLE($comp): not waiting for the process to get ready"
-        after [expr $CHECKNOWAIT_TIME($comp) * 1000] component_cmd $comp check
+        after $CHECKNOWAIT_TIME($comp) component_cmd $comp check
     }
 }
 
@@ -732,8 +732,7 @@ proc component_cmd {comp cmd} {
 
             set SCREENED($comp) 1
             if {$DETACHTIME($comp) > 0} {
-                set detach_after [expr $DETACHTIME($comp) * 1000]
-                set TIMERDETACH($comp) [after $detach_after component_cmd $comp detach]
+                set TIMERDETACH($comp) [after $DETACHTIME($comp) component_cmd $comp detach]
             } elseif {$DETACHTIME($comp) == 0} {
                 set SCREENED($comp) 0
             }
