@@ -637,7 +637,9 @@ proc wait_ready {comp} {
                 return
             }
         }
-        dputs "$TITLE($comp): waiting timeout"
+        puts "$TITLE($comp) failed: timeout after [expr $WAIT_READY($comp) / 1000]s"
+        # stop starting further components
+        set WAIT_BREAK 1
 
         # first re-enable start button
         $WIDGET($comp).start state !disabled
@@ -792,11 +794,11 @@ proc component_cmd {comp cmd} {
 
             set cmd_line "$VARS $component_script $component_options check"
             set res [ssh_command "$cmd_line" "$HOST($comp)"]
-            dputs "ssh result: $res" 2
+            dputs "check result: $res" 2
             after idle $WIDGET($comp).check state !disabled
 
             if { ! [string is integer -strict $res] } {
-                puts "internal error: ssh result is not an integer: '$res'"
+                puts "internal error: result is not an integer: '$res'"
                 $WIDGET($comp).start state !disabled
                 return
             }
@@ -826,7 +828,7 @@ proc component_cmd {comp cmd} {
                     # if onCheck not (yet) successful, stay in starting
                     if {$onCheckResult != 0} {set s starting}
                 } else {
-                    if {$::CHECK_TIME($comp) > 0 && $onCheckResult != 0} {
+                    if {$::CHECK_TIME($comp) > 0 && $onCheckResult != 0 && $screenResult == 0} {
                         # when CHECK_TIME was requested: stay in starting and retrigger check
                         set s starting
                         after $::CHECK_TIME($comp) component_cmd $comp check
@@ -987,7 +989,7 @@ proc ssh_command {cmd hostname {check 1} {verbose 1}} {
     } else {set verbose ""}
 
     set res [exec bash -c "echo '$verbose $cmd 1>&2; echo \$?' > $f.in; cat $f.out"]
-    dputs "ssh result: $res" 2
+    dputs "ssh result: $res" 3
     return $res
 }
 
@@ -1279,7 +1281,8 @@ proc handle_screen_failure {chan host} {
                 [expr [clock seconds] - $::LAST_GUI_INTERACTION($comp) < $::SCREEN_FAILURE_DELAY]} {
                 # component was stopped or just started via gui -> ignore event
                 # trigger stop: component's on_stop() might do some cleanup
-                component_cmd $comp stop
+                # component_cmd $comp stop
+                component_cmd $comp check
             } else {
                 # if this is not a user initiated stop, exit the system if requested
                 if {[lsearch -exact $::VDEMO_QUIT_COMPONENTS $comp] >= 0 || \
@@ -1297,7 +1300,8 @@ proc handle_screen_failure {chan host} {
                         component_cmd $comp start
                     } else {
                         # trigger stop: component's on_stop() might do some cleanup
-                        component_cmd $comp stop
+                        # component_cmd $comp stop
+                        component_cmd $comp check
                         blink_start $::WIDGET($comp).check 500
                         show_component $comp
                     }
