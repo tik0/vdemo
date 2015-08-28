@@ -70,6 +70,14 @@ dputs "default detach time: $::env(VDEMO_DETACH_TIME)" 3
 set VDEMO_QUIT_COMPONENTS [list]
 catch {set VDEMO_QUIT_COMPONENTS [split $::env(VDEMO_QUIT_COMPONENTS)]}
 
+proc number {val type} {
+    if {[string is $type -strict $val]} {
+        return $val
+    } else {
+        throw {ARITH DOMAIN {no number}} "$val is not $type"
+    }
+}
+
 proc parse_options {comp} {
     global COMPONENTS ARGS USEX TERMINAL WAIT_READY NOAUTO LOGGING GROUP DETACHTIME COMP_LEVEL EXPORTS TITLE CONT_CHECK CHECKNOWAIT_TIME RESTART
 
@@ -93,13 +101,13 @@ proc parse_options {comp} {
 
     for {set i 0} \$i<[llength $ARGS($comp)] {incr i} {
         set arg [lindex $ARGS($comp) $i]; set val [lindex $ARGS($comp) [expr $i+1]]
-        switch -glob -- $arg {
+        if { [catch {switch -glob -- $arg {
             -w {
-                set WAIT_READY($comp) "$val"
+                set WAIT_READY($comp) [number $val double]
                 incr i
             }
             -W {
-                set CHECKNOWAIT_TIME($comp) "$val"
+                set CHECKNOWAIT_TIME($comp) [number $val double]
                 incr i
             }
             -c {
@@ -112,7 +120,7 @@ proc parse_options {comp} {
                 set RESTART($comp) 2
             }
             -d {
-                set DETACHTIME($comp) "$val"
+                set DETACHTIME($comp) [number $val double]
                 incr i
             }
             -g {
@@ -137,7 +145,7 @@ proc parse_options {comp} {
                 set LOGGING($comp) 1
             }
             -L {
-                set COMP_LEVEL($comp) "$val"
+                set COMP_LEVEL($comp) [number $val integer]
                 incr i
             }
             -Q {
@@ -146,6 +154,9 @@ proc parse_options {comp} {
             default {
                 set NEWARGS [lappend NEWARGS $arg]
             }
+        } } err ] } {
+            puts "$comp: error processing '$arg $val': $err"
+            exit
         }
     }
     set ARGS($comp) $NEWARGS
