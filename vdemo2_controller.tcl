@@ -621,7 +621,7 @@ proc level_cmd {cmd level {group ""} {lazy 0} } {
 proc wait_ready {comp} {
     global WAIT_READY WAIT_BREAK COMPSTATUS CONT_CHECK WAIT_BREAK TITLE CHECKNOWAIT_TIME WIDGET
     set WAIT_BREAK 0
-    if {[string is digit $WAIT_READY($comp)] && $WAIT_READY($comp) > 0} {
+    if { $WAIT_READY($comp) > 0 } {
         puts "$TITLE($comp): waiting for the process to get ready"
         set endtime [expr [clock milliseconds] + $WAIT_READY($comp) * 1000]
         set checktime [expr [clock milliseconds] + 1000]
@@ -823,7 +823,7 @@ proc component_cmd {comp cmd} {
             }
             if { [$::WIDGET($comp).start instate disabled] } {
                 # component is starting
-                if { [string is digit $::WAIT_READY($comp)] && $::WAIT_READY($comp) > 0 } {
+                if { $::WAIT_READY($comp) > 0 } {
                     # check was triggered by wait_ready()
                     # if onCheck not (yet) successful, stay in starting
                     if {$onCheckResult != 0} {set s starting}
