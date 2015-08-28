@@ -1428,8 +1428,15 @@ proc handle_ctrl_fifo { infile } {
     }
 }
 
-proc setup_ctrl_fifo { filename  } {
-    if {[string length $filename] == 0} return
+proc setup_ctrl_fifo { { filename "" } } {
+    if {$filename == ""} {
+        # fetch default from environment variable
+        if {[info exists ::env(VDEMO_CONTROL_FIFO)]} {
+            set filename $::env(VDEMO_CONTROL_FIFO)
+        }
+    }
+    if {$filename == ""} return
+
     exec mkdir -p [file dirname $filename]
     exec rm -f $filename
     exec mkfifo $filename
@@ -1461,7 +1468,7 @@ connect_hosts
 update
 gui_tcl
 update
-setup_ctrl_fifo "$::env(VDEMO_CONTROL_FIFO)"
+setup_ctrl_fifo
 
 # autostart
 if {[info exists ::env(VDEMO_autostart)] && $::env(VDEMO_autostart) == "true"} {
