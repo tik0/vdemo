@@ -799,7 +799,7 @@ proc component_cmd {comp cmd} {
             }
 
             set noscreen 0
-            # res = 10*onCheckResult + screenResult
+            # res = 10*min(onCheckResult, 25) + screenResult
             # onCheckResult is the result from the on_check function (0 on success)
             # screenResult: 0: success, 1: no screen, 2: PID not there
             set onCheckResult [expr $res / 10]

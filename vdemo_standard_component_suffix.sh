@@ -130,6 +130,8 @@ case "$1" in
 	if [[ -n $func && ! $func =~ $re ]] ; then
 		# only call on_check if it is defined and non-trivial
 		on_check; callResult=$?
+		# combined result is limited to 8bit!
+		if (( $callResult > 25 || $callResult < 0 )); then callResult=25; fi
 	else
 		callResult=$processResult
 	fi
