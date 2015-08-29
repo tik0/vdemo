@@ -568,87 +568,80 @@ proc insertLog {infile} {
     }
 }
 
+# all_cmd() and level_cmd() should start/stop all components in a specific group
+# *level by level*. Components at the same level can be started/stopped in parallel.
+# However, high-level components should be started later (or stopped earlier).
+# WAIT_BREAK values:
+# -1: process failed
+# -2: interrupt requested manually
+#  0: no multi command pending
+# >0: wait level (increased with every component, level_cmd, all_cmd
+proc interrupt_multi_cmd {cmd} {
+    while {[set ::WAIT_BREAK_$cmd] > 0} {
+        # interrupt any previous command
+        set ::WAIT_BREAK_$cmd -2
+        # wait for variable to become 0
+        vwait ::WAIT_BREAK_$cmd
+    }
+    set ::WAIT_BREAK_$cmd 0
+}
 proc all_cmd {cmd {levels $::LEVELS} {group ""} {lazy 1}} {
-    if {"$cmd" == "stop"} {
-        set ::WAIT_BREAK 1
-        foreach {level} "[lreverse $::LEVELS]" {
-            level_cmd $cmd $level $group $lazy
-        }
-    } else {
-        set ::WAIT_BREAK 0
-        foreach {level} "$::LEVELS" {
-            # if WAIT_BREAK was set to 1 somewhere, we stop the loop
-            if {$::WAIT_BREAK} { break }
-            level_cmd $cmd $level $group $lazy
-        }
+    puts -nonewline "all_cmd($cmd $group $lazy) WAIT_BREAK: [set ::WAIT_BREAK_$cmd]"
+    interrupt_multi_cmd $cmd
+    puts -nonewline " [set ::WAIT_BREAK_$cmd]"
+    if {$cmd != "check"} {incr ::WAIT_BREAK_$cmd 1}
+    puts " [set ::WAIT_BREAK_$cmd]"
+
+    if {"$cmd" == "stop"} {set levels [lreverse $levels]}
+    foreach {level} "$levels" {
+        # if WAIT_BREAK was set to -1 somewhere, we stop the loop
+        if {$cmd != "check" && [set ::WAIT_BREAK_$cmd] < 0} {break}
+        level_cmd $cmd $level 0 $group $lazy
     }
+
+    if {$cmd != "check"} {incr ::WAIT_BREAK_$cmd -1}
+    puts "done all_cmd($cmd $group $lazy) WAIT_BREAK: [set ::WAIT_BREAK_$cmd]"
 }
 
-proc level_cmd {cmd level {group ""} {lazy 0} } {
-    switch $cmd {
-    stop {
-        set ::WAIT_BREAK 1
-        foreach {comp} "[lreverse $::COMPONENTS]" {
-            if {$::COMP_LEVEL($comp) == $level && \
-                ($group == "" || $::GROUP($comp) == $group)} {
-                if { !$lazy || [running $comp] } { component_cmd $comp $cmd }
-            }
-        }
-    }
-    check {
-        foreach {comp} "$::COMPONENTS" {
-            if {$::COMP_LEVEL($comp) == $level && \
-                ($group == "" || $::GROUP($comp) == $group)} {
-                component_cmd $comp $cmd
-            }
-        }
-    }
-    start {
-        set ::WAIT_BREAK 0
-        foreach {comp} "$::COMPONENTS" {
-            if {$::COMP_LEVEL($comp) == $level && \
-                ($group == "" || $::GROUP($comp) == $group)} {
-                if {$::WAIT_BREAK} { break }
-                if {! $::NOAUTO($comp)} {
-                    component_cmd $comp $cmd
-                }
-            }
-        }
-    }
-    }
-}
+proc level_cmd {cmd level {interrupt 1} {group ""} {lazy 0} } {
+    puts -nonewline "level_cmd($cmd $level $group $lazy) WAIT_BREAK: [set ::WAIT_BREAK_$cmd]"
+    if {$interrupt} {interrupt_multi_cmd $cmd}
+    puts -nonewline " [set ::WAIT_BREAK_$cmd]"
 
-proc wait_ready {comp} {
-    global WAIT_READY WAIT_BREAK COMPSTATUS CHECK_TIME WAIT_BREAK TITLE CHECKNOWAIT_TIME WIDGET
-    set WAIT_BREAK 0
-    if { $WAIT_READY($comp) > 0 } {
-        puts "$TITLE($comp): waiting for the process to get ready"
-        set endtime [expr [clock milliseconds] + $WAIT_READY($comp)]
-        set checktime [expr [clock milliseconds] + $CHECK_TIME($comp)]
-        # do not check too fast, otherwise screen is not *yet* started
-        sleep 500
-        while {$endtime > [clock milliseconds]} {
-            sleep 100
-            if {$CHECK_TIME($comp) > 0 && $checktime < [clock milliseconds]} {
-                component_cmd $comp check
-                set checktime [expr [clock milliseconds] + $CHECK_TIME($comp)]
-            }
-            if {[string match "ok_*" $COMPSTATUS($comp)] || $WAIT_BREAK} {
-                return
-            }
-        }
-        puts "$TITLE($comp) failed: timeout after [expr $WAIT_READY($comp) / 1000]s"
-        # stop starting further components
-        set WAIT_BREAK 1
+    # a start / stop command should stop a currently running process
+    set doWait [expr ![string equal $cmd "check"]]
 
-        # first re-enable start button
-        $WIDGET($comp).start state !disabled
-        # and then check component a last time to reflect final state
-        component_cmd $comp check
-    } else {
-        dputs "$TITLE($comp): not waiting for the process to get ready"
-        after $CHECKNOWAIT_TIME($comp) component_cmd $comp check
+    set components $::COMPONENTS
+    if {"$cmd" == "stop"} {set components [lreverse $::COMPONENTS]}
+
+    set ORIG_WAIT_BREAK [set ::WAIT_BREAK_$cmd]
+    if {$doWait} {incr ::WAIT_BREAK_$cmd 1}
+    puts " [set ::WAIT_BREAK_$cmd]"
+    foreach {comp} "$components" {
+        if {$::COMP_LEVEL($comp) == $level && \
+                ($group == "" || $::GROUP($comp) == $group)} {
+            switch $cmd {
+                check {set doIt 1}
+                stop  {set doIt [expr !$lazy || [running $comp]]}
+                start {set doIt [expr !$::NOAUTO($comp) && (!$lazy || ![running $comp])]}
+            }
+            # indicate that there is another component we should wait for
+            if {$doIt && $doWait} {incr ::WAIT_BREAK_$cmd 1}
+            puts "** $cmd $comp (level: $level, doIt: $doIt) WAIT_BREAK: [set ::WAIT_BREAK_$cmd]"
+            if {$doIt} {component_cmd $comp $cmd}
+            if {$doWait && [set ::WAIT_BREAK_$cmd] < -1} {break}
+        }
     }
+    if {$doWait} {incr ::WAIT_BREAK_$cmd -1}
+
+    # wait until WAIT_BREAK becomes original value again
+    if {$doWait} {
+        while {[set ::WAIT_BREAK_$cmd] > $ORIG_WAIT_BREAK} {
+            # wait for variable to become 0
+            vwait ::WAIT_BREAK_$cmd
+        }
+    }
+    puts "done level_cmd($cmd $level $group $lazy) WAIT_BREAK: [set ::WAIT_BREAK_$cmd]"
 }
 
 proc remote_xterm {host} {
@@ -674,7 +667,7 @@ proc cancel_detach_timer {comp} {
 }
 
 proc component_cmd {comp cmd} {
-    global HOST COMPONENTS ARGS TERMINAL USEX WAIT_READY LOGGING WAIT_BREAK SCREENED DETACHTIME WIDGET COMMAND EXPORTS TITLE COMPSTATUS TIMERDETACH
+    global HOST COMPONENTS ARGS TERMINAL USEX WAIT_READY LOGGING SCREENED DETACHTIME WIDGET COMMAND EXPORTS TITLE COMPSTATUS TIMERDETACH
     set cpath "$::env(VDEMO_componentPath)"
     set component_script "$cpath/component_$COMMAND($comp)"
     set component_options "-t $TITLE($comp)"
@@ -705,7 +698,6 @@ proc component_cmd {comp cmd} {
                 $WIDGET($comp).start state disabled
             }
 
-            set WAIT_BREAK 0
             set_status $comp starting
             cancel_detach_timer $comp
 
@@ -738,8 +730,10 @@ proc component_cmd {comp cmd} {
             } elseif {$DETACHTIME($comp) == 0} {
                 set SCREENED($comp) 0
             }
-            wait_ready $comp
-            set ::LAST_GUI_INTERACTION($comp) [clock seconds]
+            set ::LAST_GUI_INTERACTION($comp) [clock milliseconds]
+            set check_time 500
+            if { $WAIT_READY($comp) <= 0 } {set check_time $::CHECKNOWAIT_TIME($comp)}
+            after $check_time component_cmd $comp check
         }
         stop {
             if { [$WIDGET($comp).stop instate disabled] } {
@@ -752,12 +746,10 @@ proc component_cmd {comp cmd} {
             cancel_detach_timer $comp
 
             set cmd_line "$VARS $component_script $component_options stop"
-            set WAIT_BREAK 1
-
             set res [ssh_command "$cmd_line" "$HOST($comp)"]
             set SCREENED($comp) 0
 
-            set ::LAST_GUI_INTERACTION($comp) [clock seconds]
+            set ::LAST_GUI_INTERACTION($comp) [clock milliseconds]
             after idle $WIDGET($comp).stop state !disabled
             if {$res != -1} { after idle component_cmd $comp check }
         }
@@ -791,6 +783,7 @@ proc component_cmd {comp cmd} {
             }
             $WIDGET($comp).check state disabled
             set_status $comp unknown
+            update
 
             set cmd_line "$VARS $component_script $component_options check"
             set res [ssh_command "$cmd_line" "$HOST($comp)"]
@@ -822,23 +815,28 @@ proc component_cmd {comp cmd} {
                 if {$screenResult == 0} { set s failed_check } { set s failed_noscreen }
             }
             if { [$::WIDGET($comp).start instate disabled] } {
-                # component is starting
-                if { $::WAIT_READY($comp) > 0 } {
-                    # check was triggered by wait_ready()
-                    # if onCheck not (yet) successful, stay in starting
-                    if {$onCheckResult != 0} {set s starting}
-                } else {
-                    if {$::CHECK_TIME($comp) > 0 && $onCheckResult != 0 && $screenResult == 0} {
-                        # when CHECK_TIME was requested: stay in starting and retrigger check
+                set endtime [expr $::LAST_GUI_INTERACTION($comp) + $WAIT_READY($comp)]
+                if {$::CHECK_TIME($comp) > 0 && $onCheckResult != 0 && $screenResult == 0} {
+                    if {$endtime < [clock milliseconds]} {
+                        puts "$TITLE($comp) failed: timeout"
+                        # do not continue with further commands
+                        set ::WAIT_BREAK_start -1
+                    } else {
+                        # stay in starting state and retrigger check
                         set s starting
                         after $::CHECK_TIME($comp) component_cmd $comp check
                     }
+                } else {
+                    incr ::WAIT_BREAK_start -1
+                    puts "** $comp WAIT_BREAK: $::WAIT_BREAK_start"
                 }
+            } elseif {$s == "failed_noscreen"} {
+                incr ::WAIT_BREAK_stop -1
             }
             set_status $comp $s
             # re-enable start button?
             if {"$s" != "starting"} {
-                set ::LAST_GUI_INTERACTION($comp) [clock seconds]
+                set ::LAST_GUI_INTERACTION($comp) [clock milliseconds]
                 $WIDGET($comp).start state !disabled
             }
 
@@ -959,7 +957,8 @@ proc ssh_check_connection {hostname {connect 1}} {
 
     # actually try to reconnect
     if { $msg != "" && (!$connect || [reconnect_host $hostname $msg] != 0) } {
-        set ::WAIT_BREAK 1
+        set ::WAIT_BREAK_start -2
+        set ::WAIT_BREAK_stop  -2
         return $res
     } elseif { $msg != "" && $connect } {
         # successfully (re)established connection
@@ -1358,7 +1357,8 @@ proc disconnect_screen_monitoring {host} {
 }
 
 proc running {comp} {
-    return [expr [lsearch [list starting ok_screen failed_check] $::COMPSTATUS($comp)] >= 0]
+    set running_states [list starting ok_screen failed_check]
+    return [expr [lsearch -exact $running_states $::COMPSTATUS($comp)] >= 0]
 }
 
 proc gui_exit {} {
@@ -1464,6 +1464,9 @@ proc setup_ctrl_fifo { { filename "" } } {
 }
 
 set mypid [pid]
+set WAIT_BREAK_start 0
+set WAIT_BREAK_stop 0
+set WAIT_BREAK_check 0
 puts "My process id is $mypid"
 
 signal trap SIGINT finish
