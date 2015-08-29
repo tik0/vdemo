@@ -459,9 +459,9 @@ proc gui_tcl {} {
         ttk::frame .main.group.named.$g -style groove.TFrame
         pack .main.group.named.$g -side top -fill x
         ttk::label .main.group.named.$g.label  -style group.TLabel -text "$g" -width 10 -anchor e
-        ttk::button .main.group.named.$g.start -style cmd.TButton -text "start" -command "all_cmd start [list $::LEVELS] $g"
-        ttk::button .main.group.named.$g.stop  -style cmd.TButton -text "stop"  -command "all_cmd stop  [list $::LEVELS] $g"
-        ttk::button .main.group.named.$g.check -style cmd.TButton -text "check" -command "all_cmd check [list $::LEVELS] $g"
+        ttk::button .main.group.named.$g.start -style cmd.TButton -text "start" -command "all_cmd start [list] $g"
+        ttk::button .main.group.named.$g.stop  -style cmd.TButton -text "stop"  -command "all_cmd stop  [list] $g"
+        ttk::button .main.group.named.$g.check -style cmd.TButton -text "check" -command "all_cmd check [list] $g"
         ttk::checkbutton .main.group.named.$g.noauto -text "no auto" -command "set_group_noauto $g" -variable GNOAUTO($g) -onvalue 1 -offvalue 0
 
         pack .main.group.named.$g.label -side left -padx 2
@@ -585,13 +585,14 @@ proc interrupt_multi_cmd {cmd} {
     }
     set ::WAIT_COUNT_$cmd 0
 }
-proc all_cmd {cmd {levels $::LEVELS} {group ""} {lazy 1}} {
-    puts -nonewline "all_cmd($cmd $group $lazy) WAIT_COUNT: [set ::WAIT_COUNT_$cmd]"
+proc all_cmd {cmd {levels [list]} {group ""} {lazy 1}} {
+    puts -nonewline "all_cmd($cmd $levels $group $lazy) WAIT_COUNT: [set ::WAIT_COUNT_$cmd]"
     interrupt_multi_cmd $cmd
     puts -nonewline " [set ::WAIT_COUNT_$cmd]"
     if {$cmd != "check"} {incr ::WAIT_COUNT_$cmd 1}
     puts " [set ::WAIT_COUNT_$cmd]"
 
+    if {[llength $levels]} {set levels $::LEVELS}
     if {"$cmd" == "stop"} {set levels [lreverse $levels]}
     foreach {level} "$levels" {
         # if WAIT_COUNT was set to -1 somewhere, we stop the loop
@@ -1379,7 +1380,7 @@ proc gui_exit {} {
             set ans yes
         }
         switch $ans {
-            yes {all_cmd stop $::LEVELS "" 1}
+            yes {all_cmd stop [list $::LEVELS] "" 1}
             cancel {return}
         }
     }
