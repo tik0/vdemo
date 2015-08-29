@@ -571,42 +571,42 @@ proc insertLog {infile} {
 # all_cmd() and level_cmd() should start/stop all components in a specific group
 # *level by level*. Components at the same level can be started/stopped in parallel.
 # However, high-level components should be started later (or stopped earlier).
-# WAIT_BREAK values:
+# WAIT_COUNT values:
 # -1: process failed
 # -2: interrupt requested manually
 #  0: no multi command pending
 # >0: wait level (increased with every component, level_cmd, all_cmd
 proc interrupt_multi_cmd {cmd} {
-    while {[set ::WAIT_BREAK_$cmd] > 0} {
+    while {[set ::WAIT_COUNT_$cmd] > 0} {
         # interrupt any previous command
-        set ::WAIT_BREAK_$cmd -2
+        set ::WAIT_COUNT_$cmd -2
         # wait for variable to become 0
-        vwait ::WAIT_BREAK_$cmd
+        vwait ::WAIT_COUNT_$cmd
     }
-    set ::WAIT_BREAK_$cmd 0
+    set ::WAIT_COUNT_$cmd 0
 }
 proc all_cmd {cmd {levels $::LEVELS} {group ""} {lazy 1}} {
-    puts -nonewline "all_cmd($cmd $group $lazy) WAIT_BREAK: [set ::WAIT_BREAK_$cmd]"
+    puts -nonewline "all_cmd($cmd $group $lazy) WAIT_COUNT: [set ::WAIT_COUNT_$cmd]"
     interrupt_multi_cmd $cmd
-    puts -nonewline " [set ::WAIT_BREAK_$cmd]"
-    if {$cmd != "check"} {incr ::WAIT_BREAK_$cmd 1}
-    puts " [set ::WAIT_BREAK_$cmd]"
+    puts -nonewline " [set ::WAIT_COUNT_$cmd]"
+    if {$cmd != "check"} {incr ::WAIT_COUNT_$cmd 1}
+    puts " [set ::WAIT_COUNT_$cmd]"
 
     if {"$cmd" == "stop"} {set levels [lreverse $levels]}
     foreach {level} "$levels" {
-        # if WAIT_BREAK was set to -1 somewhere, we stop the loop
-        if {$cmd != "check" && [set ::WAIT_BREAK_$cmd] < 0} {break}
+        # if WAIT_COUNT was set to -1 somewhere, we stop the loop
+        if {$cmd != "check" && [set ::WAIT_COUNT_$cmd] < 0} {break}
         level_cmd $cmd $level 0 $group $lazy
     }
 
-    if {$cmd != "check"} {incr ::WAIT_BREAK_$cmd -1}
-    puts "done all_cmd($cmd $group $lazy) WAIT_BREAK: [set ::WAIT_BREAK_$cmd]"
+    if {$cmd != "check"} {incr ::WAIT_COUNT_$cmd -1}
+    puts "done all_cmd($cmd $group $lazy) WAIT_COUNT: [set ::WAIT_COUNT_$cmd]"
 }
 
 proc level_cmd {cmd level {interrupt 1} {group ""} {lazy 0} } {
-    puts -nonewline "level_cmd($cmd $level $group $lazy) WAIT_BREAK: [set ::WAIT_BREAK_$cmd]"
+    puts -nonewline "level_cmd($cmd $level $group $lazy) WAIT_COUNT: [set ::WAIT_COUNT_$cmd]"
     if {$interrupt} {interrupt_multi_cmd $cmd}
-    puts -nonewline " [set ::WAIT_BREAK_$cmd]"
+    puts -nonewline " [set ::WAIT_COUNT_$cmd]"
 
     # a start / stop command should stop a currently running process
     set doWait [expr ![string equal $cmd "check"]]
@@ -614,9 +614,9 @@ proc level_cmd {cmd level {interrupt 1} {group ""} {lazy 0} } {
     set components $::COMPONENTS
     if {"$cmd" == "stop"} {set components [lreverse $::COMPONENTS]}
 
-    set ORIG_WAIT_BREAK [set ::WAIT_BREAK_$cmd]
-    if {$doWait} {incr ::WAIT_BREAK_$cmd 1}
-    puts " [set ::WAIT_BREAK_$cmd]"
+    set ORIG_WAIT_COUNT [set ::WAIT_COUNT_$cmd]
+    if {$doWait} {incr ::WAIT_COUNT_$cmd 1}
+    puts " [set ::WAIT_COUNT_$cmd]"
     foreach {comp} "$components" {
         if {$::COMP_LEVEL($comp) == $level && \
                 ($group == "" || $::GROUP($comp) == $group)} {
@@ -626,22 +626,22 @@ proc level_cmd {cmd level {interrupt 1} {group ""} {lazy 0} } {
                 start {set doIt [expr !$::NOAUTO($comp) && (!$lazy || ![running $comp])]}
             }
             # indicate that there is another component we should wait for
-            if {$doIt && $doWait} {incr ::WAIT_BREAK_$cmd 1}
-            puts "** $cmd $comp (level: $level, doIt: $doIt) WAIT_BREAK: [set ::WAIT_BREAK_$cmd]"
+            if {$doIt && $doWait} {incr ::WAIT_COUNT_$cmd 1}
+            puts "** $cmd $comp (level: $level, doIt: $doIt) WAIT_COUNT: [set ::WAIT_COUNT_$cmd]"
             if {$doIt} {component_cmd $comp $cmd}
-            if {$doWait && [set ::WAIT_BREAK_$cmd] < -1} {break}
+            if {$doWait && [set ::WAIT_COUNT_$cmd] < -1} {break}
         }
     }
-    if {$doWait} {incr ::WAIT_BREAK_$cmd -1}
+    if {$doWait} {incr ::WAIT_COUNT_$cmd -1}
 
-    # wait until WAIT_BREAK becomes original value again
+    # wait until WAIT_COUNT becomes original value again
     if {$doWait} {
-        while {[set ::WAIT_BREAK_$cmd] > $ORIG_WAIT_BREAK} {
+        while {[set ::WAIT_COUNT_$cmd] > $ORIG_WAIT_COUNT} {
             # wait for variable to become 0
-            vwait ::WAIT_BREAK_$cmd
+            vwait ::WAIT_COUNT_$cmd
         }
     }
-    puts "done level_cmd($cmd $level $group $lazy) WAIT_BREAK: [set ::WAIT_BREAK_$cmd]"
+    puts "done level_cmd($cmd $level $group $lazy) WAIT_COUNT: [set ::WAIT_COUNT_$cmd]"
 }
 
 proc remote_xterm {host} {
@@ -820,18 +820,18 @@ proc component_cmd {comp cmd} {
                     if {$endtime < [clock milliseconds]} {
                         puts "$TITLE($comp) failed: timeout"
                         # do not continue with further commands
-                        set ::WAIT_BREAK_start -1
+                        set ::WAIT_COUNT_start -1
                     } else {
                         # stay in starting state and retrigger check
                         set s starting
                         after $::CHECK_TIME($comp) component_cmd $comp check
                     }
                 } else {
-                    incr ::WAIT_BREAK_start -1
-                    puts "** $comp WAIT_BREAK: $::WAIT_BREAK_start"
+                    incr ::WAIT_COUNT_start -1
+                    puts "** $comp WAIT_COUNT: $::WAIT_COUNT_start"
                 }
             } elseif {$s == "failed_noscreen"} {
-                incr ::WAIT_BREAK_stop -1
+                incr ::WAIT_COUNT_stop -1
             }
             set_status $comp $s
             # re-enable start button?
@@ -957,8 +957,8 @@ proc ssh_check_connection {hostname {connect 1}} {
 
     # actually try to reconnect
     if { $msg != "" && (!$connect || [reconnect_host $hostname $msg] != 0) } {
-        set ::WAIT_BREAK_start -2
-        set ::WAIT_BREAK_stop  -2
+        set ::WAIT_COUNT_start -2
+        set ::WAIT_COUNT_stop  -2
         return $res
     } elseif { $msg != "" && $connect } {
         # successfully (re)established connection
@@ -1464,9 +1464,9 @@ proc setup_ctrl_fifo { { filename "" } } {
 }
 
 set mypid [pid]
-set WAIT_BREAK_start 0
-set WAIT_BREAK_stop 0
-set WAIT_BREAK_check 0
+set WAIT_COUNT_start 0
+set WAIT_COUNT_stop 0
+set WAIT_COUNT_check 0
 puts "My process id is $mypid"
 
 signal trap SIGINT finish
