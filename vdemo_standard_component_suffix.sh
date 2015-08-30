@@ -120,7 +120,11 @@ case "$1" in
 	fi
 	;;
     stop)
-	vdemo_stop_component $title &
+			vdemo_stop_component $title &
+	;;
+	stopwait)
+			echo "stopping and waiting" >&2
+			vdemo_stop_component $title
 	;;
     check)
 	vdemo_check_component $title; processResult=$?

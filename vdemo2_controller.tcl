@@ -60,6 +60,14 @@ proc assert condition {
         return -code error "assertion failed: $condition"
     }
 }
+proc printBackTrace {} {
+    set backTrace {}
+    set startLevel [expr {[info level] - 2}]
+    for {set level 1} {$level <= $startLevel} {incr level} {
+        lappend backTrace [lindex [info level $level] 0]
+    }
+    puts stderr "   backtrace: [join $backTrace { => }]"
+}
 
 # set some default values from environment variables
 if { ! [info exists ::env(VDEMO_LOGGING)] || \
@@ -775,8 +783,8 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
                 $WIDGET($comp).start state !disabled
                 return
             } elseif {$res == 0} {
-                puts "$TITLE($comp): already running, stopping first..."
-                component_cmd $comp stop
+                dputs "$TITLE($comp): already running, stopping first..."
+                component_cmd $comp stopwait
                 $WIDGET($comp).start state disabled
             }
 
@@ -821,22 +829,28 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
             if { $WAIT_READY($comp) <= 0 } {set check_time $::CHECKNOWAIT_TIME($comp)}
             after $check_time component_cmd $comp check $allcmd_group
         }
+        stopwait -
         stop {
             if { [$WIDGET($comp).stop instate disabled] } {
                 dputs "$TITLE($comp): already stopping"
                 return
             }
-            $WIDGET($comp).stop state disabled
-            $WIDGET($comp).start state !disabled
+            # Hm. For some reason, we shouldn't do this for stopwait (called from start)
+            if {$cmd != "stopwait"} {
+                $WIDGET($comp).stop state disabled
+                $WIDGET($comp).start state !disabled
+            }
             set_status $comp unknown
             cancel_detach_timer $comp
 
-            set cmd_line "$VARS $component_script $component_options stop"
+            set cmd_line "$VARS $component_script $component_options $cmd"
             set res [ssh_command "$cmd_line" "$HOST($comp)"]
             set SCREENED($comp) 0
 
             set ::LAST_GUI_INTERACTION($comp) [clock milliseconds]
-            if {$res != -1} { after 100 component_cmd $comp check $allcmd_group }
+            if {$res != -1 && $cmd != "stopwait"} {
+                after 100 component_cmd $comp check $allcmd_group
+            }
         }
         screen {
             cancel_detach_timer $comp
@@ -870,7 +884,6 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
             }
             $WIDGET($comp).check state disabled
             set_status $comp unknown
-            update
 
             set cmd_line "$VARS $component_script $component_options check"
             set res [ssh_command "$cmd_line" "$HOST($comp)"]
