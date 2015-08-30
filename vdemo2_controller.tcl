@@ -562,14 +562,19 @@ proc insertLog {infile} {
     }
 }
 
-# all_cmd() and level_cmd() should start/stop all components in a specific group
-# *level by level*. Components at the same level can be started/stopped in parallel.
-# However, high-level components should be started later (or stopped earlier).
-# ALLCMD_COUNT values:
-# -1: process failed
-# -2: interrupt requested manually
-#  0: no multi command pending
-# >0: wait level (increased with every component, level_cmd, all_cmd
+# all_cmd() should start/stop all components in a specific group *level by level*.
+# Components at the same level can be started/stopped in parallel.
+# start/stop buttons of different groups can be run in parallel too.
+# However, within a group (ALL serves as a group as well), either start or stop can run,
+# and the components of *different level* should be started / stopped sequentially.
+#
+# We achieve that behavior, by counting the number of started components
+# (in ::ALLCMD_COUNT_$group), and storing the start/stop mode (in ::ALLCMD(mode_$group))
+# as well as a list of pending components (in ::ALLCMD(list_$group)).
+# ALLCMD_COUNT is set to 100 (and then counting the no. of pending components)
+# as soon as all_cmd() is triggered. If a running command should be canceled, we use:
+# -1: process failed -> stop further launching at next level
+# -2: manual interrupt request -> immediately stop launching
 proc all_cmd_reset {group} {
     set ::ALLCMD(list_$group) [list]
     set ::ALLCMD(mode_$group) ""
@@ -639,7 +644,7 @@ proc all_cmd {cmd {group "all"} {lazy 1}} {
 proc all_cmd_add_comp {group comp} {
     lappend ::ALLCMD(list_$group) $comp
     incr ::ALLCMD_COUNT_$group 1
-    puts "  + $group: $comp"
+    puts "  + $::COMP_LEVEL($comp) $group: $comp"
 }
 # called when component's status changed
 proc all_cmd_comp_status {group comp status} {
@@ -652,10 +657,10 @@ proc all_cmd_comp_status {group comp status} {
         ok_* {set cmd "start"}
         default {set cmd "-"}
     }
-    if {"$cmd" == "$::ALLCMD(mode_$group)"} {
+    if {$cmd == $::ALLCMD(mode_$group)} {
         set ::ALLCMD(list_$group) [lsearch -inline -all -not -exact $::ALLCMD(list_$group) $comp]
         incr ::ALLCMD_COUNT_$group -1
-        puts "  - $group: $comp"
+        puts "  - $::COMP_LEVEL($comp) $group: $comp"
     }
 }
 proc all_cmd_wait {group} {
@@ -666,6 +671,7 @@ proc all_cmd_wait {group} {
 }
 # set ALLCMD_COUNT to -1 to indicate cancelling
 proc all_cmd_cancel {group} {
+    if {$group == "" || $::ALLCMD(mode_$group) == ""} return
     set ::ALLCMD_COUNT_$group -1
 }
 proc level_cmd { cmd level group {lazy 0} } {
@@ -829,8 +835,10 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
             ssh_command "$cmd_line" "$HOST($comp)"
         }
         check {
+            if {$allcmd_group != ""} {puts "  ? $::COMP_LEVEL($comp) $allcmd_group $comp"}
             if { [$WIDGET($comp).check instate disabled] } {
                 dputs "$TITLE($comp): already checking"
+                if {$allcmd_group != ""} {after 100 component_cmd $comp check $allcmd_group}
                 return
             }
             $WIDGET($comp).check state disabled
@@ -845,11 +853,13 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
             if { ! [string is integer -strict $res] } {
                 puts "internal error: result is not an integer: '$res'"
                 $WIDGET($comp).start state !disabled
+                if {$allcmd_group != ""} {after 100 component_cmd $comp check $allcmd_group}
                 return
             }
 
             if {$res == -1} {
                 dputs "no master connection to $HOST($comp)";
+                all_cmd_cancel $allcmd_group
                 $WIDGET($comp).start state !disabled
                 return
             }
