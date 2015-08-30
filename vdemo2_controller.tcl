@@ -592,7 +592,7 @@ proc all_cmd {cmd {levels {}} {group ""} {lazy 1}} {
     foreach {level} "$levels" {
         # if WAIT_COUNT was set to -1 somewhere, we stop the loop
         if {$doWait && $::WAIT_COUNT < 0} {break}
-        level_cmd $cmd $level $group $lazy 0
+        level_cmd $cmd $level $group $lazy
     }
 
     if {$doWait} {incr ::WAIT_COUNT -1}
@@ -602,10 +602,8 @@ proc all_cmd {cmd {levels {}} {group ""} {lazy 1}} {
     $widget state !disabled
 }
 
-proc level_cmd {cmd level {group ""} {lazy 0} {fromGui 1} } {
+proc level_cmd { cmd level {group ""} {lazy 0} } {
     puts -nonewline "level_cmd($cmd $level $group $lazy) WAIT_COUNT: $::WAIT_COUNT"
-    if {$fromGui} {interrupt_multi_cmd $cmd}
-    puts -nonewline " $::WAIT_COUNT"
 
     # a start / stop command should stop a currently running process
     set doWait [expr [lsearch -exact [list "start" "stop"] $cmd] >= 0]
