@@ -79,7 +79,7 @@ fi
 
 if ! declare -F "component" >/dev/null; then
 	echo 'function "component" is not declared or declared as variable'
-	exit 1
+	exit 3
 fi
 
 # run the
@@ -104,7 +104,7 @@ case "$1" in
     start)
 	if vdemo_check_component $title; then
 	    echo "$title already running">&2
-		exit 1
+		exit 4
 	fi
 
 	call_if_exists clean_component
@@ -120,8 +120,11 @@ case "$1" in
 	fi
 	;;
     stop)
-	vdemo_stop_component $title
-	call_if_exists on_stop
+			vdemo_stop_component $title &
+	;;
+	stopwait)
+			echo "stopping and waiting" >&2
+			vdemo_stop_component $title
 	;;
     check)
 	vdemo_check_component $title; processResult=$?
