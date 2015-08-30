@@ -585,6 +585,7 @@ proc all_cmd {cmd {levels {}} {group ""} {lazy 1}} {
     set widget .main.multi.$group.$cmd
     if {$group == ""} {set widget .main.multi.all.$cmd}
     $widget configure -style "starting.cmd.TButton"
+    $widget state disabled
 
     if {"$levels" == ""} {set levels $::LEVELS}
     if {"$cmd" == "stop"} {set levels [lreverse $levels]}
@@ -598,6 +599,7 @@ proc all_cmd {cmd {levels {}} {group ""} {lazy 1}} {
     puts "done all_cmd($cmd $group $lazy) WAIT_COUNT: $::WAIT_COUNT"
 
     $widget configure -style "cmd.TButton"
+    $widget state !disabled
 }
 
 proc level_cmd {cmd level {group ""} {lazy 0} {fromGui 1} } {
