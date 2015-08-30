@@ -84,7 +84,7 @@ proc number {val type} {
 }
 
 proc parse_options {comp} {
-    global COMPONENTS ARGS USEX TERMINAL WAIT_READY NOAUTO LOGGING GROUP DETACHTIME COMP_LEVEL EXPORTS TITLE CHECK_TIME CHECKNOWAIT_TIME RESTART
+    global COMPONENTS ARGS USEX TERMINAL WAIT_READY NOAUTO LOGGING GROUP DETACHTIME COMP_LEVEL EXPORTS TITLE CHECKNOWAIT_TIME RESTART
 
     set NEWARGS [list]
     set USEX($comp) 0
@@ -92,8 +92,6 @@ proc parse_options {comp} {
     set WAIT_READY($comp) 0
     # time until process is checked after start (when not waiting)
     set CHECKNOWAIT_TIME($comp) 1000
-    # period for continous checks after start of component: <= 0: don't auto-check
-    set CHECK_TIME($comp) 1000
     set GROUP($comp) ""
     # detach a component after this time
     set DETACHTIME($comp) [expr 1000 * $::env(VDEMO_DETACH_TIME)]
@@ -116,7 +114,8 @@ proc parse_options {comp} {
                 incr i
             }
             -c {
-                set CHECK_TIME($comp) [expr 1000 * [number $val double]]
+                puts "$comp: arg '-c' is obsolete"
+                if [string is double -strict $val] {incr i}
             }
             -r {
                 set RESTART($comp) 1
@@ -871,14 +870,14 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
             # handle started component
             if { [$::WIDGET($comp).start instate disabled] } {
                 set endtime [expr $::LAST_GUI_INTERACTION($comp) + $WAIT_READY($comp)]
-                if {$::CHECK_TIME($comp) > 0 && $onCheckResult != 0 && $screenResult == 0} {
+                if {$onCheckResult != 0 && $screenResult == 0} {
                     if {$endtime < [clock milliseconds]} {
                         puts "$TITLE($comp) failed: timeout"
                         all_cmd_cancel $allcmd_group
                     } else {
                         # stay in starting state and retrigger check
                         set s starting
-                        after $::CHECK_TIME($comp) component_cmd $comp check $allcmd_group
+                        after 1000 component_cmd $comp check $allcmd_group
                     }
                 }
             }
@@ -891,7 +890,7 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
             } elseif { [$WIDGET($comp).stop instate disabled] } {
                 # comp not yet stopped, retrigger check
                 set s unknown
-                after $::CHECK_TIME($comp) component_cmd $comp check $allcmd_group
+                after 1000 component_cmd $comp check $allcmd_group
             }
 
             set_status $comp $s
