@@ -571,28 +571,31 @@ proc insertLog {infile} {
 # We achieve that behavior, by counting the number of started components
 # (in ::ALLCMD_COUNT_$group), and storing the start/stop mode (in ::ALLCMD(mode_$group))
 # as well as a list of pending components (in ::ALLCMD(list_$group)).
-# ALLCMD_COUNT is set to 100 (and then counting the no. of pending components)
-# as soon as all_cmd() is triggered. If a running command should be canceled, we use:
+# If a running command should be canceled, we use ::ALLCMD_INTR_$group:
 # -1: process failed -> stop further launching at next level
 # -2: manual interrupt request -> immediately stop launching
+#  0: all_cmd() finished / nothing pending
+#  1: all_cmd() is pending
 proc all_cmd_reset {group} {
     set ::ALLCMD(list_$group) [list]
     set ::ALLCMD(mode_$group) ""
     set ::ALLCMD_COUNT_$group 0
+    set ::ALLCMD_INTR_$group  0
 }
 proc all_cmd_interrupt {groups} {
     # interrupt all groups?
-    if {$groups == "all"} {set groups $::GROUPS}
-    # set manual stop flag: -2
+    if {$groups == "all"} {set groups "all $::GROUPS"}
+
+    set ret 0
+    # set manual interrupt flag: -2
     foreach group "$groups" {
-        if {[set ::ALLCMD_COUNT_$group] != 0} {set ::ALLCMD_COUNT_$groups -2}
-    }
-    # wait for all commands to be finished
-    foreach group "$groups" {
-        while {[set ::ALLCMD_COUNT_$group] != 0} {
-            vwait ::ALLCMD_COUNT_$group
+        if {[set ::ALLCMD_INTR_$group] != 0} {
+            puts "! interrupt $group ($::ALLCMD(mode_$group) #[set ::ALLCMD_COUNT_$group])"
+            set ::ALLCMD_INTR_$group -2
+            set ret 1
         }
     }
+    return $ret
 }
 proc all_cmd_set_gui {cmd group status} {
     set stylePrefix [expr {$status == "disabled" ? "starting." : ""}]
@@ -604,41 +607,60 @@ proc all_cmd_set_gui {cmd group status} {
         }
     }
 }
-proc all_cmd_begin {cmd group} {
-    puts -nonewline "+ all_cmd($cmd $group) #[set ::ALLCMD_COUNT_$group]: {$::ALLCMD(list_$group)}"
 
+set ::ALLCMD(pending) [list]
+proc all_cmd_next_pending {} {
+    # is there a pending command?
+    if {[llength $::ALLCMD(pending)] == 0} {return ""}
+    # peek next command
+    set next [lindex $::ALLCMD(pending) 0]
+    set group [lindex [split $next] 2]
+
+    # check whether next command will conflict with active ones
+    if {[all_cmd_interrupt $group]} {return ""}
+
+    # no active + conflicting all_cmd() call: pop first element and return next
+    set ::ALLCMD(pending) [lreplace $::ALLCMD(pending) 0 0]
+    return $next
+}
+
+proc all_cmd {cmd {group "all"} {lazy 1}} {
+    ### preparation
     # disable gui buttons
     all_cmd_set_gui $cmd $group "disabled"
     # ensure that other all_cmds from same $group are interrupted
     set doWait [expr [lsearch -exact [list "start" "stop"] $cmd] >= 0]
     if {$doWait} {
-        all_cmd_interrupt $group
-        assert {[set ::ALLCMD_COUNT_$group] == 0}
-        set ::ALLCMD_COUNT_$group 100
+        if {[all_cmd_interrupt $group]} {
+            # there is a pending all_cmd() call, postpone this new one
+            lappend ::ALLCMD(pending) "all_cmd $cmd $group $lazy"
+            return
+        }
+        # cmd accepted, clean pending var
+        set ::ALLCMD(pending) ""
+        set ::ALLCMD_INTR_$group  1
         set ::ALLCMD(mode_$group) $cmd
+        puts "+ all_cmd($cmd $group) #[set ::ALLCMD_COUNT_$group]: {$::ALLCMD(list_$group)}"
     }
-    puts " #[set ::ALLCMD_COUNT_$group]"
-    return $doWait
-}
-proc all_cmd_end {cmd group doWait} {
-    puts "- all_cmd($cmd $group) #[set ::ALLCMD_COUNT_$group]: {$::ALLCMD(list_$group)}"
-    if {$doWait} {all_cmd_reset $group}
-    # enable gui buttons
-    all_cmd_set_gui $cmd $group "!disabled"
-}
 
-proc all_cmd {cmd {group "all"} {lazy 1}} {
-    set doWait [all_cmd_begin $cmd $group]
-
+    ### run all components by level
     set levels $::LEVELS
     if {"$cmd" == "stop"} {set levels [lreverse $levels]}
     foreach {level} "$levels" {
-        # if ALLCMD_COUNT was set negative, we break the loop
-        if {$doWait && [set ::ALLCMD_COUNT_$group] < 0} {break}
+        # if ALLCMD_INTR was set negative, we break the loop
+        if {$doWait && [set ::ALLCMD_INTR_$group] < 0} {break}
         level_cmd $cmd $level $group $lazy
     }
 
-    all_cmd_end $cmd $group $doWait
+    ### cleanup
+    # enable gui buttons
+    all_cmd_set_gui $cmd $group "!disabled"
+    if {$doWait} {
+        puts "- all_cmd($cmd $group) #[set ::ALLCMD_COUNT_$group]: {$::ALLCMD(list_$group)}"
+        all_cmd_reset $group
+        # if there is a pending all_cmd, now we can execute it
+        if {[set next [all_cmd_next_pending]] != ""} {after idle $next}
+    }
 }
 
 proc all_cmd_add_comp {group comp} {
@@ -664,21 +686,22 @@ proc all_cmd_comp_status {group comp status} {
     }
 }
 proc all_cmd_wait {group} {
-    while {[set ::ALLCMD_COUNT_$group] > 100} {
+    # TODO: only wait as long as INTR was not set?
+    while {[set ::ALLCMD_COUNT_$group] > 0} {
         puts "$group pending: $::ALLCMD(list_$group)"
         vwait ::ALLCMD_COUNT_$group
     }
 }
-# set ALLCMD_COUNT to -1 to indicate cancelling
+# set ALLCMD_INTR to -1 to indicate cancelling
 proc all_cmd_cancel {group} {
     if {$group == "" || $::ALLCMD(mode_$group) == ""} return
-    set ::ALLCMD_COUNT_$group -1
+    set ::ALLCMD_INTR_$group -1
 }
 proc level_cmd { cmd level group {lazy 0} } {
     # a start / stop command should stop a currently running process
     set doWait [expr [lsearch -exact [list "start" "stop"] $cmd] >= 0]
 
-    puts " + level_cmd($cmd $level $group $lazy) #[set ::ALLCMD_COUNT_$group]: $::ALLCMD(list_$group)"
+    puts " + level_cmd($cmd $level $group $lazy) #[set ::ALLCMD_COUNT_$group]: {$::ALLCMD(list_$group)}"
 
     set components $::COMPONENTS
     if {"$cmd" == "stop"} {set components [lreverse $::COMPONENTS]}
@@ -694,13 +717,13 @@ proc level_cmd { cmd level group {lazy 0} } {
                 if {$doWait} {all_cmd_add_comp $group $comp}
                 component_cmd $comp $cmd $group
             }
-            # break from loop, when manually requested (ALLCMD_COUNT <= -2)
-            if {$doWait && [set ::ALLCMD_COUNT_$group] < -1} {break}
+            # break from loop, when manually requested (ALLCMD_INTR <= -2)
+            if {$doWait && [set ::ALLCMD_INTR_$group] < -1} {break}
         }
     }
 
     if {$doWait} {all_cmd_wait $group}
-    puts " - level_cmd($cmd $level $group $lazy) #[set ::ALLCMD_COUNT_$group]: $::ALLCMD(list_$group)"
+    puts " - level_cmd($cmd $level $group $lazy) #[set ::ALLCMD_COUNT_$group]: {$::ALLCMD(list_$group)} [set ::ALLCMD_INTR_$group]"
 }
 
 proc remote_xterm {host} {
@@ -1027,7 +1050,6 @@ proc ssh_check_connection {hostname {connect 1}} {
 
     # actually try to reconnect
     if { $msg != "" && (!$connect || [reconnect_host $hostname $msg] != 0) } {
-        set ::ALLCMD_COUNT -2
         return $res
     } elseif { $msg != "" && $connect } {
         # successfully (re)established connection
