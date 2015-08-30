@@ -577,7 +577,7 @@ proc all_cmd {cmd {levels {}} {group ""} {lazy 1}} {
     interrupt_multi_cmd $cmd
     puts -nonewline " $::WAIT_COUNT"
     # a start / stop command should stop a currently running process
-    set doWait [expr [lsearch -exact [list "start"] $cmd] >= 0]
+    set doWait [expr [lsearch -exact [list "start" "stop"] $cmd] >= 0]
     if {$doWait} {incr ::WAIT_COUNT 1; set ::WAIT_MODE $cmd}
     puts " $::WAIT_COUNT"
 
@@ -608,7 +608,7 @@ proc level_cmd {cmd level {group ""} {lazy 0} {fromGui 1} } {
     puts -nonewline " $::WAIT_COUNT"
 
     # a start / stop command should stop a currently running process
-    set doWait [expr [lsearch -exact [list "start"] $cmd] >= 0]
+    set doWait [expr [lsearch -exact [list "start" "stop"] $cmd] >= 0]
 
     set components $::COMPONENTS
     if {"$cmd" == "stop"} {set components [lreverse $::COMPONENTS]}
@@ -845,6 +845,7 @@ proc component_cmd {comp cmd {fromGui 1}} {
                 $WIDGET($comp).stop state !disabled
             } elseif { [$WIDGET($comp).stop instate disabled] } {
                 # comp not yet stopped, retrigger check
+                set s unknown
                 after $::CHECK_TIME($comp) component_cmd $comp check $fromGui
             }
 

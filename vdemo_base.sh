@@ -297,6 +297,11 @@ function vdemo_stop_component {
 		kill -9 $PIDS > /dev/null 2>&1
 		# to be really sure, also kill the screen process
 		kill -9 $VDEMO_pid > /dev/null 2>&1
+
+		# call on_stop function
+		if declare -F on_stop > /dev/null; then
+			on_stop
+		fi
 	fi
 }
 

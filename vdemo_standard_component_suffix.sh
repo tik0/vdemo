@@ -120,8 +120,7 @@ case "$1" in
 	fi
 	;;
     stop)
-	vdemo_stop_component $title
-	call_if_exists on_stop
+	vdemo_stop_component $title &
 	;;
     check)
 	vdemo_check_component $title; processResult=$?
