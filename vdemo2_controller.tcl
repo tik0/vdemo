@@ -55,6 +55,11 @@ proc dputs {args {level 1}} {
         puts stderr "-- $args"
     }
 }
+proc assert condition {
+    if {![uplevel 1 expr $condition]} {
+        return -code error "assertion failed: $condition"
+    }
+}
 
 # set some default values from environment variables
 if { ! [info exists ::env(VDEMO_LOGGING)] || \
@@ -414,34 +419,37 @@ proc gui_tcl {} {
         set ::TABS $tabs
     }
 
-    ttk::frame .main.multi
-    pack .main.multi -side left -fill y
+    set allcmd ".main.allcmd"
+    ttk::frame $allcmd
+    pack $allcmd -side left -fill y
     # buttons to control ALL components
-    ttk::frame .main.multi.all -style groove.TFrame
-    pack .main.multi.all -side top -fill x
-    ttk::label .main.multi.all.label -style TLabel -text "ALL COMPONENTS"
-    ttk::button .main.multi.all.start -style cmd.TButton -text "start" -command "all_cmd start"
-    ttk::button .main.multi.all.stop  -style cmd.TButton -text "stop"  -command "all_cmd stop"
-    ttk::button .main.multi.all.check -style cmd.TButton -text "check" -command "all_cmd check"
-    pack .main.multi.all.label -side left -fill x
-    pack .main.multi.all.check .main.multi.all.stop .main.multi.all.start -side right
+    all_cmd_reset "all"
+    ttk::frame $allcmd.all -style groove.TFrame
+    pack $allcmd.all -side top -fill x
+    ttk::label $allcmd.all.label -style TLabel -text "ALL COMPONENTS"
+    ttk::button $allcmd.all.start -style cmd.TButton -text "start" -command "all_cmd start"
+    ttk::button $allcmd.all.stop  -style cmd.TButton -text "stop"  -command "all_cmd stop"
+    ttk::button $allcmd.all.check -style cmd.TButton -text "check" -command "all_cmd check"
+    pack $allcmd.all.label -side left -fill x
+    pack $allcmd.all.check $allcmd.all.stop $allcmd.all.start -side right
 
     # buttons for group control:
-    set groups [lsort -unique "$groups"]
-    foreach {g} "$groups" {
-        ttk::frame .main.multi.$g -style groove.TFrame
-        pack .main.multi.$g -side top -fill x
-        ttk::label .main.multi.$g.label  -style group.TLabel -text "$g" -width 10 -anchor e
-        ttk::button .main.multi.$g.start -style cmd.TButton -text "start" -command "all_cmd start {} $g"
-        ttk::button .main.multi.$g.stop  -style cmd.TButton -text "stop"  -command "all_cmd stop  {} $g"
-        ttk::button .main.multi.$g.check -style cmd.TButton -text "check" -command "all_cmd check {} $g"
-        ttk::checkbutton .main.multi.$g.noauto -text "no auto" -command "set_group_noauto $g" -variable GNOAUTO($g) -onvalue 1 -offvalue 0
+    set ::GROUPS [lsort -unique "$groups"]
+    foreach {g} "$::GROUPS" {
+        all_cmd_reset "$g"
+        ttk::frame $allcmd.$g -style groove.TFrame
+        pack $allcmd.$g -side top -fill x
+        ttk::label $allcmd.$g.label  -style group.TLabel -text "$g" -width 10 -anchor e
+        ttk::button $allcmd.$g.start -style cmd.TButton -text "start" -command "all_cmd start $g"
+        ttk::button $allcmd.$g.stop  -style cmd.TButton -text "stop"  -command "all_cmd stop  $g"
+        ttk::button $allcmd.$g.check -style cmd.TButton -text "check" -command "all_cmd check $g"
+        ttk::checkbutton $allcmd.$g.noauto -text "no auto" -command "set_group_noauto $g" -variable GNOAUTO($g) -onvalue 1 -offvalue 0
 
-        pack .main.multi.$g.label -side left -padx 2
-        pack .main.multi.$g.start -side left
-        pack .main.multi.$g.stop -side left
-        pack .main.multi.$g.check -side left
-        pack .main.multi.$g.noauto -side left
+        pack $allcmd.$g.label -side left -padx 2
+        pack $allcmd.$g.start -side left
+        pack $allcmd.$g.stop -side left
+        pack $allcmd.$g.check -side left
+        pack $allcmd.$g.noauto -side left
     }
 
     ttk::frame .main.log
@@ -558,91 +566,136 @@ proc insertLog {infile} {
 # all_cmd() and level_cmd() should start/stop all components in a specific group
 # *level by level*. Components at the same level can be started/stopped in parallel.
 # However, high-level components should be started later (or stopped earlier).
-# WAIT_COUNT values:
+# ALLCMD_COUNT values:
 # -1: process failed
 # -2: interrupt requested manually
 #  0: no multi command pending
 # >0: wait level (increased with every component, level_cmd, all_cmd
-proc interrupt_multi_cmd {cmd} {
-    while {$::WAIT_COUNT > 0} {
-        # interrupt any previous command
-        set ::WAIT_COUNT -2
-        # wait for variable to become 0
-        vwait ::WAIT_COUNT
-    }
-    set ::WAIT_COUNT 0
+proc all_cmd_reset {group} {
+    set ::ALLCMD(list_$group) [list]
+    set ::ALLCMD(mode_$group) ""
+    set ::ALLCMD_COUNT_$group 0
 }
-proc all_cmd {cmd {levels {}} {group ""} {lazy 1}} {
-    puts -nonewline "all_cmd($cmd {$levels} $group $lazy) WAIT_COUNT: $::WAIT_COUNT"
-    interrupt_multi_cmd $cmd
-    puts -nonewline " $::WAIT_COUNT"
-    # a start / stop command should stop a currently running process
+proc all_cmd_interrupt {groups} {
+    # interrupt all groups?
+    if {$groups == "all"} {set groups $::GROUPS}
+    # set manual stop flag: -2
+    foreach group "$groups" {
+        if {[set ::ALLCMD_COUNT_$group] != 0} {set ::ALLCMD_COUNT_$groups -2}
+    }
+    # wait for all commands to be finished
+    foreach group "$groups" {
+        while {[set ::ALLCMD_COUNT_$group] != 0} {
+            vwait ::ALLCMD_COUNT_$group
+        }
+    }
+}
+proc all_cmd_set_gui {cmd group status} {
+    set stylePrefix [expr {$status == "disabled" ? "starting." : ""}]
+    .main.allcmd.$group.$cmd state $status
+    .main.allcmd.$group.$cmd configure -style "${stylePrefix}cmd.TButton"
+    if {$group == "all"} { # also disable group buttons
+        foreach g "$::GROUPS" {
+            .main.allcmd.$g.$cmd state $status
+        }
+    }
+}
+proc all_cmd_begin {cmd group} {
+    puts -nonewline "+ all_cmd($cmd $group) #[set ::ALLCMD_COUNT_$group]: {$::ALLCMD(list_$group)}"
+
+    # disable gui buttons
+    all_cmd_set_gui $cmd $group "disabled"
+    # ensure that other all_cmds from same $group are interrupted
     set doWait [expr [lsearch -exact [list "start" "stop"] $cmd] >= 0]
-    if {$doWait} {incr ::WAIT_COUNT 1; set ::WAIT_MODE $cmd}
-    puts " $::WAIT_COUNT"
+    if {$doWait} {
+        all_cmd_interrupt $group
+        assert {[set ::ALLCMD_COUNT_$group] == 0}
+        set ::ALLCMD_COUNT_$group 100
+        set ::ALLCMD(mode_$group) $cmd
+    }
+    puts " #[set ::ALLCMD_COUNT_$group]"
+    return $doWait
+}
+proc all_cmd_end {cmd group doWait} {
+    puts "- all_cmd($cmd $group) #[set ::ALLCMD_COUNT_$group]: {$::ALLCMD(list_$group)}"
+    if {$doWait} {all_cmd_reset $group}
+    # enable gui buttons
+    all_cmd_set_gui $cmd $group "!disabled"
+}
 
-    # GUI sugar
-    set widget .main.multi.$group.$cmd
-    if {$group == ""} {set widget .main.multi.all.$cmd}
-    $widget configure -style "starting.cmd.TButton"
-    $widget state disabled
+proc all_cmd {cmd {group "all"} {lazy 1}} {
+    set doWait [all_cmd_begin $cmd $group]
 
-    if {"$levels" == ""} {set levels $::LEVELS}
+    set levels $::LEVELS
     if {"$cmd" == "stop"} {set levels [lreverse $levels]}
     foreach {level} "$levels" {
-        # if WAIT_COUNT was set to -1 somewhere, we stop the loop
-        if {$doWait && $::WAIT_COUNT < 0} {break}
+        # if ALLCMD_COUNT was set negative, we break the loop
+        if {$doWait && [set ::ALLCMD_COUNT_$group] < 0} {break}
         level_cmd $cmd $level $group $lazy
     }
 
-    if {$doWait} {incr ::WAIT_COUNT -1}
-    puts "done all_cmd($cmd $group $lazy) WAIT_COUNT: $::WAIT_COUNT"
-
-    $widget configure -style "cmd.TButton"
-    $widget state !disabled
+    all_cmd_end $cmd $group $doWait
 }
 
-proc level_cmd { cmd level {group ""} {lazy 0} } {
-    puts -nonewline "level_cmd($cmd $level $group $lazy) WAIT_COUNT: $::WAIT_COUNT"
+proc all_cmd_add_comp {group comp} {
+    lappend ::ALLCMD(list_$group) $comp
+    incr ::ALLCMD_COUNT_$group 1
+    puts "  + $group: $comp"
+}
+# called when component's status changed
+proc all_cmd_comp_status {group comp status} {
+    if {$group == ""} return
 
+    switch -glob -- $status {
+        # this is accepted for stop:
+        *_noscreen {set cmd "stop"}
+        # this is accept for start:
+        ok_* {set cmd "start"}
+        default {set cmd "-"}
+    }
+    if {"$cmd" == "$::ALLCMD(mode_$group)"} {
+        set ::ALLCMD(list_$group) [lsearch -inline -all -not -exact $::ALLCMD(list_$group) $comp]
+        incr ::ALLCMD_COUNT_$group -1
+        puts "  - $group: $comp"
+    }
+}
+proc all_cmd_wait {group} {
+    while {[set ::ALLCMD_COUNT_$group] > 100} {
+        puts "$group pending: $::ALLCMD(list_$group)"
+        vwait ::ALLCMD_COUNT_$group
+    }
+}
+# set ALLCMD_COUNT to -1 to indicate cancelling
+proc all_cmd_cancel {group} {
+    set ::ALLCMD_COUNT_$group -1
+}
+proc level_cmd { cmd level group {lazy 0} } {
     # a start / stop command should stop a currently running process
     set doWait [expr [lsearch -exact [list "start" "stop"] $cmd] >= 0]
 
+    puts " + level_cmd($cmd $level $group $lazy) #[set ::ALLCMD_COUNT_$group]: $::ALLCMD(list_$group)"
+
     set components $::COMPONENTS
     if {"$cmd" == "stop"} {set components [lreverse $::COMPONENTS]}
-
-    set ORIG_WAIT_COUNT $::WAIT_COUNT
-    if {$doWait} {incr ::WAIT_COUNT 1}
-    puts " $::WAIT_COUNT"
-
     foreach {comp} "$components" {
         if {$::COMP_LEVEL($comp) == $level && \
-                ($group == "" || $::GROUP($comp) == $group)} {
-            switch $cmd {
+                ($group == "all" || $::GROUP($comp) == $group)} {
+            switch -exact -- $cmd {
                 check {set doIt 1}
                 stop  {set doIt [expr !$lazy || [running $comp]]}
                 start {set doIt [expr !$::NOAUTO($comp) && (!$lazy || ![running $comp])]}
             }
             if {$doIt} {
-                # indicate that there is another component we should wait for
-                if {$doWait} {incr ::WAIT_COUNT 1}
-                puts "** $cmd $comp (level: $level, doIt: $doIt) WAIT_COUNT: $::WAIT_COUNT"
-                if {$doIt} {component_cmd $comp $cmd}
+                if {$doWait} {all_cmd_add_comp $group $comp}
+                component_cmd $comp $cmd $group
             }
-            # break from loop, when manually requested (WAIT_COUNT <= -2)
-            if {$doWait && $::WAIT_COUNT < -1} {break}
+            # break from loop, when manually requested (ALLCMD_COUNT <= -2)
+            if {$doWait && [set ::ALLCMD_COUNT_$group] < -1} {break}
         }
     }
-    if {$doWait} {incr ::WAIT_COUNT -1}
 
-    # wait until WAIT_COUNT becomes original value again
-    if {$doWait} {
-        while {$::WAIT_COUNT > $ORIG_WAIT_COUNT} {
-            # wait for variable to become 0
-            vwait ::WAIT_COUNT
-        }
-    }
-    puts "done level_cmd($cmd $level $group $lazy) WAIT_COUNT: $::WAIT_COUNT"
+    if {$doWait} {all_cmd_wait $group}
+    puts " - level_cmd($cmd $level $group $lazy) #[set ::ALLCMD_COUNT_$group]: $::ALLCMD(list_$group)"
 }
 
 proc remote_xterm {host} {
@@ -667,7 +720,7 @@ proc cancel_detach_timer {comp} {
     }
 }
 
-proc component_cmd {comp cmd {fromGui 1}} {
+proc component_cmd {comp cmd {allcmd_group ""}} {
     global HOST COMPONENTS ARGS TERMINAL USEX WAIT_READY LOGGING SCREENED DETACHTIME WIDGET COMMAND EXPORTS TITLE COMPSTATUS TIMERDETACH
     set cpath "$::env(VDEMO_componentPath)"
     set component_script "$cpath/component_$COMMAND($comp)"
@@ -680,7 +733,7 @@ proc component_cmd {comp cmd {fromGui 1}} {
     }
     set VARS "$EXPORTS($comp) "
 
-    switch $cmd {
+    switch -exact -- $cmd {
         start {
             if { [$WIDGET($comp).start instate disabled] } {
                 puts "$TITLE($comp): not ready, still waiting for the process"
@@ -708,7 +761,7 @@ proc component_cmd {comp cmd {fromGui 1}} {
             set res [ssh_command "$cmd_line" "$HOST($comp)"]
 
             # handle some typical errors:
-            switch $res {
+            switch -exact -- $res {
                   0 { set msg "" }
                   2 { set msg "X connection failed on $HOST($comp).\nConsider using xhost+" }
                 126 { set msg "component_$COMMAND($comp) start: permission denied" }
@@ -734,7 +787,7 @@ proc component_cmd {comp cmd {fromGui 1}} {
             set ::LAST_GUI_INTERACTION($comp) [clock milliseconds]
             set check_time 500
             if { $WAIT_READY($comp) <= 0 } {set check_time $::CHECKNOWAIT_TIME($comp)}
-            after $check_time component_cmd $comp check 0
+            after $check_time component_cmd $comp check $allcmd_group
         }
         stop {
             if { [$WIDGET($comp).stop instate disabled] } {
@@ -751,7 +804,7 @@ proc component_cmd {comp cmd {fromGui 1}} {
             set SCREENED($comp) 0
 
             set ::LAST_GUI_INTERACTION($comp) [clock milliseconds]
-            if {$res != -1} { after 100 component_cmd $comp check 0 }
+            if {$res != -1} { after 100 component_cmd $comp check $allcmd_group }
         }
         screen {
             cancel_detach_timer $comp
@@ -821,22 +874,16 @@ proc component_cmd {comp cmd {fromGui 1}} {
                 if {$::CHECK_TIME($comp) > 0 && $onCheckResult != 0 && $screenResult == 0} {
                     if {$endtime < [clock milliseconds]} {
                         puts "$TITLE($comp) failed: timeout"
-                        # do not continue with further commands
-                        set ::WAIT_COUNT -1
+                        all_cmd_cancel $allcmd_group
                     } else {
                         # stay in starting state and retrigger check
                         set s starting
-                        after $::CHECK_TIME($comp) component_cmd $comp check $fromGui
+                        after $::CHECK_TIME($comp) component_cmd $comp check $allcmd_group
                     }
-                } elseif {!$fromGui && $::WAIT_MODE == "start"} {
-                    # process ready, decrease WAIT_COUNT
-                    incr ::WAIT_COUNT -1
                 }
             }
-            if {!$fromGui && $::WAIT_MODE == "stop" && $s == "failed_noscreen" } {
-                # process stopped, decrease WAIT_COUNT
-                incr ::WAIT_COUNT -1
-            }
+            # indicate component status to all_cmd monitor
+            all_cmd_comp_status $allcmd_group $comp $s
 
             # handle stopped component
             if {$screenResult != 0} {
@@ -844,7 +891,7 @@ proc component_cmd {comp cmd {fromGui 1}} {
             } elseif { [$WIDGET($comp).stop instate disabled] } {
                 # comp not yet stopped, retrigger check
                 set s unknown
-                after $::CHECK_TIME($comp) component_cmd $comp check $fromGui
+                after $::CHECK_TIME($comp) component_cmd $comp check $allcmd_group
             }
 
             set_status $comp $s
@@ -871,7 +918,7 @@ proc component_cmd {comp cmd {fromGui 1}} {
 proc set_status {comp status} {
     global WIDGET COMPSTATUS
     set COMPSTATUS($comp) $status
-    switch -- $status {
+    switch -exact -- $status {
         starting {set style "starting.cmd.TButton"}
         ok_screen {set style "ok.cmd.TButton"}
         ok_noscreen {set style "noscreen.ok.cmd.TButton"}
@@ -971,7 +1018,7 @@ proc ssh_check_connection {hostname {connect 1}} {
 
     # actually try to reconnect
     if { $msg != "" && (!$connect || [reconnect_host $hostname $msg] != 0) } {
-        set ::WAIT_COUNT -2
+        set ::ALLCMD_COUNT -2
         return $res
     } elseif { $msg != "" && $connect } {
         # successfully (re)established connection
@@ -1069,7 +1116,7 @@ proc connect_host {fifo host} {
     if {[string match "connected*" $res]} {
         puts " OK"
     } else { # some failure
-        switch $res {
+        switch -exact -- $res {
             124 {puts " timeout"}
              -2 {puts " aborted"}
             default {puts "error: $res"; set res -2}
@@ -1391,8 +1438,8 @@ proc gui_exit {} {
             puts "Stopping remaining components before quitting."
             set ans yes
         }
-        switch $ans {
-            yes {all_cmd stop [list $::LEVELS] "" 1}
+        switch -- $ans {
+            yes {all_cmd stop "all" 1}
             cancel {return}
         }
     }
@@ -1440,11 +1487,11 @@ proc handle_ctrl_fifo { infile } {
                 return
             } elseif {$::GROUP($c) == $comp} {
                 puts "remote cmd: ${cmd}ing group $comp"
-                all_cmd $cmd [list $::LEVELS] $comp
+                all_cmd $cmd $comp
                 return
             } elseif {$comp == "ALL"} {
                 puts "remote cmd: ${cmd}ing all components"
-                all_cmd $cmd [list $::LEVELS]
+                all_cmd $cmd
                 return
             }
         }
@@ -1477,8 +1524,6 @@ proc setup_ctrl_fifo { { filename "" } } {
 }
 
 set mypid [pid]
-set WAIT_COUNT 0
-set WAIT_MODE ""
 puts "My process id is $mypid"
 
 signal trap SIGINT finish
