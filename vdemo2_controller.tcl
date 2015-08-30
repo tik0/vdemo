@@ -266,7 +266,7 @@ proc find_component {what} {
             set comp [lindex $COMPONENTS_ON_TAB($_SEARCH(cur_tab)) $index]
             show_component $comp
             hilite_component $comp
-            .main.all.searchText configure -style TEntry
+            .main.log.row.searchText configure -style TEntry
             break
         }
         # if not found, try on next tab
@@ -278,7 +278,7 @@ proc find_component {what} {
         # reached initial tab again? -> indicate failure
         if {$_SEARCH(cur_idx) == $_SEARCH(start_idx)} {
             hilite_component ""
-            .main.all.searchText configure -style failed.TEntry
+            .main.log.row.searchText configure -style failed.TEntry
             break
         }
     }
@@ -401,6 +401,7 @@ proc gui_tcl {} {
         pack $w.$c.start -side right
         set_status $c unknown
     }
+    set LEVELS [lsort -unique "$LEVELS"]
 
     if {[llength $::TABS] > 1} {
         set tabs [list]
@@ -413,72 +414,58 @@ proc gui_tcl {} {
         set ::TABS $tabs
     }
 
+    ttk::frame .main.multi
+    pack .main.multi -side left -fill y
     # buttons to control ALL components
-    ttk::frame .main.all -style groove.TFrame
-    pack .main.all -side top -fill x
-    ttk::label .main.all.label -style TLabel -text "ALL COMPONENTS"
-    ttk::button .main.all.start -style cmd.TButton -text "start" -command "all_cmd start"
-    ttk::button .main.all.stop  -style cmd.TButton -text "stop"  -command "all_cmd stop"
-    ttk::button .main.all.check -style cmd.TButton -text "check" -command "all_cmd check"
-    pack .main.all.label .main.all.start .main.all.stop .main.all.check -side left
+    ttk::frame .main.multi.all -style groove.TFrame
+    pack .main.multi.all -side top -fill x
+    ttk::label .main.multi.all.label -style TLabel -text "ALL COMPONENTS"
+    ttk::button .main.multi.all.start -style cmd.TButton -text "start" -command "all_cmd start"
+    ttk::button .main.multi.all.stop  -style cmd.TButton -text "stop"  -command "all_cmd stop"
+    ttk::button .main.multi.all.check -style cmd.TButton -text "check" -command "all_cmd check"
+    pack .main.multi.all.label -side left -fill x
+    pack .main.multi.all.check .main.multi.all.stop .main.multi.all.start -side right
+
+    # buttons for group control:
+    set groups [lsort -unique "$groups"]
+    foreach {g} "$groups" {
+        ttk::frame .main.multi.$g -style groove.TFrame
+        pack .main.multi.$g -side top -fill x
+        ttk::label .main.multi.$g.label  -style group.TLabel -text "$g" -width 10 -anchor e
+        ttk::button .main.multi.$g.start -style cmd.TButton -text "start" -command "all_cmd start {} $g"
+        ttk::button .main.multi.$g.stop  -style cmd.TButton -text "stop"  -command "all_cmd stop  {} $g"
+        ttk::button .main.multi.$g.check -style cmd.TButton -text "check" -command "all_cmd check {} $g"
+        ttk::checkbutton .main.multi.$g.noauto -text "no auto" -command "set_group_noauto $g" -variable GNOAUTO($g) -onvalue 1 -offvalue 0
+
+        pack .main.multi.$g.label -side left -padx 2
+        pack .main.multi.$g.start -side left
+        pack .main.multi.$g.stop -side left
+        pack .main.multi.$g.check -side left
+        pack .main.multi.$g.noauto -side left
+    }
+
+    ttk::frame .main.log
+    pack .main.log -side left
+    ttk::frame .main.log.row
+    pack .main.log.row -side top -fill x
+    # search widgets
+    ttk::button .main.log.row.searchBtn -style cmd.TButton -text "search" -command {find_component $SEARCH_STRING}
+    ttk::entry  .main.log.row.searchText -textvariable SEARCH_STRING
+    bind .main.log.row.searchText <Return> {find_component $SEARCH_STRING}
 
     # clear logger button
-    ttk::button .main.all.clearLogger -text "clear logger" -command "clearLogger"
-    pack .main.all.clearLogger -side right -ipadx 15
-
-    # search widgets
-    ttk::entry  .main.all.searchText -textvariable SEARCH_STRING
-    bind .main.all.searchText <Return> {find_component $SEARCH_STRING}
-    ttk::button .main.all.searchBtn -style cmd.TButton -text "search" -command {find_component $SEARCH_STRING}
-    pack .main.all.searchText .main.all.searchBtn -side right -ipadx 15
-
-    ttk::frame .main.group
-    pack .main.group -side top -fill x
-    # button for level control:
-    set LEVELS [lsort -unique "$LEVELS"]
-    ttk::frame .main.group.level
-    pack .main.group.level -side left -fill both
-    foreach {l} "$LEVELS" {
-        ttk::frame .main.group.level.$l -style groove.TFrame
-        pack .main.group.level.$l -side top -fill x
-
-        ttk::label .main.group.level.$l.label  -text "$l"
-        ttk::button .main.group.level.$l.start -style cmd.TButton -text "start" -command "level_cmd start $l"
-        ttk::button .main.group.level.$l.stop  -style cmd.TButton -text "stop"  -command "level_cmd stop  $l"
-        ttk::button .main.group.level.$l.check -style cmd.TButton -text "check" -command "level_cmd check $l"
-        pack .main.group.level.$l.label -side left -padx 5 -fill x
-        pack .main.group.level.$l.start -side left
-        pack .main.group.level.$l.stop  -side left
-        pack .main.group.level.$l.check -side left
-    }
-    # button for group control:
-    set groups [lsort -unique "$groups"]
-    ttk::frame .main.group.named
-    pack .main.group.named -side left -fill both
-    foreach {g} "$groups" {
-        ttk::frame .main.group.named.$g -style groove.TFrame
-        pack .main.group.named.$g -side top -fill x
-        ttk::label .main.group.named.$g.label  -style group.TLabel -text "$g" -width 10 -anchor e
-        ttk::button .main.group.named.$g.start -style cmd.TButton -text "start" -command "all_cmd start {} $g"
-        ttk::button .main.group.named.$g.stop  -style cmd.TButton -text "stop"  -command "all_cmd stop  {} $g"
-        ttk::button .main.group.named.$g.check -style cmd.TButton -text "check" -command "all_cmd check {} $g"
-        ttk::checkbutton .main.group.named.$g.noauto -text "no auto" -command "set_group_noauto $g" -variable GNOAUTO($g) -onvalue 1 -offvalue 0
-
-        pack .main.group.named.$g.label -side left -padx 2
-        pack .main.group.named.$g.start -side left
-        pack .main.group.named.$g.stop -side left
-        pack .main.group.named.$g.check -side left
-        pack .main.group.named.$g.noauto -side left
-    }
+    ttk::button .main.log.row.clearLogger -text "clear logger" -command "clearLogger"
+    pack .main.log.row.searchText -side left -fill x -expand 1
+    pack .main.log.row.searchBtn -side left -ipadx 15
+    pack .main.log.row.clearLogger -side left -ipadx 10
 
     # LOGGER area (WATCHFILE)
-    ttk::frame .main.group.log
-    text .main.group.log.text -yscrollcommand ".main.group.log.sb set" -height 8
+    text .main.log.text -yscrollcommand ".main.log.sb set" -height 8
 
-    ttk::scrollbar .main.group.log.sb -command ".main.group.log.text yview"
-    pack .main.group.log -side left -fill both -expand 1
-    pack .main.group.log.text -side left -fill both -expand 1
-    pack .main.group.log.sb -side right -fill y
+    ttk::scrollbar .main.log.sb -command ".main.log.text yview"
+    pack .main.log -side left -fill both -expand 1
+    pack .main.log.text -side left -fill both -expand 1
+    pack .main.log.sb -side right -fill y
     if {"$WATCHFILE" != ""} {
         init_logger "$WATCHFILE"
     }
@@ -543,8 +530,8 @@ proc gui_update_host {host status {forceCreate 0}} {
 }
 
 proc clearLogger {} {
-    .main.group.log.text delete 1.0 end
-    exec echo -n "" >> "$::WATCHFILE"
+    .main.log.text delete 1.0 end
+    if {$::WATCHFILE != ""} {exec echo -n "" >> "$::WATCHFILE"}
 }
 
 proc init_logger {filename} {
@@ -560,8 +547,8 @@ proc init_logger {filename} {
 
 proc insertLog {infile} {
     if { [gets $infile line] >= 0 } {
-        .main.group.log.text insert end "$line\n"  ;# Add a newline too
-        .main.group.log.text yview moveto 1
+        .main.log.text insert end "$line\n"  ;# Add a newline too
+        .main.log.text yview moveto 1
     } else {
         # Close the pipe - otherwise we will loop endlessly
         close $infile
@@ -595,8 +582,8 @@ proc all_cmd {cmd {levels {}} {group ""} {lazy 1}} {
     puts " $::WAIT_COUNT"
 
     # GUI sugar
-    set widget .main.group.named.$group.$cmd
-    if {$group == ""} {set widget .main.all.$cmd}
+    set widget .main.multi.$group.$cmd
+    if {$group == ""} {set widget .main.multi.all.$cmd}
     $widget configure -style "starting.cmd.TButton"
 
     if {"$levels" == ""} {set levels $::LEVELS}
