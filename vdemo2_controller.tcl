@@ -584,11 +584,11 @@ proc all_cmd_reset {group} {
 }
 proc all_cmd_interrupt {groups} {
     # interrupt all groups?
-    if {$groups == "all"} {set groups "all $::GROUPS"}
+    if {$groups == "all"} {set groups "$::GROUPS"}
 
     set ret 0
     # set manual interrupt flag: -2
-    foreach group "$groups" {
+    foreach group "all $groups" {
         if {[set ::ALLCMD_INTR_$group] != 0} {
             puts "! interrupt $group ($::ALLCMD(mode_$group) #[set ::ALLCMD_COUNT_$group])"
             set ::ALLCMD_INTR_$group -2
