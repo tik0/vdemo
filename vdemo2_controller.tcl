@@ -683,12 +683,14 @@ proc all_cmd_add_comp {group comp} {
     lappend ::ALLCMD(list_$group) $comp
     puts "  + $::COMP_LEVEL($comp) $group: $comp"
 }
+proc all_cmd_comp_started {status} { return [string match "ok_*" $status] }
+proc all_cmd_comp_stopped {status} { return [string match "*_noscreen" $status] }
 # called when component's status changed
-proc all_cmd_comp_status {group comp status} {
+proc all_cmd_comp_set_status {group comp status} {
     if {$group == ""} return
 
-    set started [string match "ok_*" $status]
-    set stopped [string match "*_noscreen" $status]
+    set started [all_cmd_comp_started $status]
+    set stopped [all_cmd_comp_stopped $status]
     switch -exact -- $::ALLCMD(mode_$group) {
         start {
             if {!$started} {
@@ -740,8 +742,8 @@ proc level_cmd { cmd level group {lazy 0} } {
                 ($group == "all" || $::GROUP($comp) == $group)} {
             switch -exact -- $cmd {
                 check {set doIt 1}
-                stop  {set doIt [expr !$lazy || [running $comp]]}
-                start {set doIt [expr !$::NOAUTO($comp) && (!$lazy || ![running $comp])]}
+                stop  {set doIt [expr  !$lazy || ![all_cmd_comp_stopped $::COMPSTATUS($comp)]]}
+                start {set doIt [expr (!$lazy || ![all_cmd_comp_started $::COMPSTATUS($comp)]) && !$::NOAUTO($comp)]}
             }
             if {$doIt} {
                 if {$doWait} {all_cmd_add_comp $group $comp}
@@ -979,7 +981,7 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
                 set SCREENED($comp) 0
             }
             # indicate component status to all_cmd monitor
-            all_cmd_comp_status $allcmd_group $comp $s
+            all_cmd_comp_set_status $allcmd_group $comp $s
         }
         inspect {
             set cmd_line "$VARS $component_script $component_options inspect"
