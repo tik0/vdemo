@@ -610,14 +610,17 @@ proc all_cmd_interrupt {groups} {
     }
     return $ret
 }
-proc all_cmd_set_gui {cmd group status style} {
-    .main.allcmd.$group.$cmd state $status
-    .main.allcmd.$group.$cmd configure -style $style
+proc all_cmd_update_gui {cmd group status style} {
     if {$group == "all"} { # also disable group buttons
         foreach g "$::GROUPS" {
             .main.allcmd.$g.$cmd state $status
+            # reset style of all start buttons
+            .main.allcmd.$g.start configure -style "cmd.TButton"
         }
     }
+    .main.allcmd.$group.start configure -style "cmd.TButton"
+    .main.allcmd.$group.$cmd state $status
+    .main.allcmd.$group.$cmd configure -style $style
 }
 
 set ::ALLCMD(pending) [list]
@@ -639,7 +642,7 @@ proc all_cmd_next_pending {} {
 proc all_cmd {cmd {group "all"} {lazy 1}} {
     ### preparation
     # disable gui buttons
-    all_cmd_set_gui $cmd $group "disabled" "starting.cmd.TButton"
+    all_cmd_update_gui $cmd $group "disabled" "starting.cmd.TButton"
     # ensure that other all_cmds from same $group are interrupted
     set doWait [expr [lsearch -exact [list "start" "stop"] $cmd] >= 0]
     if {$doWait} {
@@ -666,7 +669,7 @@ proc all_cmd {cmd {group "all"} {lazy 1}} {
     ### cleanup
     # enable gui buttons
     set stylePrefix [expr {$::ALLCMD(intr_$group) == -1 ? "failed." : ""}]
-    all_cmd_set_gui $cmd $group "!disabled" "${stylePrefix}cmd.TButton"
+    all_cmd_update_gui $cmd $group "!disabled" "${stylePrefix}cmd.TButton"
     if {$doWait} {
         puts "- all_cmd($cmd $group) : {$::ALLCMD(list_$group)}"
         all_cmd_reset $group
