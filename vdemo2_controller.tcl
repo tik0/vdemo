@@ -801,12 +801,13 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
             # handle some typical errors:
             switch -exact -- $res {
                   0 { set msg "" }
-                  1 { set msg "invalid vdemo configuration. \nCheck VDEMO_root, component args, etc." }
-
-                  2 { set msg "X connection failed on $HOST($comp).\nConsider using xhost+" }
-                  3 { set msg "function 'component' not declared in component script" }
-                  4 { set msg "component already running" }
+                  2 { set msg "syntax error in component script" }
+                  3 { set msg "invalid vdemo configuration. \nCheck VDEMO_root, component args, etc." }
+                 10 { set msg "component already running" }
+                 11 { set msg "function 'component' not declared in component script" }
+                 12 { set msg "X connection failed on $HOST($comp).\nConsider using xhost+" }
                 126 { set msg "component_$COMMAND($comp) start: permission denied" }
+                127 { set msg "command not found" }
                 default { set msg "component_$COMMAND($comp) start: unknown error $res" }
             }
             if {$msg != ""} {

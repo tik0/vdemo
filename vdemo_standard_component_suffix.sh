@@ -52,7 +52,7 @@ while [ $# -gt 0 ]; do
 	-*)
 	    echo "illegal option '$1'" >& 2
 	    echo "$HELP" >& 2
-	    exit 1
+	    exit 3
 	    ;;
 	*)
 	    break
@@ -64,13 +64,13 @@ done
 # obligatory arguments check
 if [ $# -lt 1 ]; then
     echo "obligatory argument(s) missing. $HELP" >&2
-    exit 1
+    exit 3
 fi
 
 # This MUST be the absolut path to the used vdemo scripts (this script)
 if [ -z "$VDEMO_root" ]; then
     echo '$VDEMO_root is not set. Set it to absolut path of the used vdemo installation' >&2
-    exit 1
+    exit 3
 fi
 
 if [ -z "$VDEMO_logfile_prefix" ]; then
@@ -79,7 +79,7 @@ fi
 
 if ! declare -F "component" >/dev/null; then
 	echo 'function "component" is not declared or declared as variable'
-	exit 3
+	exit 11
 fi
 
 # run the
@@ -104,7 +104,7 @@ case "$1" in
     start)
 	if vdemo_check_component $title; then
 	    echo "$title already running">&2
-		exit 4
+		exit 10
 	fi
 
 	call_if_exists clean_component
@@ -112,7 +112,7 @@ case "$1" in
 
 	if [ "${vdemo_start_XSERVER}" ]; then
 	    comp_display=$(start_Xserver)
-		 if [ $? == 2 ]; then exit 2; fi
+		 if [ $? == 2 ]; then exit 12; fi
 	    echo "DISPLAY: $comp_display" >&2
 	    vdemo_start_component -n $title $vdemo_start_LOGGING $vdemo_start_DETACHED -d $comp_display
 	else
@@ -177,6 +177,6 @@ case "$1" in
 	;;
     *)
 	echo "wrong argument. $HELP" >&2
-	exit 1
+	exit 3
 	;;
 esac
