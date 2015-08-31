@@ -97,7 +97,7 @@ proc parse_options {comp} {
     set NEWARGS [list]
     set USEX($comp) 0
     # time to wait for a process to startup
-    set WAIT_READY($comp) 0
+    set WAIT_READY($comp) 5000
     # time until process is checked after start (when not waiting)
     set CHECKNOWAIT_TIME($comp) 1000
     set GROUP($comp) ""
@@ -689,8 +689,7 @@ proc all_cmd_comp_status {group comp status} {
     }
 }
 proc all_cmd_wait {group} {
-    # TODO: only wait as long as INTR was not set?
-    while {[set ::ALLCMD_COUNT_$group] > 0} {
+    while {[set ::ALLCMD_COUNT_$group] > 0 && [set ::ALLCMD_INTR_$group] > 0} {
         vwait ::ALLCMD_COUNT_$group
     }
 }
@@ -715,7 +714,10 @@ proc level_cmd { cmd level group {lazy 0} } {
             }
             if {$doIt} {
                 if {$doWait} {all_cmd_add_comp $group $comp}
-                component_cmd $comp $cmd $group
+                set res [component_cmd $comp $cmd $group]
+                if {$doWait && $res != 0} { # component_cmd failed
+                    all_cmd_cancel $group
+                }
             }
             # break from loop, when manually requested (ALLCMD_INTR <= -2)
             if {$doWait && [set ::ALLCMD_INTR_$group] < -1} {break}
@@ -764,7 +766,7 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
         start {
             if { [$WIDGET($comp).start instate disabled] } {
                 puts "$TITLE($comp): not ready, still waiting for the process"
-                return
+                return 1
             }
             $WIDGET($comp).start state disabled
 
@@ -772,7 +774,7 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
             if {$res == -1} {
                 puts "no master connection to $HOST($comp)"
                 $WIDGET($comp).start state !disabled
-                return
+                return 1
             } elseif {$res == 0} {
                 dputs "$TITLE($comp): already running, stopping first..."
                 component_cmd $comp stopwait
@@ -806,7 +808,7 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
                 }
                 set_status $comp failed_noscreen
                 $WIDGET($comp).start state !disabled
-                return
+                return 1
             }
 
             set SCREENED($comp) 1
@@ -824,7 +826,7 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
         stop {
             if { [$WIDGET($comp).stop instate disabled] } {
                 dputs "$TITLE($comp): already stopping"
-                return
+                return 1
             }
             # Hm. For some reason, we shouldn't do this for stopwait (called from start)
             if {$cmd != "stopwait"} {
@@ -870,7 +872,7 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
             if { [$WIDGET($comp).check instate disabled] } {
                 dputs "$TITLE($comp): already checking"
                 if {$allcmd_group != ""} {after 100 component_cmd $comp check $allcmd_group}
-                return
+                return 0
             }
             $WIDGET($comp).check state disabled
             set_status $comp unknown
@@ -884,14 +886,14 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
                 puts "internal error: result is not an integer: '$res'"
                 $WIDGET($comp).start state !disabled
                 if {$allcmd_group != ""} {after 100 component_cmd $comp check $allcmd_group}
-                return
+                return 0
             }
 
             if {$res == -1} {
                 dputs "no master connection to $HOST($comp)";
                 all_cmd_cancel $allcmd_group
                 $WIDGET($comp).start state !disabled
-                return
+                return 0
             }
 
             set noscreen 0
@@ -952,6 +954,7 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
         }
     }
     update
+    return 0
 }
 
 proc set_status {comp status} {
