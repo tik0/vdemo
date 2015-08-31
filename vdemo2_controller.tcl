@@ -60,13 +60,13 @@ proc assert condition {
         return -code error "assertion failed: $condition"
     }
 }
-proc printBackTrace {} {
-    set backTrace {}
+proc backtrace {} {
+    set bt {}
     set startLevel [expr {[info level] - 2}]
     for {set level 1} {$level <= $startLevel} {incr level} {
-        lappend backTrace [lindex [info level $level] 0]
+        lappend bt [lindex [info level $level] 0]
     }
-    puts stderr "   backtrace: [join $backTrace { => }]"
+    return [join $bt { => }]
 }
 
 # set some default values from environment variables
@@ -608,6 +608,7 @@ proc all_cmd_interrupt {groups} {
             set ret 1
         }
     }
+    if {$ret == 1} {all_cmd_signal}
     return $ret
 }
 proc all_cmd_update_gui {cmd group status style} {
@@ -686,26 +687,43 @@ proc all_cmd_add_comp {group comp} {
 proc all_cmd_comp_status {group comp status} {
     if {$group == ""} return
 
+    set started [string match "ok_*" $status]
+    set stopped [string match "*_noscreen" $status]
     switch -exact -- $::ALLCMD(mode_$group) {
-        start {if {![string match "ok_*" $status]} {return}}
-        stop  {if {![string match "*_noscreen" $status]} {return}}
+        start {
+            if {!$started} {
+                # if component is not in starting mode anymore, it failed -> cancel
+                if {![$::WIDGET($comp).start instate disabled]} { all_cmd_cancel $group $comp}
+                # otherwise, it simply isn't ready yet
+                return
+            }
+        }
+        stop  {
+            # if component isn't stopped yet, simply be patient...
+            if {!$stopped } { return }
+        }
         default {return}
     }
     puts "  - $::COMP_LEVEL($comp) $group: $comp"
     set ::ALLCMD(list_$group) [lsearch -inline -all -not -exact $::ALLCMD(list_$group) $comp]
     all_cmd_signal
 }
-# wait until all components from this group are finished (or we got an interrupt)
+# wait until all components from this group (at specific level) are finished
 proc all_cmd_wait {group} {
-    while {[llength $::ALLCMD(list_$group)] > 0 && $::ALLCMD(intr_$group) > 0} {
+    # do not break from loop on interrupt!
+    # Otherwise components might be in an intermediate state
+    while {[llength $::ALLCMD(list_$group)] > 0} {
         puts "$group pending: $::ALLCMD(list_$group)"
         vwait ::ALLCMD_COND
     }
 }
 # set ALLCMD_INTR to -1 to indicate cancelling
-proc all_cmd_cancel {group} {
+proc all_cmd_cancel {group comp} {
     if {$group == "" || $::ALLCMD(mode_$group) == ""} return
     puts "  ! cancel $group: intr:$::ALLCMD(intr_$group) {$::ALLCMD(list_$group)}"
+    # remove comp from list ...
+    set ::ALLCMD(list_$group) [lsearch -inline -all -not -exact $::ALLCMD(list_$group) $comp]
+    # ... and indicate interrupt
     if {$::ALLCMD(intr_$group) > -1} {set ::ALLCMD(intr_$group) -1}
     all_cmd_signal
 }
@@ -729,7 +747,7 @@ proc level_cmd { cmd level group {lazy 0} } {
                 if {$doWait} {all_cmd_add_comp $group $comp}
                 set res [component_cmd $comp $cmd $group]
                 if {$doWait && $res != 0} { # component_cmd failed
-                    all_cmd_cancel $group
+                    all_cmd_cancel $group $comp
                 }
             }
             # break from loop, when manually requested (ALLCMD_INTR == -2)
@@ -907,7 +925,7 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
 
             if {$res == -1} {
                 dputs "no master connection to $HOST($comp)";
-                all_cmd_cancel $allcmd_group
+                all_cmd_cancel $allcmd_group $comp
                 $WIDGET($comp).start state !disabled
                 return 0
             }
@@ -931,7 +949,6 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
                 if {$onCheckResult != 0 && $screenResult == 0} {
                     if {$endtime < [clock milliseconds]} {
                         puts "$TITLE($comp) failed: timeout"
-                        all_cmd_cancel $allcmd_group
                     } else {
                         # stay in starting state and retrigger check
                         set s starting
@@ -939,8 +956,6 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
                     }
                 }
             }
-            # indicate component status to all_cmd monitor
-            all_cmd_comp_status $allcmd_group $comp $s
 
             # handle stopped component
             if {$screenResult != 0} {
@@ -963,6 +978,8 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
                 cancel_detach_timer $comp
                 set SCREENED($comp) 0
             }
+            # indicate component status to all_cmd monitor
+            all_cmd_comp_status $allcmd_group $comp $s
         }
         inspect {
             set cmd_line "$VARS $component_script $component_options inspect"

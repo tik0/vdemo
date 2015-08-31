@@ -35,27 +35,17 @@ proc doIt {group} {
     $group state !disabled
 }
 
-# event-handling sleep, see http://www2.tcl.tk/933
-proc uniqkey { } {
-    set key   [ expr { pow(2,31) + [ clock clicks ] } ]
-    set key   [ string range $key end-8 end-3 ]
-    set key   [ clock seconds ]$key
-    return $key
-}
-proc sleep { ms } {
-    set uniq [ uniqkey ]
-    set ::__sleep__tmp__$uniq 0
-    after $ms set ::__sleep__tmp__$uniq 1
-    vwait ::__sleep__tmp__$uniq
-    unset ::__sleep__tmp__$uniq
-}
-proc wait {time} {
-    sleep [expr $time*1000]
-    puts "timer for $time done"
+set foo 0
+proc wait {arg} {
+    while {$::foo < 20} {
+        after 1000 incr ::foo 1
+        vwait ::foo
+        puts "start: $arg  foo: $::foo"
+    }
+    puts "done: start: $arg  foo: $::foo"
 }
 
 pack [ttk::button .a -text "A" -command "doIt .a"]
 pack [ttk::button .b -text "B" -command "doIt .b"]
 
-pack [ttk::button .c -text "2s" -command "wait 2"]
-pack [ttk::button .d -text "5s" -command "wait 5"]
+pack [ttk::button .c -text "wait" -command {wait [expr ([clock milliseconds] / 100) % 1000]}]
