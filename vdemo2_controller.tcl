@@ -97,7 +97,7 @@ proc parse_options {comp} {
     set NEWARGS [list]
     set USEX($comp) 0
     # time to wait for a process to startup
-    set WAIT_READY($comp) 0
+    set WAIT_READY($comp) 5000
     # time until process is checked after start (when not waiting)
     set CHECKNOWAIT_TIME($comp) 1000
     set GROUP($comp) ""
