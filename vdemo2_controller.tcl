@@ -60,13 +60,13 @@ proc assert condition {
         return -code error "assertion failed: $condition"
     }
 }
-proc printBackTrace {} {
-    set backTrace {}
+proc backtrace {} {
+    set bt {}
     set startLevel [expr {[info level] - 2}]
     for {set level 1} {$level <= $startLevel} {incr level} {
-        lappend backTrace [lindex [info level $level] 0]
+        lappend bt [lindex [info level $level] 0]
     }
-    puts stderr "   backtrace: [join $backTrace { => }]"
+    return [join $bt { => }]
 }
 
 # set some default values from environment variables
@@ -576,19 +576,24 @@ proc insertLog {infile} {
 # However, within a group (ALL serves as a group as well), either start or stop can run,
 # and the components of *different level* should be started / stopped sequentially.
 #
-# We achieve that behavior, by counting the number of started components
-# (in ::ALLCMD_COUNT_$group), and storing the start/stop mode (in ::ALLCMD(mode_$group))
-# as well as a list of pending components (in ::ALLCMD(list_$group)).
-# If a running command should be canceled, we use ::ALLCMD_INTR_$group:
+# We achieve that behavior, by monitoring a list of started components (in ::ALLCMD(list_$group))
+# and storing the start/stop mode (in ::ALLCMD(mode_$group)).
+# If a running command should be canceled, we use ::ALLCMD(intr_$group):
 # -1: process failed -> stop further launching at next level
 # -2: manual interrupt request -> immediately stop launching
 #  0: all_cmd() finished / nothing pending
 #  1: all_cmd() is pending
+# The variable ::ALLCMD_COND is used as a condition (in vwait)
+# to listen to changes in the above varirables.
+set ::ALLCMD_COND 0
 proc all_cmd_reset {group} {
     set ::ALLCMD(list_$group) [list]
     set ::ALLCMD(mode_$group) ""
-    set ::ALLCMD_COUNT_$group 0
-    set ::ALLCMD_INTR_$group  0
+    set ::ALLCMD(intr_$group) 0
+}
+proc all_cmd_signal {} {
+    # vwait simply listens to changes in a variable -> change something
+    set ::ALLCMD_COND [expr ($::ALLCMD_COND+1) % 10]
 }
 proc all_cmd_interrupt {groups} {
     # interrupt all groups?
@@ -597,22 +602,25 @@ proc all_cmd_interrupt {groups} {
     set ret 0
     # set manual interrupt flag: -2
     foreach group "all $groups" {
-        if {[set ::ALLCMD_INTR_$group] != 0} {
-            set ::ALLCMD_INTR_$group -2
+        if {$::ALLCMD(intr_$group) != 0} {
+            set ::ALLCMD(intr_$group) -2
             set ret 1
         }
     }
+    if {$ret == 1} {all_cmd_signal}
     return $ret
 }
-proc all_cmd_set_gui {cmd group status} {
-    set stylePrefix [expr {$status == "disabled" ? "starting." : ""}]
-    .main.allcmd.$group.$cmd state $status
-    .main.allcmd.$group.$cmd configure -style "${stylePrefix}cmd.TButton"
+proc all_cmd_update_gui {cmd group status style} {
     if {$group == "all"} { # also disable group buttons
         foreach g "$::GROUPS" {
             .main.allcmd.$g.$cmd state $status
+            # reset style of all start buttons
+            .main.allcmd.$g.start configure -style "cmd.TButton"
         }
     }
+    .main.allcmd.$group.start configure -style "cmd.TButton"
+    .main.allcmd.$group.$cmd state $status
+    .main.allcmd.$group.$cmd configure -style $style
 }
 
 set ::ALLCMD(pending) [list]
@@ -634,18 +642,17 @@ proc all_cmd_next_pending {} {
 proc all_cmd {cmd {group "all"} {lazy 1}} {
     ### preparation
     # disable gui buttons
-    all_cmd_set_gui $cmd $group "disabled"
+    all_cmd_update_gui $cmd $group "disabled" "starting.cmd.TButton"
     # ensure that other all_cmds from same $group are interrupted
     set doWait [expr [lsearch -exact [list "start" "stop"] $cmd] >= 0]
     if {$doWait} {
         if {[all_cmd_interrupt $group]} {
-            # there is a pending all_cmd() call, postpone this new one
+            # there is an active, conflicting all_cmd() call, postpone this new one
             lappend ::ALLCMD(pending) "all_cmd $cmd $group $lazy"
             return
         }
-        # cmd accepted, clean pending var
-        set ::ALLCMD(pending) ""
-        set ::ALLCMD_INTR_$group  1
+        # cmd accepted
+        set ::ALLCMD(intr_$group) 1
         set ::ALLCMD(mode_$group) $cmd
     }
 
@@ -654,13 +661,14 @@ proc all_cmd {cmd {group "all"} {lazy 1}} {
     if {"$cmd" == "stop"} {set levels [lreverse $levels]}
     foreach {level} "$levels" {
         # if ALLCMD_INTR was set negative, we break the loop
-        if {$doWait && [set ::ALLCMD_INTR_$group] < 0} {break}
+        if {$::ALLCMD(intr_$group) < 0} {break}
         level_cmd $cmd $level $group $lazy
     }
 
     ### cleanup
     # enable gui buttons
-    all_cmd_set_gui $cmd $group "!disabled"
+    set stylePrefix [expr {$::ALLCMD(intr_$group) == -1 ? "failed." : ""}]
+    all_cmd_update_gui $cmd $group "!disabled" "${stylePrefix}cmd.TButton"
     if {$doWait} {
         all_cmd_reset $group
         # if there is a pending all_cmd, now we can execute it
@@ -670,33 +678,49 @@ proc all_cmd {cmd {group "all"} {lazy 1}} {
 
 proc all_cmd_add_comp {group comp} {
     lappend ::ALLCMD(list_$group) $comp
-    incr ::ALLCMD_COUNT_$group 1
 }
+proc all_cmd_comp_started {status} { return [string match "ok_*" $status] }
+proc all_cmd_comp_stopped {status} { return [string match "*_noscreen" $status] }
 # called when component's status changed
-proc all_cmd_comp_status {group comp status} {
+proc all_cmd_comp_set_status {group comp status} {
     if {$group == ""} return
 
-    switch -glob -- $status {
-        # this is accepted for stop:
-        *_noscreen {set cmd "stop"}
-        # this is accept for start:
-        ok_* {set cmd "start"}
-        default {set cmd "-"}
+    set started [all_cmd_comp_started $status]
+    set stopped [all_cmd_comp_stopped $status]
+    switch -exact -- $::ALLCMD(mode_$group) {
+        start {
+            if {!$started} {
+                # if component is not in starting mode anymore, it failed -> cancel
+                if {![$::WIDGET($comp).start instate disabled]} { all_cmd_cancel $group $comp}
+                # otherwise, it simply isn't ready yet
+                return
+            }
+        }
+        stop  {
+            # if component isn't stopped yet, simply be patient...
+            if {!$stopped } { return }
+        }
+        default {return}
     }
-    if {$cmd == $::ALLCMD(mode_$group)} {
-        set ::ALLCMD(list_$group) [lsearch -inline -all -not -exact $::ALLCMD(list_$group) $comp]
-        incr ::ALLCMD_COUNT_$group -1
-    }
+    set ::ALLCMD(list_$group) [lsearch -inline -all -not -exact $::ALLCMD(list_$group) $comp]
+    all_cmd_signal
 }
+# wait until all components from this group (at specific level) are finished
 proc all_cmd_wait {group} {
-    while {[set ::ALLCMD_COUNT_$group] > 0 && [set ::ALLCMD_INTR_$group] > 0} {
-        vwait ::ALLCMD_COUNT_$group
+    # do not break from loop on interrupt!
+    # Otherwise components might be in an intermediate state
+    while {[llength $::ALLCMD(list_$group)] > 0} {
+        vwait ::ALLCMD_COND
     }
 }
 # set ALLCMD_INTR to -1 to indicate cancelling
-proc all_cmd_cancel {group} {
+proc all_cmd_cancel {group comp} {
     if {$group == "" || $::ALLCMD(mode_$group) == ""} return
-    set ::ALLCMD_INTR_$group -1
+    # remove comp from list ...
+    set ::ALLCMD(list_$group) [lsearch -inline -all -not -exact $::ALLCMD(list_$group) $comp]
+    # ... and indicate interrupt
+    if {$::ALLCMD(intr_$group) > -1} {set ::ALLCMD(intr_$group) -1}
+    all_cmd_signal
 }
 proc level_cmd { cmd level group {lazy 0} } {
     # a start / stop command should stop a currently running process
@@ -709,18 +733,18 @@ proc level_cmd { cmd level group {lazy 0} } {
                 ($group == "all" || $::GROUP($comp) == $group)} {
             switch -exact -- $cmd {
                 check {set doIt 1}
-                stop  {set doIt [expr !$lazy || [running $comp]]}
-                start {set doIt [expr !$::NOAUTO($comp) && (!$lazy || ![running $comp])]}
+                stop  {set doIt [expr  !$lazy || ![all_cmd_comp_stopped $::COMPSTATUS($comp)]]}
+                start {set doIt [expr (!$lazy || ![all_cmd_comp_started $::COMPSTATUS($comp)]) && !$::NOAUTO($comp)]}
             }
             if {$doIt} {
                 if {$doWait} {all_cmd_add_comp $group $comp}
                 set res [component_cmd $comp $cmd $group]
                 if {$doWait && $res != 0} { # component_cmd failed
-                    all_cmd_cancel $group
+                    all_cmd_cancel $group $comp
                 }
             }
-            # break from loop, when manually requested (ALLCMD_INTR <= -2)
-            if {$doWait && [set ::ALLCMD_INTR_$group] < -1} {break}
+            # break from loop, when manually requested (ALLCMD_INTR == -2)
+            if {$doWait && $::ALLCMD(intr_$group) == -2} {break}
         }
     }
 
@@ -792,12 +816,13 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
             # handle some typical errors:
             switch -exact -- $res {
                   0 { set msg "" }
-                  1 { set msg "invalid vdemo configuration. \nCheck VDEMO_root, component args, etc." }
-
-                  2 { set msg "X connection failed on $HOST($comp).\nConsider using xhost+" }
-                  3 { set msg "function 'component' not declared in component script" }
-                  4 { set msg "component already running" }
+                  2 { set msg "syntax error in component script" }
+                  3 { set msg "invalid vdemo configuration. \nCheck VDEMO_root, component args, etc." }
+                 10 { set msg "component already running" }
+                 11 { set msg "function 'component' not declared in component script" }
+                 12 { set msg "X connection failed on $HOST($comp).\nConsider using xhost+" }
                 126 { set msg "component_$COMMAND($comp) start: permission denied" }
+                127 { set msg "command not found" }
                 default { set msg "component_$COMMAND($comp) start: unknown error $res" }
             }
             if {$msg != ""} {
@@ -891,7 +916,7 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
 
             if {$res == -1} {
                 dputs "no master connection to $HOST($comp)";
-                all_cmd_cancel $allcmd_group
+                all_cmd_cancel $allcmd_group $comp
                 $WIDGET($comp).start state !disabled
                 return 0
             }
@@ -915,7 +940,6 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
                 if {$onCheckResult != 0 && $screenResult == 0} {
                     if {$endtime < [clock milliseconds]} {
                         puts "$TITLE($comp) failed: timeout"
-                        all_cmd_cancel $allcmd_group
                     } else {
                         # stay in starting state and retrigger check
                         set s starting
@@ -923,8 +947,6 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
                     }
                 }
             }
-            # indicate component status to all_cmd monitor
-            all_cmd_comp_status $allcmd_group $comp $s
 
             # handle stopped component
             if {$screenResult != 0} {
@@ -947,6 +969,8 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
                 cancel_detach_timer $comp
                 set SCREENED($comp) 0
             }
+            # indicate component status to all_cmd monitor
+            all_cmd_comp_set_status $allcmd_group $comp $s
         }
         inspect {
             set cmd_line "$VARS $component_script $component_options inspect"
@@ -1489,22 +1513,6 @@ proc gui_exit {} {
 
 wm protocol . WM_DELETE_WINDOW {
     gui_exit
-}
-
-# event-handling sleep, see http://www2.tcl.tk/933
-proc uniqkey { } {
-    set key   [ expr { pow(2,31) + [ clock clicks ] } ]
-    set key   [ string range $key end-8 end-3 ]
-    set key   [ clock seconds ]$key
-    return $key
-}
-
-proc sleep { ms } {
-    set uniq [ uniqkey ]
-    set ::__sleep__tmp__$uniq 0
-    after $ms set ::__sleep__tmp__$uniq 1
-    vwait ::__sleep__tmp__$uniq
-    unset ::__sleep__tmp__$uniq
 }
 
 proc setup_temp_dir { } {
