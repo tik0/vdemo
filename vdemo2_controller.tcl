@@ -413,7 +413,7 @@ proc gui_tcl {} {
         pack $w.$c.start -side right
         set_status $c unknown
     }
-    set LEVELS [lsort -unique "$LEVELS"]
+    set LEVELS [lsort -integer -unique "$LEVELS"]
 
     if {[llength $::TABS] > 1} {
         set tabs [list]
