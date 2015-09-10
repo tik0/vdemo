@@ -1175,7 +1175,7 @@ proc connect_host {fifo host} {
     }
 
     # re-enable monitoring of master connection on this host
-    after [expr $::SCREEN_FAILURE_DELAY * 1000] enable_monitoring $host
+    after [expr $::SCREEN_FAILURE_DELAY] enable_monitoring $host
 
     # handle connection errors
     if {[string match "connected*" $res]} {
@@ -1372,7 +1372,7 @@ proc create_spread_conf {} {
     exec cat $filename
 }
 
-set SCREEN_FAILURE_DELAY 2
+set SCREEN_FAILURE_DELAY 2000
 proc handle_screen_failure {chan host} {
     gets $chan line
     dputs "screen failure: $host $chan: $line" 3
@@ -1402,7 +1402,7 @@ proc handle_screen_failure {chan host} {
             dputs "$comp closed its screen session on $host" 2
             if {[$::WIDGET($comp).stop  instate disabled] || \
                 [$::WIDGET($comp).start instate disabled] ||
-                [expr [clock seconds] - $::LAST_GUI_INTERACTION($comp) < $::SCREEN_FAILURE_DELAY]} {
+                [expr [clock milliseconds] - $::LAST_GUI_INTERACTION($comp) < $::SCREEN_FAILURE_DELAY]} {
                 # component was stopped or just started via gui -> ignore event
                 # trigger stop: component's on_stop() might do some cleanup
                 # component_cmd $comp stop
