@@ -1524,23 +1524,33 @@ proc handle_ctrl_fifo { infile } {
     if { [gets $infile line] >= 0 } {
         set args [regexp -all -inline {\S+} $line]
         set cmd [lindex $args 0]
-        set comp [lindex $args 1]
+        if {"$cmd" == "FINISH"} {
+            puts "remote cmd: stopping all components and finish"
+            all_cmd "stop"
+            finish
+            return
+        }
+
         if {[lsearch -exact [list "start" "stop" "check"] $cmd] == -1} {
             puts "unknown remote control command: $cmd"
+            return
+        }
+
+        set comp [lindex $args 1]
+        if {$comp == "ALL"} {
+            puts "remote cmd: ${cmd}ing all components"
+            all_cmd $cmd
+            return
+        }
+        if {[lsearch -exact "$::GROUPS" $comp] != -1} {
+            puts "remote cmd: ${cmd}ing group $comp"
+            all_cmd $cmd $comp
             return
         }
         foreach {c} "$::COMPONENTS" {
             if {$c == $comp} {
                 puts "remote cmd: ${cmd}ing component $comp"
                 component_cmd $comp $cmd
-                return
-            } elseif {$::GROUP($c) == $comp} {
-                puts "remote cmd: ${cmd}ing group $comp"
-                all_cmd $cmd $comp
-                return
-            } elseif {$comp == "ALL"} {
-                puts "remote cmd: ${cmd}ing all components"
-                all_cmd $cmd
                 return
             }
         }
