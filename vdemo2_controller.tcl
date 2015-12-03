@@ -24,6 +24,7 @@ ttk::style configure groove.TFrame -relief groove
 ttk::style configure TButton -font "$FONT bold" -padding "2 -1"
 ttk::style configure TCheckbutton -padding "2 -1"
 ttk::style configure cmd.TButton -padding "2 -1" -width -5
+ttk::style configure ls.TButton -font "$FONT" -padding "2 -1"
 
 define_theme_color ok green3 [list active green2]
 define_theme_color noscreen.ok orange2 [list active orange]
@@ -527,10 +528,12 @@ proc gui_add_host {host} {
         # create buttons
         ttk::frame  .ssh.$lh
         ttk::button .ssh.$lh.xterm -style $style -text "$host" -command "remote_xterm $host"
+        ttk::button .ssh.$lh.ls -style ls.TButton -text "ls" -command "remote_ls $host" -width -2
         ttk::button .ssh.$lh.clock -style cmd.TButton -text "⌚" -command "remote_clock $host" -width -2
         ttk::checkbutton .ssh.$lh.screen -text "" -command "screen_ssh_master $host" -variable ::SCREENED_SSH($host) -onvalue 1 -offvalue 0
         pack .ssh.$lh -side left -fill x -padx 3
         pack .ssh.$lh.xterm  -side left -fill x
+        pack .ssh.$lh.ls  -side left -fill x
         pack .ssh.$lh.clock  -side left -fill x
         pack .ssh.$lh.screen -side left -fill x
     }
@@ -762,6 +765,11 @@ proc remote_xterm {host} {
 
 proc remote_clock {host} {
     set cmd_line "xclock -fg white -bg black -geometry 250x30 -title $host -digital -update 1 &"
+    ssh_command "$cmd_line" "$host"
+}
+
+proc remote_ls {host} {
+    set cmd_line "ls -R $::env(VDEMO_root)/../.. $::env(VDEMO_demoRoot)/../.. > /dev/null &"
     ssh_command "$cmd_line" "$host"
 }
 
