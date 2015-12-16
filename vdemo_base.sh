@@ -176,10 +176,10 @@ function vdemo_start_component {
 	if [ "x$VDEMO_startDetached" == "xno" ]; then
 		xterm -fg $COLOR -bg black -title "starting $VDEMO_title" -e \
 			screen -t "$VDEMO_title" -S "${VDEMO_title}_" \
-			stdbuf -oL bash --norc -i -c "$cmd" &
+			bash --norc -i -c "$cmd" &
 	else
 		screen -t "$VDEMO_title" -S "${VDEMO_title}_" -d -m \
-			stdbuf -oL bash --norc -i -c "$cmd"
+			bash --norc -i -c "$cmd"
 	fi
 }
 
