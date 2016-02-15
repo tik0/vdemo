@@ -1424,8 +1424,7 @@ proc handle_screen_failure {chan host} {
                         component_cmd $comp start
                     } else {
                         # trigger stop: component's on_stop() might do some cleanup
-                        # component_cmd $comp stop
-                        component_cmd $comp check
+                        component_cmd $comp stop
                         blink_start $::WIDGET($comp).check
                         show_component $comp
                     }
