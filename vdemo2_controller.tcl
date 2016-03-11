@@ -337,7 +337,6 @@ proc gui_tcl {} {
     global HOST COMPONENTS ARGS TERMINAL USEX LOGTEXT NOAUTO LOGGING  GROUP SCREENED  COMP_LEVEL WATCHFILE COMMAND LEVELS TITLE TIMERDETACH TAB WIDGET COMPONENTS_WIDGET
     set LOGTEXT "demo configured from '$::env(VDEMO_demoConfig)'"
     wm title . "vdemo_controller: $::env(VDEMO_demoConfig)"
-    wm geometry . "875x600"
 
     set groups ""
     set LEVELS ""

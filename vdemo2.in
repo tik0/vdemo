@@ -10,26 +10,30 @@ usage: $SCRIPTNAME [options] <Config file>
   for further help invoke '$SCRIPTNAME -h'
 "
 
+GEOMETRY="875x600"
+
 HELP="\
 usage: $SCRIPTNAME [options] <Config file>
 
 vdemo starter
 
  options:
-  -h  --help               display this help
-  -a  --auto               automatically start all components
-  -l  --log                enable logging for all components
-  -d  --detach time        set default detach time in seconds
-                            0: start detached
-                           <0: never detach
-  -r  --logrotate          enable log rotation
-  -v  --verbose [level]    set verbosity [level]
-                           >0: increasing verbosity
-                           -1: also suppress message boxes
-  -f  --fifo <file>        fifo for text-based remote-control of vdemo gui
-                           accepting:
-                           (start | stop | check) (component | group | ALL)
-  -Q  --quit <components>  space separated list of components to quit vdemo on
+  -h  --help                 display this help
+  -a  --auto                 automatically start all components
+  -l  --log                  enable logging for all components
+  -d  --detach time          set default detach time in seconds
+                              0: start detached
+                             <0: never detach
+  -r  --logrotate            enable log rotation
+  -v  --verbose [level]      set verbosity [level]
+                             >0: increasing verbosity
+                             -1: also suppress message boxes
+  -f  --fifo <file>          fifo for text-based remote-control of vdemo gui
+                             accepting:
+                             (start | stop | check) (component | group | ALL)
+  -g  --geometry <geometry>  sets the main vdemo windows geometry to the specified
+                             size. Uses default value (\"$GEOMETRY\") otherwise.
+  -Q  --quit <components>    space separated list of components to quit vdemo on
 
  authors: Marc Hanheide, Robert Haschke
 "
@@ -76,6 +80,10 @@ while [ $# -gt 0 ]; do
         export VDEMO_CONTROL_FIFO=$2
         shift
         ;;
+    "-g"|"--geometry")
+        export GEOMETRY=$2
+        shift
+        ;;
     "-Q"|"--quit")
         export VDEMO_QUIT_COMPONENTS=$2
         shift
@@ -107,4 +115,4 @@ source "$VDEMO_demoConfig"
 
 export VDEMO_exports="SPREAD_CONFIG $VDEMO_exports"
 
-exec $VDEMO_root/vdemo2_controller.tcl
+exec $VDEMO_root/vdemo2_controller.tcl -geometry "$GEOMETRY"
