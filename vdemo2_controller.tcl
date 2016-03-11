@@ -1218,6 +1218,9 @@ proc connect_host {fifo host} {
 }
 
 proc connect_hosts {} {
+    set geometry ${::geometry}
+    wm geometry . "466x107"
+    update
     label .vdemoinit -text "init VDemo - be patient..." -foreground darkgreen -font "helvetica 30 bold"
     label .vdemoinit2 -text "" -foreground darkred -font "helvetica 20 bold"
     pack .vdemoinit
@@ -1232,6 +1235,7 @@ proc connect_hosts {} {
     }
     # establish screen monitoring locally (for master connections)
     connect_screen_monitoring localhost
+    wm geometry . ${geometry}
     destroy .vdemoinit
     destroy .vdemoinit2
 }
