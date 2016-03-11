@@ -1235,7 +1235,7 @@ proc connect_hosts {} {
     }
     # establish screen monitoring locally (for master connections)
     connect_screen_monitoring localhost
-    wm geometry . ${geometry}
+    if { ${geometry} != "" } { wm geometry . ${geometry} }
     destroy .vdemoinit
     destroy .vdemoinit2
 }
