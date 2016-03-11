@@ -1219,7 +1219,7 @@ proc connect_host {fifo host} {
 
 proc connect_hosts {} {
     set geometry ${::geometry}
-    wm geometry . "466x107"
+    wm geometry . ""
     update
     label .vdemoinit -text "init VDemo - be patient..." -foreground darkgreen -font "helvetica 30 bold"
     label .vdemoinit2 -text "" -foreground darkred -font "helvetica 20 bold"
