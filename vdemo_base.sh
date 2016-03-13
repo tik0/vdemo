@@ -127,7 +127,7 @@ function vdemo_start_component {
 				fi
 				echo "logging to ${VDEMO_logfile}" >&2
 				# exec allows to redirect output of current shell
-				VDEMO_logging="exec 1> >(tee -a \"${VDEMO_logfile}\") 2>&1;"
+				VDEMO_logging="set -x; exec 1> >(tee -a \"${VDEMO_logfile}\") 2>&1;"
 				;;
 			--)
 				break
@@ -162,10 +162,6 @@ function vdemo_start_component {
 
 		EOX
 	fi
-
-	test -n "${VDEMO_logging}" && \
-	echo "starting $VDEMO_title with component function:"$'\n'"$(declare -f component)" \
-		>> ${VDEMO_logfile}
 
 	# Hm. For some reason the last line of the output doesn't enter the log.
 	# Adding a small sleep seems to fix this issue.
