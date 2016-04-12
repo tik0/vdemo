@@ -10,7 +10,7 @@ usage: $SCRIPTNAME [options] <Config file>
   for further help invoke '$SCRIPTNAME -h'
 "
 
-GEOMETRY="875x600"
+GEOMETRY=""
 
 HELP="\
 usage: $SCRIPTNAME [options] <Config file>
