@@ -350,7 +350,7 @@ proc gui_tcl {} {
     # main gui frame
     ttk::frame .main
     # scrollable frame
-    iwidgets::scrolledframe .main.scrollable -vscrollmode dynamic -hscrollmode none
+    iwidgets::scrolledframe .main.scrollable -vscrollmode dynamic -hscrollmode none -height 300
     bind_wheel_sf .main.scrollable
     pack .main.scrollable -side top -fill both -expand yes
 
