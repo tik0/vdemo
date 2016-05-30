@@ -91,24 +91,18 @@ function vdemo_inspect {
 }
 
 # start a component. This function has the following options:
-#   -n    title of the component (name to identify it by other functions,
-#         needs not to be the program name)
 #   -d    use X11 DISPLAY to display the component
 #   -l    enable logging
 #   -D    start detached
 # remaining arguments are treated as command line of the component to start
 function vdemo_start_component {
+	VDEMO_title=$1; shift
 	VDEMO_componentDisplay="${DISPLAY}"
 	VDEMO_startDetached="no"
 	COLOR="white"
 	VDEMO_logfile="${VDEMO_logfile_prefix}${VDEMO_title}.log"
-
 	while [ $# -gt 0 ]; do
 		case $1 in
-			"-n"|"--name")
-				shift
-				VDEMO_title="$1"
-				;;
 			"-D"|"--detached")
 				VDEMO_startDetached="yes"
 				;;

@@ -114,10 +114,9 @@ case "$1" in
            comp_display=$(start_Xserver)
            if [ $? == 2 ]; then exit 12; fi
            echo "DISPLAY: $comp_display" >&2
-           vdemo_start_component -n $title $vdemo_start_LOGGING $vdemo_start_DETACHED -d $comp_display
-        else
-           vdemo_start_component -n $title $vdemo_start_LOGGING $vdemo_start_DETACHED
+           display_arg="-d $comp_display"
         fi
+        vdemo_start_component $title $vdemo_start_LOGGING $vdemo_start_DETACHED $display_arg
         ;;
     stop)
         vdemo_stop_component $title &
