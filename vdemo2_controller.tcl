@@ -852,7 +852,7 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
                 dputs "$TITLE($comp): already stopping"
                 return 1
             }
-            # Hm. For some reason, we shouldn't do this for stopwait (called from start)
+            # We shouldn't enable start for stopwait (called from start)
             if {$cmd != "stopwait"} {
                 $WIDGET($comp).stop state disabled
                 $WIDGET($comp).start state !disabled
@@ -866,6 +866,7 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
 
             set ::LAST_GUI_INTERACTION($comp) [clock milliseconds]
             if {$res != -1 && $cmd != "stopwait"} {
+                # Asynchronously wait for component to stop (triggering check every 100ms)
                 after 100 component_cmd $comp check $allcmd_group
             }
         }
