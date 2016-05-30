@@ -157,7 +157,7 @@ function vdemo_start_component {
 		EOX
 	fi
 
-	# Hm. For some reason the last line of the output doesn't enter the log.
+	# Logging has missing lines at the end (or is completely empty) when finishing fast.
 	# Adding a small sleep seems to fix this issue.
 	cmd="${VDEMO_logging} ${log_rotation_command} LD_LIBRARY_PATH=${LD_LIBRARY_PATH} DISPLAY=${VDEMO_componentDisplay} component; sleep 0.01"
 
@@ -250,20 +250,6 @@ function all_children {
 	done
 }
 
-function vdemo_pidsFromComponent {
-	# pid of bash process inside screen
-	local ppid=$(ps --ppid $1 -o pid --no-headers)
-	local children=$(ps --ppid $ppid -o pid --no-headers --sort -start_time,-pid)
-
-	# exclude the logging process (tee)
-	for pid in $children; do
-		if [[ ! "$(ps -p $pid -o cmd=)" =~ \
-			"bash -c exec 1> >(tee -a \"/tmp/vdemo-" ]]; then
-			echo -n " $pid"
-		fi
-	done
-}
-
 # stop a component
 # $1: title of the component
 function vdemo_stop_component {
@@ -271,7 +257,7 @@ function vdemo_stop_component {
 	VDEMO_pid=$(vdemo_pidFromScreen ${VDEMO_title})
 	if [ "$VDEMO_pid" ]; then
 		echo "stopping $VDEMO_title: screen pid: ${VDEMO_pid}" >&2
-		local PIDS=$(vdemo_pidsFromComponent $VDEMO_pid)
+		local PIDS=$(all_children $VDEMO_pid)
 		# call stop_component if that function exists
 		if declare -F stop_component > /dev/null; then
 			echo "calling stop_component"
@@ -285,8 +271,6 @@ function vdemo_stop_component {
 		test -n "$REMAIN_PIDS" && \
 			(echo "killing remaining processes"; echo "$REMAIN_PIDS")
 		kill -9 $PIDS > /dev/null 2>&1
-		# to be really sure, also kill the screen process
-		kill -9 $VDEMO_pid > /dev/null 2>&1
 
 		# call on_stop function
 		if declare -F on_stop > /dev/null; then
@@ -295,17 +279,21 @@ function vdemo_stop_component {
 	fi
 }
 
-# stop screen children of component by signal
+# This is the default stopping function:
+# Stop all children of component by a signal, starting at the leafs of the process tree
 # $1 - title of component
 # $2 - signal to use (default: SIGINT)
 # $3 - timeout, waiting for a single component (default: 2s)
 function vdemo_stop_signal_children {
 	VDEMO_title="$1"
-	VDEMO_pid=$(vdemo_pidFromScreen ${VDEMO_title})
-	VDEMO_compo_pids=$(vdemo_pidsFromComponent $VDEMO_pid)
+	# get pids of screen and of all children
+	local VDEMO_pid=$(vdemo_pidFromScreen ${VDEMO_title})
+	local VDEMO_compo_pids=$(all_children $VDEMO_pid)
 	local SIGNAL=${2:-SIGINT}
 	local TIMEOUT=$((10*${3:-2}))
 	for pid in $VDEMO_compo_pids; do
+		# don't send a kill signal when process is already gone
+		kill -0 $pid > /dev/null 2>&1 || continue
 		echo -n "${SIGNAL}ing $pid: $(ps -p $pid -o comm=) "
 		kill -$SIGNAL $pid > /dev/null 2>&1
 		# wait for process to be finished
@@ -314,6 +302,7 @@ function vdemo_stop_signal_children {
 			test $((i % 10)) -eq 0 && echo -n "."
 			kill -0 $pid > /dev/null 2>&1 || break
 		done
+		sleep 0.01 # give parent processes some time to quit themselves
 		echo
 	done
 }
