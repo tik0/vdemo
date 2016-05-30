@@ -92,7 +92,7 @@ source "$VDEMO_root/vdemo_base.sh"
 # returns: If function exists: Return value of function.
 #          If function does not exist: True.
 function call_if_exists {
-    func=$1; shift
+    local func=$1; shift
     if declare -F $func >/dev/null; then
        $func $@
     else
@@ -126,7 +126,8 @@ case "$1" in
         vdemo_stop_component $title
         ;;
     check)
-        vdemo_check_component $title; processResult=$?
+        vdemo_check_component $title;
+        processResult=$?
         re="^on_check[^{]*\{[[:space:]]*true[[:space:]]*\}$"
         func=$(declare -f on_check)
         if [[ -n $func && ! $func =~ $re ]] ; then
@@ -164,8 +165,7 @@ case "$1" in
     single)
         if [ "$2" ]; then
            echo "configuration from $2" >&2
-           VDEMO_demoConfig="$2"
-           export VDEMO_demoConfig
+           export VDEMO_demoConfig="$2"
            source "$2"
         fi
         call_if_exists clean_component
