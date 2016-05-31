@@ -30,6 +30,11 @@ define_theme_color noscreen.ok orange2 [list active orange]
 define_theme_color failed red2 [list active red]
 define_theme_color check.failed pink [list active pink2]
 define_theme_color starting yellow2 [list active yellow]
+set CHECK_TOOLTIP "green: everything OK
+red: no process
+orange: no screen process, but successful test
+pink: screen process exists, but test failed
+yellow: starting"
 
 ttk::style configure clock.TButton -font "$FONT"
 ttk::style configure exit.TButton
@@ -67,6 +72,28 @@ proc backtrace {} {
         lappend bt [lindex [info level $level] 0]
     }
     return [join $bt { => }]
+}
+
+# tooltips
+proc tooltip {w help} {
+    bind $w <Any-Enter> "after 1000 [list tooltip:show %W [list $help]]"
+    bind $w <Any-Leave> "destroy %W.tooltip"
+}
+
+proc tooltip:show {w arg} {
+    if {[eval winfo containing  [winfo pointerxy .]]!=$w} {return}
+    set top $w.tooltip
+    catch {destroy $top}
+    toplevel $top -bd 1 -bg black
+    wm overrideredirect $top 1
+    if {[string equal [tk windowingsystem] aqua]}  {
+        ::tk::unsupported::MacWindowStyle style $top help none
+    }
+    pack [message $top.txt -aspect 10000 -bg lightyellow -text $arg]
+    set wmx [winfo rootx $w]
+    set wmy [expr [winfo rooty $w]+[winfo height $w]]
+    wm geometry $top [winfo reqwidth $top.txt]x[winfo reqheight $top.txt]+$wmx+$wmy
+    raise $top
 }
 
 # set some default values from environment variables
@@ -391,6 +418,8 @@ proc gui_tcl {} {
         ttk::checkbutton $w.$c.ownx   -text "own X" -variable USEX($c)
         ttk::checkbutton $w.$c.logging -text "logging" -variable LOGGING($c)
         ttk::button $w.$c.viewlog -style cmd.TButton -text "view log" -command "component_cmd $c showlog"
+
+        tooltip $w.$c.check $::CHECK_TOOLTIP
 
         set SCREENED($c) 0
         ttk::checkbutton $w.$c.screen -text "show term" -command "component_cmd $c screen" -variable SCREENED($c) -onvalue 1 -offvalue 0
