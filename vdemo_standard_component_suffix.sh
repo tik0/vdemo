@@ -133,12 +133,13 @@ case "$1" in
         if [[ -n $func && ! $func =~ $re ]] ; then
            # only call on_check if it is defined and non-trivial
            on_check; callResult=$?
-           # combined result is limited to 8bit!
-           if (( $callResult > 25 || $callResult < 0 )); then callResult=25; fi
         else
            callResult=$processResult
         fi
-        exit $((10*callResult + processResult)) # combine both results
+        # combine both results, return value is limited to range [0..255]
+        # - 6 highest bits for callResult
+        # - 2 lowest bits for processResult (2#11 = binary 11 = 3)
+        exit $(( ((callResult << 2) | (processResult & 2#11)) & 255 ))
         ;;
     screen)
         vdemo_reattach_screen $title

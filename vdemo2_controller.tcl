@@ -904,7 +904,6 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
 
             set cmd_line "$VARS $component_script $component_options check"
             set res [ssh_command "$cmd_line" "$HOST($comp)"]
-            dputs "check result: $res" 2
             after idle $WIDGET($comp).check state !disabled
 
             if { ! [string is integer -strict $res] } {
@@ -922,11 +921,12 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
             }
 
             set noscreen 0
-            # res = 10*min(onCheckResult, 25) + screenResult
+            # res = (onCheckResult << 2) | (screenResult & 3)
             # onCheckResult is the result from the on_check function (0 on success)
-            # screenResult: 0: success, 1: no screen, 2: PID not there
-            set onCheckResult [expr $res / 10]
-            set screenResult  [expr $res % 10]
+            # screenResult: 0: success, 1/2: no screen, finished without(1) / with(2) error
+            dputs "check result: $res = ([expr $res >> 2] << 2) | [expr $res & 3]" 2
+            set onCheckResult [expr $res >> 2]
+            set screenResult  [expr $res & 3]
             set s unknown
             if {$onCheckResult == 0} { # on_check was successful
                 if {$screenResult == 0} { set s ok_screen } { set s ok_noscreen }
