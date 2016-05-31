@@ -1,24 +1,22 @@
 #!/bin/bash
 # /// @author    Marc Hanheide (mhanheid@TechFak.Uni-Bielefeld.de)
-# /// @date      started at 2005/03/01
-# /// @version   $Id: vdemo_standard_component_suffix.sh,v 1.4 2007/08/17 15:28:47 mhanheid Exp $
+# /// @author    Robert Haschke (rhaschke@TechFak.Uni-Bielefeld.de)
 #
-# THIS SCRIPT EXPECTS THE FOLLOWING VARIABLES TO BE SET:
-#   component="$prefix/bin/some_binary args"
-#   title=MemoryServer # only if not sourced from another bash script
+# THIS SCRIPT EXPECTS A FUNCTION NAMED "component" to be defined.
+# This function can start any processes required for the component.
 
 vdemo_component_scriptname="${BASH_SOURCE[${#BASH_SOURCE[@]}-1]##*/}"
 
 HELP="\
-usage: $vdemo_component_scriptname [options] start|stop|check
+usage: $vdemo_component_scriptname [options] command [component options]
 
+ available commands: start,stop,check,screen,detach,showlog,clean,single
  options:
   -h  --help               this help text
   -x  --xserver            start own xserver
   -t  --title <title>      define component title
   -l  --logging            enable logging
   -D  --detached           start detached
- author: Marc Hanheide ($RCS_ID)
 "
 
 # option checks
@@ -66,6 +64,7 @@ if [ $# -lt 1 ]; then
    echo "obligatory argument(s) missing. $HELP" >&2
    exit 3
 fi
+cmd=$1; shift
 
 # This MUST be the absolut path to the used vdemo scripts (this script)
 if [ -z "$VDEMO_root" ]; then
@@ -100,7 +99,7 @@ function call_if_exists {
     fi
 }
 
-case "$1" in
+case "$cmd" in
     start)
         if vdemo_check_component $title; then
            echo "$title already running">&2
@@ -116,7 +115,7 @@ case "$1" in
            echo "DISPLAY: $comp_display" >&2
            display_arg="-d $comp_display"
         fi
-        vdemo_start_component $title $vdemo_start_LOGGING $vdemo_start_DETACHED $display_arg
+        vdemo_start_component $title $vdemo_start_LOGGING $vdemo_start_DETACHED $display_arg -- "$*"
         ;;
     stop)
         vdemo_stop_component $title &
@@ -176,7 +175,8 @@ case "$1" in
         call_if_exists on_stop
         ;;
     *)
-        echo "wrong argument. $HELP" >&2
+        echo "wrong command argument: $cmd.
+$HELP" >&2
         exit 3
         ;;
 esac

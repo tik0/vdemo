@@ -94,7 +94,6 @@ proc number {val type} {
 proc parse_options {comp} {
     global COMPONENTS ARGS USEX TERMINAL WAIT_READY NOAUTO LOGGING GROUP DETACHTIME COMP_LEVEL EXPORTS TITLE CHECKNOWAIT_TIME RESTART
 
-    set NEWARGS [list]
     set USEX($comp) 0
     # time to wait for a process to startup
     set WAIT_READY($comp) 5000
@@ -110,8 +109,14 @@ proc parse_options {comp} {
     set EXPORTS($comp) ""
     set RESTART($comp) 0
 
-    for {set i 0} \$i<[llength $ARGS($comp)] {incr i} {
-        set arg [lindex $ARGS($comp) $i]; set val [lindex $ARGS($comp) [expr $i+1]]
+    # do not simply tokenize at spaces, but allow quoted strings ("" or '')
+    set TOKENS [regexp -all -inline -- "\\S+|\[^ =\]+=(?:\\S+|\"\[^\"]+\"|'\[^'\]+')" $ARGS($comp)]
+
+    for {set i 0} { $i < [llength $TOKENS] } {incr i} {
+        set arg [lindex $TOKENS $i]
+        set val [lindex $TOKENS [expr $i+1]]
+        if { "$arg" == "--" } { break }
+
         if { [catch {switch -glob -- $arg {
             -w {
                 set WAIT_READY($comp) [expr 1000 * [number $val double]]
@@ -164,14 +169,16 @@ proc parse_options {comp} {
                 lappend ::VDEMO_QUIT_COMPONENTS $comp
             }
             default {
-                set NEWARGS [lappend NEWARGS $arg]
+                puts "$comp: unknown component option $arg"
+                exit
             }
         } } err ] } {
-            puts "$comp: error processing '$arg $val': $err"
+            puts "$comp: error processing option '$arg $val': $err"
             exit
         }
     }
-    set ARGS($comp) $NEWARGS
+    # re-assign remaining arguments:
+    set ARGS($comp) [lrange $TOKENS [expr $i+1] end]
 }
 
 # split $str on $sep, but don't split when $sep is preceeded by $protector
@@ -225,8 +232,6 @@ proc parse_env_var {} {
             if {"$host" != ""} {lappend ::HOSTS $host}
             set HOST($component_name) $host
             set ARGS($component_name) [lindex $thisComp 2]
-            # do not simply tokenize at spaces, but allow quoted strings ("" or '')
-            set ARGS($component_name) [regexp -all -inline -- "\\S+|\[^ =\]+=(?:\\S+|\"\[^\"]+\"|'\[^'\]+')" $ARGS($component_name)]
             dputs [format "%-20s HOST: %-13s ARGS: %s" $component_name $HOST($component_name) $ARGS($component_name)]
             # parse options known by the script and remove them from them the list
             parse_options "$component_name"
@@ -334,7 +339,7 @@ proc get_tab {name} {
 }
 
 proc gui_tcl {} {
-    global HOST COMPONENTS ARGS TERMINAL USEX LOGTEXT NOAUTO LOGGING  GROUP SCREENED  COMP_LEVEL WATCHFILE COMMAND LEVELS TITLE TIMERDETACH TAB WIDGET COMPONENTS_WIDGET
+    global HOST COMPONENTS TERMINAL USEX LOGTEXT NOAUTO LOGGING  GROUP SCREENED  COMP_LEVEL WATCHFILE COMMAND LEVELS TITLE TIMERDETACH TAB WIDGET COMPONENTS_WIDGET
     set LOGTEXT "demo configured from '$::env(VDEMO_demoConfig)'"
     wm title . "vdemo_controller: $::env(VDEMO_demoConfig)"
 
@@ -809,7 +814,7 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
 
             # don't detach when detach time == 0
             if {$DETACHTIME($comp) == 0} { set component_options "$component_options -D" }
-            set cmd_line "$VARS $component_script $component_options start"
+            set cmd_line "$VARS $component_script $component_options start $ARGS($comp)"
             set res [ssh_command "$cmd_line" "$HOST($comp)"]
 
             # handle some typical errors:

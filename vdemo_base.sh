@@ -124,15 +124,13 @@ function vdemo_start_component {
 				local VDEMO_logging="set -x; exec 1> >(tee -a \"${VDEMO_logfile}\") 2>&1;"
 				;;
 			--)
+				shift
 				break
-				;;
-			-*)
-				echo "illegal option $1" >&2
-				echo "$USAGE" >&2
-				exit 1
 				;;
 			*)
-				break
+				echo "illegal argument $1" >&2
+				echo "$USAGE" >&2
+				exit 1
 				;;
 		esac
 		shift
@@ -159,7 +157,7 @@ function vdemo_start_component {
 
 	# Logging has missing lines at the end (or is completely empty) when finishing fast.
 	# Adding a small sleep seems to fix this issue.
-	local cmd="${VDEMO_logging} ${log_rotation_command} LD_LIBRARY_PATH=${LD_LIBRARY_PATH} DISPLAY=${VDEMO_componentDisplay} component; sleep 0.01"
+	local cmd="${VDEMO_logging} ${log_rotation_command} LD_LIBRARY_PATH=${LD_LIBRARY_PATH} DISPLAY=${VDEMO_componentDisplay} component $*; sleep 0.01"
 
     # bash needs to be started in in interactive mode to have job control available
     # --norc is used to prevent inclusion of the use configuration in the execution.
