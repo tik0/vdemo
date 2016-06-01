@@ -30,11 +30,6 @@ define_theme_color noscreen.ok orange2 [list active orange]
 define_theme_color failed red2 [list active red]
 define_theme_color check.failed pink [list active pink2]
 define_theme_color starting yellow2 [list active yellow]
-set CHECK_TOOLTIP "green: everything OK
-red: no process
-orange: no screen process, but successful test
-pink: screen process exists, but test failed
-yellow: starting"
 
 ttk::style configure clock.TButton -font "$FONT"
 ttk::style configure exit.TButton
@@ -75,8 +70,8 @@ proc backtrace {} {
 }
 
 # tooltips
-proc tooltip {w help} {
-    bind $w <Any-Enter> "after 1000 [list tooltip:show %W [list $help]]"
+proc tooltip { w txt } {
+    bind $w <Any-Enter> "after 1000 [list tooltip:show %W $txt]"
     bind $w <Any-Leave> "destroy %W.tooltip"
 }
 
@@ -95,6 +90,18 @@ proc tooltip:show {w arg} {
     wm geometry $top [winfo reqwidth $top.txt]x[winfo reqheight $top.txt]+$wmx+$wmy
     raise $top
 }
+
+proc check:tooltip {comp} {
+    switch -- "$::COMPSTATUS($comp)" {
+        starting {return "starting"}
+        ok_screen {return "screen process is alive and component check succeeded"}
+        ok_noscreen {return "component check succeeded, but not started from vdemo"}
+        failed_noscreen {return "component not running"}
+        failed_check {return "component is running, but component check failed"}
+        default  {return "status unknown"}
+    }
+}
+
 
 # set some default values from environment variables
 if { ! [info exists ::env(VDEMO_LOGGING)] || \
@@ -419,7 +426,7 @@ proc gui_tcl {} {
         ttk::checkbutton $w.$c.logging -text "logging" -variable LOGGING($c)
         ttk::button $w.$c.viewlog -style cmd.TButton -text "view log" -command "component_cmd $c showlog"
 
-        tooltip $w.$c.check $::CHECK_TOOLTIP
+        tooltip $w.$c.check [concat {[eval check:tooltip } $c {]} ]
 
         set SCREENED($c) 0
         ttk::checkbutton $w.$c.screen -text "show term" -command "component_cmd $c screen" -variable SCREENED($c) -onvalue 1 -offvalue 0
