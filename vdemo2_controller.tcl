@@ -1423,8 +1423,9 @@ proc handle_screen_failure {chan host} {
                         dputs "Restarting $::TITLE($comp)." 0
                         component_cmd $comp start
                     } else {
-                        # trigger stop: component's on_stop() might do some cleanup
-                        component_cmd $comp stop
+                        # trigger stopwait: component's on_stop() might do some cleanup
+                        component_cmd $comp stopwait
+                        component_cmd $comp check
                         blink_start $::WIDGET($comp).check
                         show_component $comp
                     }
