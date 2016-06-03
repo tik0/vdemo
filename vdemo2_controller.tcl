@@ -69,6 +69,40 @@ proc backtrace {} {
     return [join $bt { => }]
 }
 
+# tooltips
+proc tooltip { w txt } {
+    bind $w <Any-Enter> "after 1000 [list tooltip:show %W $txt]"
+    bind $w <Any-Leave> "destroy %W.tooltip"
+}
+
+proc tooltip:show {w arg} {
+    if {[eval winfo containing  [winfo pointerxy .]]!=$w} {return}
+    set top $w.tooltip
+    catch {destroy $top}
+    toplevel $top -bd 1 -bg black
+    wm overrideredirect $top 1
+    if {[string equal [tk windowingsystem] aqua]}  {
+        ::tk::unsupported::MacWindowStyle style $top help none
+    }
+    pack [message $top.txt -aspect 10000 -bg lightyellow -text $arg]
+    set wmx [winfo rootx $w]
+    set wmy [expr [winfo rooty $w]+[winfo height $w]]
+    wm geometry $top [winfo reqwidth $top.txt]x[winfo reqheight $top.txt]+$wmx+$wmy
+    raise $top
+}
+
+proc check:tooltip {comp} {
+    switch -- "$::COMPSTATUS($comp)" {
+        starting {return "starting"}
+        ok_screen {return "screen process is alive and component check succeeded"}
+        ok_noscreen {return "component check succeeded, but not started from vdemo"}
+        failed_noscreen {return "component not running"}
+        failed_check {return "component is running, but component check failed"}
+        default  {return "status unknown"}
+    }
+}
+
+
 # set some default values from environment variables
 if { ! [info exists ::env(VDEMO_LOGGING)] || \
      ! [string is integer -strict $::env(VDEMO_LOGGING)] } \
@@ -94,7 +128,6 @@ proc number {val type} {
 proc parse_options {comp} {
     global COMPONENTS ARGS USEX TERMINAL WAIT_READY NOAUTO LOGGING GROUP DETACHTIME COMP_LEVEL EXPORTS TITLE CHECKNOWAIT_TIME RESTART
 
-    set NEWARGS [list]
     set USEX($comp) 0
     # time to wait for a process to startup
     set WAIT_READY($comp) 5000
@@ -110,8 +143,14 @@ proc parse_options {comp} {
     set EXPORTS($comp) ""
     set RESTART($comp) 0
 
-    for {set i 0} \$i<[llength $ARGS($comp)] {incr i} {
-        set arg [lindex $ARGS($comp) $i]; set val [lindex $ARGS($comp) [expr $i+1]]
+    # do not simply tokenize at spaces, but allow quoted strings ("" or '')
+    set TOKENS [regexp -all -inline -- "\\S+|\[^ =\]+=(?:\\S+|\"\[^\"]+\"|'\[^'\]+')" $ARGS($comp)]
+
+    for {set i 0} { $i < [llength $TOKENS] } {incr i} {
+        set arg [lindex $TOKENS $i]
+        set val [lindex $TOKENS [expr $i+1]]
+        if { "$arg" == "--" } { break }
+
         if { [catch {switch -glob -- $arg {
             -w {
                 set WAIT_READY($comp) [expr 1000 * [number $val double]]
@@ -164,14 +203,16 @@ proc parse_options {comp} {
                 lappend ::VDEMO_QUIT_COMPONENTS $comp
             }
             default {
-                set NEWARGS [lappend NEWARGS $arg]
+                puts "$comp: unknown component option $arg"
+                exit
             }
         } } err ] } {
-            puts "$comp: error processing '$arg $val': $err"
+            puts "$comp: error processing option '$arg $val': $err"
             exit
         }
     }
-    set ARGS($comp) $NEWARGS
+    # re-assign remaining arguments:
+    set ARGS($comp) [lrange $TOKENS [expr $i+1] end]
 }
 
 # split $str on $sep, but don't split when $sep is preceeded by $protector
@@ -225,8 +266,6 @@ proc parse_env_var {} {
             if {"$host" != ""} {lappend ::HOSTS $host}
             set HOST($component_name) $host
             set ARGS($component_name) [lindex $thisComp 2]
-            # do not simply tokenize at spaces, but allow quoted strings ("" or '')
-            set ARGS($component_name) [regexp -all -inline -- "\\S+|\[^ =\]+=(?:\\S+|\"\[^\"]+\"|'\[^'\]+')" $ARGS($component_name)]
             dputs [format "%-20s HOST: %-13s ARGS: %s" $component_name $HOST($component_name) $ARGS($component_name)]
             # parse options known by the script and remove them from them the list
             parse_options "$component_name"
@@ -334,10 +373,9 @@ proc get_tab {name} {
 }
 
 proc gui_tcl {} {
-    global HOST COMPONENTS ARGS TERMINAL USEX LOGTEXT NOAUTO LOGGING  GROUP SCREENED  COMP_LEVEL WATCHFILE COMMAND LEVELS TITLE TIMERDETACH TAB WIDGET COMPONENTS_WIDGET
+    global HOST COMPONENTS TERMINAL USEX LOGTEXT NOAUTO LOGGING  GROUP SCREENED  COMP_LEVEL WATCHFILE COMMAND LEVELS TITLE TIMERDETACH TAB WIDGET COMPONENTS_WIDGET
     set LOGTEXT "demo configured from '$::env(VDEMO_demoConfig)'"
     wm title . "vdemo_controller: $::env(VDEMO_demoConfig)"
-    wm geometry . "875x600"
 
     set groups ""
     set LEVELS ""
@@ -351,7 +389,7 @@ proc gui_tcl {} {
     # main gui frame
     ttk::frame .main
     # scrollable frame
-    iwidgets::scrolledframe .main.scrollable -vscrollmode dynamic -hscrollmode none
+    iwidgets::scrolledframe .main.scrollable -vscrollmode dynamic -hscrollmode none -height 300
     bind_wheel_sf .main.scrollable
     pack .main.scrollable -side top -fill both -expand yes
 
@@ -392,6 +430,8 @@ proc gui_tcl {} {
         ttk::checkbutton $w.$c.ownx   -text "own X" -variable USEX($c)
         ttk::checkbutton $w.$c.logging -text "logging" -variable LOGGING($c)
         ttk::button $w.$c.viewlog -style cmd.TButton -text "view log" -command "component_cmd $c showlog"
+
+        tooltip $w.$c.check [concat {[eval check:tooltip } $c {]} ]
 
         set SCREENED($c) 0
         ttk::checkbutton $w.$c.screen -text "show term" -command "component_cmd $c screen" -variable SCREENED($c) -onvalue 1 -offvalue 0
@@ -810,7 +850,7 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
 
             # don't detach when detach time == 0
             if {$DETACHTIME($comp) == 0} { set component_options "$component_options -D" }
-            set cmd_line "$VARS $component_script $component_options start"
+            set cmd_line "$VARS $component_script $component_options start $ARGS($comp)"
             set res [ssh_command "$cmd_line" "$HOST($comp)"]
 
             # handle some typical errors:
@@ -853,7 +893,7 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
                 dputs "$TITLE($comp): already stopping"
                 return 1
             }
-            # Hm. For some reason, we shouldn't do this for stopwait (called from start)
+            # We shouldn't enable start for stopwait (called from start)
             if {$cmd != "stopwait"} {
                 $WIDGET($comp).stop state disabled
                 $WIDGET($comp).start state !disabled
@@ -867,6 +907,7 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
 
             set ::LAST_GUI_INTERACTION($comp) [clock milliseconds]
             if {$res != -1 && $cmd != "stopwait"} {
+                # Asynchronously wait for component to stop (triggering check every 100ms)
                 after 100 component_cmd $comp check $allcmd_group
             }
         }
@@ -904,7 +945,6 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
 
             set cmd_line "$VARS $component_script $component_options check"
             set res [ssh_command "$cmd_line" "$HOST($comp)"]
-            dputs "check result: $res" 2
             after idle $WIDGET($comp).check state !disabled
 
             if { ! [string is integer -strict $res] } {
@@ -922,11 +962,12 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
             }
 
             set noscreen 0
-            # res = 10*min(onCheckResult, 25) + screenResult
+            # res = (onCheckResult << 2) | (screenResult & 3)
             # onCheckResult is the result from the on_check function (0 on success)
-            # screenResult: 0: success, 1: no screen, 2: PID not there
-            set onCheckResult [expr $res / 10]
-            set screenResult  [expr $res % 10]
+            # screenResult: 0: success, 1/2: no screen, finished without(1) / with(2) error
+            dputs "check result: $res = ([expr $res >> 2] << 2) | [expr $res & 3]" 2
+            set onCheckResult [expr $res >> 2]
+            set screenResult  [expr $res & 3]
             set s unknown
             if {$onCheckResult == 0} { # on_check was successful
                 if {$screenResult == 0} { set s ok_screen } { set s ok_noscreen }
@@ -1219,6 +1260,9 @@ proc connect_host {fifo host} {
 }
 
 proc connect_hosts {} {
+    set geometry ${::geometry}
+    wm geometry . ""
+    update
     label .vdemoinit -text "init VDemo - be patient..." -foreground darkgreen -font "helvetica 30 bold"
     label .vdemoinit2 -text "" -foreground darkred -font "helvetica 20 bold"
     pack .vdemoinit
@@ -1233,6 +1277,7 @@ proc connect_hosts {} {
     }
     # establish screen monitoring locally (for master connections)
     connect_screen_monitoring localhost
+    if { ${geometry} != "" } { wm geometry . ${geometry} }
     destroy .vdemoinit
     destroy .vdemoinit2
 }
