@@ -355,10 +355,21 @@ proc hilite_component {comp} {
 }
 
 proc set_group_noauto {grp} {
-    global COMPONENTS GROUP NOAUTO GNOAUTO
+    global COMPONENTS GROUP NOAUTO
+    set state [.main.allcmd.$grp.noauto instate selected]
     foreach {comp} "$COMPONENTS" {
         if {$GROUP($comp) == $grp} {
-            set NOAUTO($comp) $GNOAUTO($grp)
+            set NOAUTO($comp) $state
+        }
+    }
+}
+
+proc set_group_logging {grp} {
+    global COMPONENTS GROUP LOGGING
+    set state [.main.allcmd.$grp.logging instate selected]
+    foreach {comp} "$COMPONENTS" {
+        if {$GROUP($comp) == $grp} {
+            set LOGGING($comp) $state
         }
     }
 }
@@ -489,13 +500,15 @@ proc gui_tcl {} {
         ttk::button $allcmd.$g.start -style cmd.TButton -text "start" -command "all_cmd start $g"
         ttk::button $allcmd.$g.stop  -style cmd.TButton -text "stop"  -command "all_cmd stop  $g"
         ttk::button $allcmd.$g.check -style cmd.TButton -text "check" -command "all_cmd check $g"
-        ttk::checkbutton $allcmd.$g.noauto -text "no auto" -command "set_group_noauto $g" -variable GNOAUTO($g) -onvalue 1 -offvalue 0
+        ttk::checkbutton $allcmd.$g.noauto -text "no auto" -command "set_group_noauto $g"
+        ttk::checkbutton $allcmd.$g.logging -text "logging" -command "set_group_logging $g"
 
         pack $allcmd.$g.label -side left -padx 2
         pack $allcmd.$g.start -side left
         pack $allcmd.$g.stop -side left
         pack $allcmd.$g.check -side left
         pack $allcmd.$g.noauto -side left
+        pack $allcmd.$g.logging -side left
     }
 
     ttk::frame .main.log
