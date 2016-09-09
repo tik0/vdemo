@@ -233,8 +233,7 @@ proc psplit { str sep {protector "\\"}} {
 }
 
 proc parse_env_var {} {
-    global HOST COMPONENTS ARGS USEX WATCHFILE COMMAND TITLE VDEMOID TABS TAB COMPONENTS_ON_TAB
-    set VDEMOID [file tail [file rootname $::env(VDEMO_demoConfig)]]
+    global HOST COMPONENTS ARGS USEX WATCHFILE COMMAND TITLE TABS TAB COMPONENTS_ON_TAB
     set components_list "$::env(VDEMO_components)"
     set comp [psplit "$components_list" ":"]
     set nCompos [llength "$comp"]
@@ -1159,12 +1158,11 @@ proc ssh_command {cmd hostname {check 1} {verbose 1}} {
 }
 
 proc get_master_screen_name { hostname } {
-    global VDEMOID
-    return "vdemo-$VDEMOID-$hostname"
+    return "$::VDEMOID-$hostname"
 }
 
 proc get_fifo_name {hostname} {
-    return "$::TEMPDIR/vdemo-$::VDEMOID-ssh-$::env(USER)-$hostname"
+    return "$::TEMPDIR/$hostname"
 }
 
 set MONITOR_IGNORE_HOSTS [list]
@@ -1334,7 +1332,8 @@ proc compute_spread_segment {ip num} {
 }
 
 proc get_autospread_filename {} {
-    return "/tmp/vdemo-spread-$::VDEMOID-$::env(USER).conf"
+    # this file will be copied to all connected hosts
+    return "/tmp/$::VDEMOID-spread.conf"
 }
 
 proc create_spread_conf {} {
@@ -1561,8 +1560,12 @@ wm protocol . WM_DELETE_WINDOW {
 }
 
 proc setup_temp_dir { } {
-    global TEMPDIR
-    set TEMPDIR [exec mktemp -d /tmp/vdemo.XXXXXXXXXX]
+    global TEMPDIR VDEMOID
+
+    # VDEMOID is composed of demoConfig's basename and unique id
+    set name [file tail [file rootname $::env(VDEMO_demoConfig)]]
+    set TEMPDIR [exec mktemp -d /tmp/vdemo-$name-XXXXXXXXXX]
+    set VDEMOID [ file tail $TEMPDIR ]
 }
 
 proc handle_ctrl_fifo { infile } {
@@ -1627,13 +1630,13 @@ proc setup_ctrl_fifo { { filename "" } } {
     }
 }
 
-set mypid [pid]
-puts "My process id is $mypid"
-
 signal trap SIGINT finish
 signal trap SIGHUP finish
 
 setup_temp_dir
+set mypid [pid]
+puts "my process id: $mypid, vdemo-id: $::VDEMOID"
+
 parse_env_var
 if {"$::VDEMO_QUIT_COMPONENTS" != ""} {puts "quitting on exit of: $::VDEMO_QUIT_COMPONENTS"}
 remove_duplicates
