@@ -8,7 +8,7 @@ package require Iwidgets 4.0
 # required for signal handling
 package require Tclx
 
-set VDEMO_CONNECTION_TIMEOUT 15
+set VDEMO_CONNECTION_TIMEOUT 5
 catch {set VDEMO_CONNECTION_TIMEOUT $::env(VDEMO_CONNECTION_TIMEOUT)}
 append SSHOPTS "-oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -oConnectTimeout=" ${VDEMO_CONNECTION_TIMEOUT}
 
