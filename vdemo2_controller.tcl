@@ -8,7 +8,9 @@ package require Iwidgets 4.0
 # required for signal handling
 package require Tclx
 
-set SSHOPTS "-oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -oConnectTimeout=15"
+set VDEMO_CONNECTION_TIMEOUT 15
+catch {set VDEMO_CONNECTION_TIMEOUT $::env(VDEMO_CONNECTION_TIMEOUT)}
+append SSHOPTS "-oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -oConnectTimeout=" ${VDEMO_CONNECTION_TIMEOUT}
 
 # Theme settings
 proc define_theme_color {stylePrefix defaultBgnd mapping} {
@@ -1202,13 +1204,14 @@ proc connect_host {fifo host} {
     # the remote bash (over ssh) and the result is read again and piped into $fifo.out.
     # This way, the remote stdout goes into $fifo.out, while remote stderr is displayed here.
     set screenid [get_master_screen_name $host]
-    exec screen -dmS $screenid bash -c "tail -s 0.1 -f $fifo.in | ssh $::SSHOPTS -Y $host bash | while read s; do echo \$s > $fifo.out; done"
+    exec screen -dmS $screenid bash -c "tail -s 0.1 -f $fifo.in | (ssh $::SSHOPTS -Y $host bash || echo ssh connection timeout) | while read s; do echo \$s > $fifo.out; done"
 
     # Wait until connection is established.
     # Issue a echo command on remote host that only returns if a connection was established.
     puts -nonewline "connecting to $host: "; flush stdout
     exec bash -c "echo 'echo connected' > $fifo.in"
-    # timeout: 30s (should be enough to enter ssh password if necessary)
+    # Loop will wait for at most 30 seconds to allow entering a password if necessary.
+    # This will break earlier if ssh connection returns, e.g. due to timeout.
     set endtime [expr [clock seconds] + 30]
     set xterm_shown 0
     while {$endtime > [clock seconds]} {
