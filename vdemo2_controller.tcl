@@ -49,6 +49,12 @@ ttk::style configure alert.TLabel -foreground blue -background yellow
 ttk::style configure info.TLabel -foreground blue -background yellow
 ttk::style configure log.TLabel -justify left -anchor e -relief sunken -foreground gray30
 
+# Output buffer PID
+set buffer_pid 0
+set current_group ""
+set current_group_stopped ""
+set current_group_started ""
+
 # debugging puts()
 set DEBUG_LEVEL 0
 catch {set DEBUG_LEVEL $::env(VDEMO_DEBUG_LEVEL)}
@@ -715,7 +721,9 @@ proc all_cmd {cmd {group "all"} {lazy 1}} {
     if {"$cmd" == "stop"} {set levels [lreverse $levels]}
     foreach {level} "$levels" {
         # if ALLCMD_INTR was set negative, we break the loop
-        if {$::ALLCMD(intr_$group) < 0} {break}
+        if {$::ALLCMD(intr_$group) < 0} {
+            break
+        }
         level_cmd $cmd $level $group $lazy
     }
 
@@ -733,14 +741,23 @@ proc all_cmd {cmd {group "all"} {lazy 1}} {
 proc all_cmd_add_comp {group comp} {
     lappend ::ALLCMD(list_$group) $comp
 }
+
 proc all_cmd_comp_started {status} { return [string match "ok_*" $status] }
+
 proc all_cmd_comp_stopped {status} { return [string match "*_noscreen" $status] }
+
 # called when component's status changed
 proc all_cmd_comp_set_status {group comp status} {
+    global current_group current_group_started current_group_stopped
+
     if {$group == ""} return
 
     set started [all_cmd_comp_started $status]
     set stopped [all_cmd_comp_stopped $status]
+    set $current_group $group
+    set current_group_started ${started}
+    set current_group_stopped ${stopped}
+    # puts "group: ${group} started:${current_group_started} stopped:${current_group_stopped}"
     switch -exact -- $::ALLCMD(mode_$group) {
         start {
             if {!$started} {
@@ -952,7 +969,7 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
             if { [$WIDGET($comp).check instate disabled] } {
                 dputs "$TITLE($comp): already checking"
                 if {$allcmd_group != ""} {after 100 component_cmd $comp check $allcmd_group}
-                return 0
+                return 1
             }
             $WIDGET($comp).check state disabled
             set_status $comp unknown
@@ -965,14 +982,14 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
                 puts "internal error: result is not an integer: '$res'"
                 $WIDGET($comp).start state !disabled
                 if {$allcmd_group != ""} {after 100 component_cmd $comp check $allcmd_group}
-                return 0
+                return 1
             }
 
             if {$res == -1} {
                 dputs "no master connection to $HOST($comp)";
                 all_cmd_cancel $allcmd_group $comp
                 $WIDGET($comp).start state !disabled
-                return 0
+                return 1
             }
 
             set noscreen 0
@@ -983,10 +1000,13 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
             set onCheckResult [expr $res >> 2]
             set screenResult  [expr $res & 3]
             set s unknown
+            set status 0
             if {$onCheckResult == 0} { # on_check was successful
                 if {$screenResult == 0} { set s ok_screen } { set s ok_noscreen }
+                set status 0
             } else { # on_check failed
                 if {$screenResult == 0} { set s failed_check } { set s failed_noscreen }
+                set status 1
             }
 
             # handle started component
@@ -995,10 +1015,12 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
                 if {$onCheckResult != 0 && $screenResult == 0} {
                     if {$endtime < [clock milliseconds]} {
                         puts "$TITLE($comp) failed: timeout"
+                        set status 1
                     } else {
                         # stay in starting state and retrigger check
                         set s starting
                         after 1000 component_cmd $comp check $allcmd_group
+                        set status 1
                     }
                 }
             }
@@ -1010,6 +1032,7 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
                 # comp not yet stopped, retrigger check
                 set s unknown
                 after 1000 component_cmd $comp check $allcmd_group
+                set status 0
             }
 
             set_status $comp $s
@@ -1023,9 +1046,12 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
                 dputs "$comp not running: cancel detach timer" 2
                 cancel_detach_timer $comp
                 set SCREENED($comp) 0
+                set status 1
             }
             # indicate component status to all_cmd monitor
             all_cmd_comp_set_status $allcmd_group $comp $s
+
+            return $status
         }
         inspect {
             set cmd_line "$VARS $component_script $component_options inspect"
@@ -1317,8 +1343,17 @@ proc disconnect_hosts {} {
     }
 }
 
+proc kill_buffer {} {
+    global buffer_pid
+    if { $buffer_pid != 0 } {
+        puts "killing buffer process PID: ${buffer_pid}"
+        catch { exec kill -2 ${buffer_pid} }
+    }
+}
+
 proc finish {} {
     disconnect_hosts
+    kill_buffer
     catch {exec rmdir "$::TEMPDIR"}
     exit
 }
@@ -1584,10 +1619,14 @@ proc setup_temp_dir { } {
     set VDEMOID [ file tail $TEMPDIR ]
 }
 
-proc handle_ctrl_fifo { infile } {
-    if { [gets $infile line] >= 0 } {
+proc handle_ctrl_fifo { _infile _outfile } {
+    global current_group_started current_group_stopped
+
+    if { [gets $_infile line] >= 0 } {
+
         set args [regexp -all -inline {\S+} $line]
         set cmd [lindex $args 0]
+
         if {"$cmd" == "FINISH"} {
             puts "remote cmd: stopping all components and finish"
             all_cmd "stop"
@@ -1595,36 +1634,63 @@ proc handle_ctrl_fifo { infile } {
             return
         }
 
-        if {[lsearch -exact [list "start" "stop" "check"] $cmd] == -1} {
+        if {[lsearch -exact [ list "start" "stop" "check" "list" ] $cmd] == -1} {
             puts "unknown remote control command: $cmd"
             return
         }
 
         set comp [lindex $args 1]
+
         if {$comp == "ALL"} {
             puts "remote cmd: ${cmd}ing all components"
             all_cmd $cmd
             return
         }
+
         if {[lsearch -exact "$::GROUPS" $comp] != -1} {
-            puts "remote cmd: ${cmd}ing group $comp"
             all_cmd $cmd $comp
+            set result $current_group_stopped
+            append result ":"
+            append result $comp
+            exec echo ${result} > $_outfile
+            puts "remote cmd: ${cmd}ing group $comp result=${result}"
             return
         }
+
+        if {${cmd} == "list"} {
+            set comps ""
+            foreach {c} "$::COMPONENTS" {
+                append comps ${c}
+                append comps ", "
+            }
+            puts "remote cmd: ${cmd}ing components result=${comps}"
+            exec echo ${comps} > $_outfile
+            return
+        }
+
         foreach {c} "$::COMPONENTS" {
             if {$c == $comp} {
-                puts "remote cmd: ${cmd}ing component $comp"
-                component_cmd $comp $cmd
+                set result [ component_cmd $comp $cmd ]
+                puts "remote cmd: ${cmd}ing component $comp result=${result}"
+                append result ":"
+                append result $comp
+                exec echo ${result} > $_outfile
                 return
             }
         }
         puts "unknown component or group: $comp"
+        set result "1"
+        append result ":"
+        append result "unkown"
+        exec echo ${result} > $_outfile
     } else {
-        close $infile
+        close $_infile
     }
 }
 
 proc setup_ctrl_fifo { { filename "" } } {
+    global buffer_pid
+
     if {$filename == ""} {
         # fetch default from environment variable
         if {[info exists ::env(VDEMO_CONTROL_FIFO)]} {
@@ -1633,17 +1699,23 @@ proc setup_ctrl_fifo { { filename "" } } {
     }
     if {$filename == ""} return
 
-    exec mkdir -p [file dirname $filename]
-    exec rm -f $filename
-    exec mkfifo $filename
+    exec mkdir -p [file dirname $filename.in]
+    exec rm -f $filename.in
+    exec mkfifo $filename.in
 
-    if { [ catch { open "|tail -n 5 --pid=[pid] -F $filename"} infile] } {
-        puts "failed creating control fifo $filename"
-    } else {
-        fconfigure $infile -blocking no -buffering line
-        fileevent $infile readable [list handle_ctrl_fifo $infile]
-        puts "connected to remote control fifo $filename"
+    if { $buffer_pid == 0 } {
+        set buffer_pid [ exec buffer -o $filename.out & ]
     }
+
+    if { [ catch { open "|tail -n 5 --pid=[pid] -F $filename.in" } infile] } {
+        puts "failed creating control input fifo $filename.in"
+    }
+
+    fconfigure $infile -blocking false -buffering line
+    fileevent $infile readable [list handle_ctrl_fifo $infile $filename.out ]
+
+    puts "connected to remote control $filename.in (fifo) and $filename.out (buffer)"
+
 }
 
 signal trap SIGINT finish
