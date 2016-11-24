@@ -54,6 +54,7 @@ set buffer_pid 0
 set current_group ""
 set current_group_stopped ""
 set current_group_started ""
+set global_outfilename ""
 
 # debugging puts()
 set DEBUG_LEVEL 0
@@ -748,7 +749,7 @@ proc all_cmd_comp_stopped {status} { return [string match "*_noscreen" $status] 
 
 # called when component's status changed
 proc all_cmd_comp_set_status {group comp status} {
-    global current_group current_group_started current_group_stopped
+    global current_group current_group_started current_group_stopped global_outfilename
 
     if {$group == ""} return
 
@@ -758,6 +759,7 @@ proc all_cmd_comp_set_status {group comp status} {
     set current_group_started ${started}
     set current_group_stopped ${stopped}
     # puts "group: ${group} started:${current_group_started} stopped:${current_group_stopped}"
+
     switch -exact -- $::ALLCMD(mode_$group) {
         start {
             if {!$started} {
@@ -774,6 +776,16 @@ proc all_cmd_comp_set_status {group comp status} {
         default {return}
     }
     set ::ALLCMD(list_$group) [lsearch -inline -all -not -exact $::ALLCMD(list_$group) $comp]
+
+    if {$global_outfilename != ""} {
+        if {$current_group != ""} {
+            set result ${current_group_started}
+            append result ":"
+            append result ${current_group}
+            exec echo ${result} > $global_outfilename
+        }
+    }
+
     all_cmd_signal
 }
 # wait until all components from this group (at specific level) are finished
@@ -1689,7 +1701,7 @@ proc handle_ctrl_fifo { _infile _outfile } {
 }
 
 proc setup_ctrl_fifo { { filename "" } } {
-    global buffer_pid
+    global buffer_pid global_outfilename
 
     if {$filename == ""} {
         # fetch default from environment variable
@@ -1705,6 +1717,7 @@ proc setup_ctrl_fifo { { filename "" } } {
 
     if { $buffer_pid == 0 } {
         set buffer_pid [ exec buffer -o $filename.out & ]
+        set global_outfilename $filename.out
     }
 
     if { [ catch { open "|tail -n 5 --pid=[pid] -F $filename.in" } infile] } {
