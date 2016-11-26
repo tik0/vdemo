@@ -1750,7 +1750,7 @@ proc setup_ctrl_fifo { { filename "" } } {
     exec mkfifo $filename.in
 
     # Check if buffer is supported
-    set buffer_avail [ auto_execok buffser ]
+    set buffer_avail [ auto_execok buffer ]
 
     if { $buffer_pid == 0 && $buffer_avail != ""} {
         set buffer_pid [ exec buffer -o $filename.out & ]
