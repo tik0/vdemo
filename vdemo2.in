@@ -28,12 +28,12 @@ vdemo starter
                              -1: also suppress message boxes
   -f  --fifo <file>          fifo and buffer for text-based remote-control of vdemo gui
                              accepting:
-                             (start | stop | check ) [component | group | ALL]
-                             ( list | grouplist )
+                             (start | stop | check) [component | group | ALL]
+                             (list | grouplist)
                              Two channels are opened: <file>.in and <file>.out
                              The out channel is a non-blocking buffer.
                              The syntax of reported output results is:
-                             status:name [status 0 = ok | status 1 nok] [name of component or group]
+                             status:name [status 0 = ok | status 1 nok]
   -g  --geometry <geometry>  sets the main vdemo windows geometry to the specified
                              size. Uses default value (\"$GEOMETRY\") otherwise.
   -Q  --quit <components>    space separated list of components to quit vdemo on
