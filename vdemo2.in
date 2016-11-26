@@ -26,15 +26,18 @@ vdemo starter
   -v  --verbose [level]      set verbosity [level]
                              >0: increasing verbosity
                              -1: also suppress message boxes
-  -f  --fifo <file>          fifo for text-based remote-control of vdemo gui
+  -f  --fifo <file>          fifo and buffer for text-based remote-control of vdemo gui
                              accepting:
-                             (start | stop | check) [component | group | ALL]
-                             (list | grouplist)
+                             (start | stop | check | list | grouplist) [component | group | ALL]
+                             Two channels are opened: <file>.in and <file>.out
+                             The out channel is a non-blocking buffer.
+                             The reported output results in the buffer are:
+                             $status:$name [status 0 = ok | status 1 nok]
   -g  --geometry <geometry>  sets the main vdemo windows geometry to the specified
                              size. Uses default value (\"$GEOMETRY\") otherwise.
   -Q  --quit <components>    space separated list of components to quit vdemo on
 
- authors: Marc Hanheide, Robert Haschke
+ authors: Marc Hanheide, Robert Haschke, Florian Lier
 "
 
 # exit script on all non-zero return values
