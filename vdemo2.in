@@ -28,7 +28,8 @@ vdemo starter
                              -1: also suppress message boxes
   -f  --fifo <file>          fifo for text-based remote-control of vdemo gui
                              accepting:
-                             (start | stop | check) (component | group | ALL)
+                             (start | stop | check) [component | group | ALL]
+                             (list | grouplist)
   -g  --geometry <geometry>  sets the main vdemo windows geometry to the specified
                              size. Uses default value (\"$GEOMETRY\") otherwise.
   -Q  --quit <components>    space separated list of components to quit vdemo on

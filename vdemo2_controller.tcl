@@ -749,16 +749,12 @@ proc all_cmd_comp_stopped {status} { return [string match "*_noscreen" $status] 
 
 # called when component's status changed
 proc all_cmd_comp_set_status {group comp status} {
-    global current_group current_group_started current_group_stopped global_outfilename
+
 
     if {$group == ""} return
 
     set started [all_cmd_comp_started $status]
     set stopped [all_cmd_comp_stopped $status]
-    set $current_group $group
-    set current_group_started ${started}
-    set current_group_stopped ${stopped}
-    # puts "group: ${group} started:${current_group_started} stopped:${current_group_stopped}"
 
     switch -exact -- $::ALLCMD(mode_$group) {
         start {
@@ -777,15 +773,6 @@ proc all_cmd_comp_set_status {group comp status} {
     }
     set ::ALLCMD(list_$group) [lsearch -inline -all -not -exact $::ALLCMD(list_$group) $comp]
 
-    if {$global_outfilename != ""} {
-        if {$current_group != ""} {
-            set result ${current_group_started}
-            append result ":"
-            append result ${current_group}
-            exec echo ${result} > $global_outfilename
-        }
-    }
-
     all_cmd_signal
 }
 # wait until all components from this group (at specific level) are finished
@@ -802,7 +789,9 @@ proc all_cmd_cancel {group comp} {
     # remove comp from list ...
     set ::ALLCMD(list_$group) [lsearch -inline -all -not -exact $::ALLCMD(list_$group) $comp]
     # ... and indicate interrupt
-    if {$::ALLCMD(intr_$group) > -1} {set ::ALLCMD(intr_$group) -1}
+    if {$::ALLCMD(intr_$group) > -1} {
+        set ::ALLCMD(intr_$group) -1
+    }
     all_cmd_signal
 }
 proc level_cmd { cmd level group {lazy 0} } {
@@ -830,7 +819,6 @@ proc level_cmd { cmd level group {lazy 0} } {
             if {$doWait && $::ALLCMD(intr_$group) == -2} {break}
         }
     }
-
     if {$doWait} {all_cmd_wait $group}
 }
 
@@ -1632,12 +1620,17 @@ proc setup_temp_dir { } {
 }
 
 proc handle_ctrl_fifo { _infile _outfile } {
-    global current_group_started current_group_stopped
+    global GROUP COMPONENTS
 
     if { [gets $_infile line] >= 0 } {
 
         set args [regexp -all -inline {\S+} $line]
         set cmd [lindex $args 0]
+
+        # Flush the Buffer before each remote command
+        if {$_outfile != ""} {
+            exec echo "unknown:unknown" > $_outfile
+        }
 
         if {"$cmd" == "FINISH"} {
             puts "remote cmd: stopping all components and finish"
@@ -1646,7 +1639,8 @@ proc handle_ctrl_fifo { _infile _outfile } {
             return
         }
 
-        if {[lsearch -exact [ list "start" "stop" "check" "list" ] $cmd] == -1} {
+        # Check if the input is a valid command
+        if {[lsearch -exact [ list "start" "stop" "check" "list" "grouplist" ] $cmd] == -1} {
             puts "unknown remote control command: $cmd"
             return
         }
@@ -1659,13 +1653,37 @@ proc handle_ctrl_fifo { _infile _outfile } {
             return
         }
 
+        # If the component is in $GROUPS and the command is check, loop through all
+        # components in that group. Check if they really exist and perform the check.
+        # If one check fails, echo failed command into the output buffer.
+        if {[lsearch -exact "$::GROUPS" $comp] != -1 && $cmd == "check"} {
+            puts "remote cmd: checking group ${comp}"
+            foreach {key value} [array get GROUP] {
+                if {$value == $comp} {
+                    if {[lsearch -exact $::COMPONENTS $key] >= 0} {
+                        set result [ component_cmd $key $cmd ]
+                        # puts "remote cmd: ${cmd}ing component $key result=${result}"
+                        if {${result} == "1"} {
+                            append result ":"
+                            append result $comp
+                            puts "group ${comp} is not running"
+                            if {$_outfile != ""} {
+                                exec echo ${result} > $_outfile
+                            }
+                            return
+                        }
+                    }
+                }
+            }
+            puts "group ${comp} is running"
+            if {$_outfile != ""} {
+                exec echo "0:${comp}" > $_outfile
+            }
+            return
+        }
+
         if {[lsearch -exact "$::GROUPS" $comp] != -1} {
             all_cmd $cmd $comp
-            set result $current_group_stopped
-            append result ":"
-            append result $comp
-            exec echo ${result} > $_outfile
-            puts "remote cmd: ${cmd}ing group $comp result=${result}"
             return
         }
 
@@ -1676,7 +1694,16 @@ proc handle_ctrl_fifo { _infile _outfile } {
                 append comps ", "
             }
             puts "remote cmd: ${cmd}ing components result=${comps}"
-            exec echo ${comps} > $_outfile
+            if {$_outfile != ""} {
+                exec echo ${comps} > $_outfile
+            }
+            return
+        }
+
+        if {${cmd} == "grouplist"} {
+            foreach {key value} [array get GROUP] {
+                puts "\"$key\": $value"
+            }
             return
         }
 
@@ -1686,15 +1713,22 @@ proc handle_ctrl_fifo { _infile _outfile } {
                 puts "remote cmd: ${cmd}ing component $comp result=${result}"
                 append result ":"
                 append result $comp
-                exec echo ${result} > $_outfile
+                if {$_outfile != ""} {
+                    exec echo ${result} > $_outfile
+                }
                 return
             }
         }
+
         puts "unknown component or group: $comp"
         set result "1"
         append result ":"
-        append result "unkown"
-        exec echo ${result} > $_outfile
+        append result "unknown"
+
+        if {$_outfile != ""} {
+            exec echo ${result} > $_outfile
+        }
+
     } else {
         close $_infile
     }
@@ -1715,9 +1749,16 @@ proc setup_ctrl_fifo { { filename "" } } {
     exec rm -f $filename.in
     exec mkfifo $filename.in
 
-    if { $buffer_pid == 0 } {
+    # Check if buffer is supported
+    set buffer_avail [ auto_execok buffser ]
+
+    if { $buffer_pid == 0 && $buffer_avail != ""} {
         set buffer_pid [ exec buffer -o $filename.out & ]
         set global_outfilename $filename.out
+    } else {
+        set buffer_avail -1
+        puts "failed creating control output buffer $filename.out. No buffer support?"
+        set global_outfilename ""
     }
 
     if { [ catch { open "|tail -n 5 --pid=[pid] -F $filename.in" } infile] } {
@@ -1725,9 +1766,13 @@ proc setup_ctrl_fifo { { filename "" } } {
     }
 
     fconfigure $infile -blocking false -buffering line
-    fileevent $infile readable [list handle_ctrl_fifo $infile $filename.out ]
+    fileevent $infile readable [list handle_ctrl_fifo $infile $global_outfilename ]
 
-    puts "connected to remote control $filename.in (fifo) and $filename.out (buffer)"
+    if {$global_outfilename != ""} {
+        puts "connected to remote control $filename.in (fifo) and $global_outfilename (buffer)"
+    } else {
+        puts "connected to remote control $filename.in (fifo) no buffer support."
+    }
 
 }
 
