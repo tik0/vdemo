@@ -198,6 +198,9 @@ function launch_logrotation {
 		}
 	EOX
 
+	# unset -x to not spam the logfile with logroation stuff
+	set +x
+
 	# wait a bit until the process is up in a screen session (we have time here)
 	sleep 10
 
