@@ -1,21 +1,20 @@
 function start_Xserver {
-	echo -n "Trying to find an unlocked X session ..." >&2
+	echo -n "Trying to find an accessible X session ..." >&2
 	# prefer $USER's own x sessions over other
-	_user_sessions=$(who | egrep "$USER :[0-9]+" | cut -f2 -d " ")
-	_other_sessions=$(who | egrep ".* :[0-9]+" | grep -v $USER | cut -f2 -d " ")
+	_user_sessions=$(who | grep -oP "$USER.*\(\K:[0-9]+(?=\))")
+	_other_sessions=$(who | grep -oP '^(?!'"$USER"' ).*\(\K:[0-9]+(?=\))')
 	# above expressions fail on Ubuntu 12.04 (Precise), list all sessions as fallback:
 	_all_sessions=$(for x in /tmp/.X*-lock; do x=${x#/tmp/.X}; echo ":${x%-lock}"; done)
 	for d in $_user_sessions $_other_sessions $_all_sessions; do
 		echo -n " $d" >&2
 		if xwininfo -display $d -root > /dev/null 2>&1; then
-			_owner=$(who | egrep ".* $d" | cut -f1 -d " ")
-			echo " ($_owner) works." >&2
+			echo " works." >&2
 			echo "$d"
 			return 0
 		fi
 	done
 	echo >&2
-	echo "Couldn't find an unlocked X session. Consider using xhost+." >&2
+	echo "Couldn't find an accessible X session. Consider copying the sessions X authority file (xauth info) to ~/.Xauthority" >&2
 	exit 2
 }
 
