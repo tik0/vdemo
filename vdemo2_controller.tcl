@@ -743,8 +743,9 @@ proc all_cmd_add_comp {group comp} {
     lappend ::ALLCMD(list_$group) $comp
 }
 
+# from status decide whether the component is correctly started or not
 proc all_cmd_comp_started {status} { return [string match "ok_*" $status] }
-
+# from status decide whether the component is correctly stopped or not
 proc all_cmd_comp_stopped {status} { return [string match "*_noscreen" $status] }
 
 # called when component's status changed
@@ -759,8 +760,8 @@ proc all_cmd_comp_set_status {group comp status} {
     switch -exact -- $::ALLCMD(mode_$group) {
         start {
             if {!$started} {
-                # if component is not in starting mode anymore, it failed -> cancel
-                if {![$::WIDGET($comp).start instate disabled]} { all_cmd_cancel $group $comp}
+                # if component is not starting anymore, it failed -> cancel
+                if {"$status" != "starting"} { all_cmd_cancel $group $comp}
                 # otherwise, it simply isn't ready yet
                 return
             }
@@ -792,10 +793,11 @@ proc all_cmd_cancel {group comp} {
     if {$::ALLCMD(intr_$group) > -1} {
         set ::ALLCMD(intr_$group) -1
     }
+    blink_start $::WIDGET($comp).check
     all_cmd_signal
 }
 proc level_cmd { cmd level group {lazy 0} } {
-    # a start / stop command should stop a currently running process
+    # wait for the component to finish the start/stop cmd? -> add it to the list
     set doWait [expr [lsearch -exact [list "start" "stop"] $cmd] >= 0]
 
     set components $::COMPONENTS
@@ -814,6 +816,8 @@ proc level_cmd { cmd level group {lazy 0} } {
                 if {$doWait && $res != 0} { # component_cmd failed
                     all_cmd_cancel $group $comp
                 }
+            } else {
+                blink_stop $::WIDGET($comp).check
             }
             # break from loop, when manually requested (ALLCMD_INTR == -2)
             if {$doWait && $::ALLCMD(intr_$group) == -2} {break}
