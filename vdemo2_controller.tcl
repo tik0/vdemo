@@ -639,23 +639,103 @@ proc insertLog {infile} {
 #
 # We achieve that behavior, by monitoring a list of started components (in ::ALLCMD(list_$group))
 # and storing the start/stop mode (in ::ALLCMD(mode_$group)).
-# If a running command should be canceled, we use ::ALLCMD(intr_$group):
+# If a running command should be cancelled, we use ::ALLCMD(intr_$group):
 # -1: process failed -> stop further launching at next level
 # -2: manual interrupt request -> immediately stop launching
 #  0: all_cmd() finished / nothing pending
 #  1: all_cmd() is pending
-# The variable ::ALLCMD_COND is used as a condition (in vwait)
-# to listen to changes in the above varirables.
-set ::ALLCMD_COND 0
+# This list of pending levels are stored in ::ALLCMD(pending_levels_$group).
+# If a job finishes, fails, or a queue is cancelled, all_cmd_signal($group) is called.
+# This one checks the open queues and triggers the next level for execution.
+
+# list of groups for which user triggered an (exclusive) all_cmd
+set ::ALLCMD(running_groups) [list]
 proc all_cmd_reset {group} {
     set ::ALLCMD(list_$group) [list]
     set ::ALLCMD(mode_$group) ""
     set ::ALLCMD(intr_$group) 0
+    set ::ALLCMD(pending_levels_$group) [list]
+    # remove $group from list of running groups
+    set ::ALLCMD(running_groups) [lsearch -inline -all -not -exact $::ALLCMD(running_groups) $group]
 }
-proc all_cmd_signal {} {
-    # vwait simply listens to changes in a variable -> change something
-    set ::ALLCMD_COND [expr ($::ALLCMD_COND+1) % 10]
+
+# a process from group succeeded, failed, or group's all_cmd was interrupted -> proceed with next jobs
+proc all_cmd_signal {group} {
+    # Are there pending jobs for this group?
+    if { [llength $::ALLCMD(list_$group)] > 0 } return
+
+    # Got we interrupted?
+    if {$::ALLCMD(intr_$group) < 0} {
+        # Should we cancel active all_cmds of other groups too?
+        # I decided for no: If the user started groups independently,
+        # they should be able to finish independently.
+        # finish the current all_cmd for this group
+        all_cmd_finish [ lindex $::ALLCMD(mode_$group) 0 ] $group 1
+        return
+    }
+
+    # Is this group idle?  Test only here, because all_cmd_finish might have changed the variable
+    if { $::ALLCMD(mode_$group) == "" } return
+
+    # extract original all_cmd args and currently active execution level
+    lassign $::ALLCMD(mode_$group) cmd lazy
+    set current_level $::ALLCMD(current_level_${cmd})
+    
+    # are there pending execution levels for this job, which can be started right away?
+    if { [llength $::ALLCMD(pending_levels_$group)] > 0 } {
+        # peek next execution level
+        set next [lindex $::ALLCMD(pending_levels_$group) 0]
+        # can we execute next level right away?
+        if { ($cmd == "start" && $current_level != "" && $next <= $current_level) ||
+             ($cmd == "stop"  && $current_level != "" && $next >= $current_level) } {
+            # eventually decrease/increase current level to $next
+            set ::ALLCMD(current_level_${cmd}) $next
+            # pop first item from pending_levels list
+            set ::ALLCMD(pending_levels_$group) [lreplace $::ALLCMD(pending_levels_$group) 0 0]
+            # run jobs at this level
+            level_cmd $cmd $next $group $lazy
+            return
+        }
+        # if we get here, the current_level doesn't allow for our execution level yet
+    } else {
+        # if there are no more pending execution levels, we are done with this all_cmd
+        all_cmd_finish $cmd $group 1
+    }
+    all_cmd_continue $cmd
 }
+
+# continue with minimum execution level of all running all_cmds
+proc all_cmd_continue {cmd} {
+    set levels [list]
+    foreach {group} $::ALLCMD(running_groups) {
+        # Is this $group running a different cmd?
+        if { [lindex $::ALLCMD(mode_$group) 0 ] != $cmd } { continue }
+        # Are there pending jobs for this group?
+        if { [llength $::ALLCMD(list_$group)] > 0 } return
+        set levels [concat $levels $::ALLCMD(pending_levels_$group)]
+    }
+    set levels [lsort -unique $levels]
+    if {"$cmd" == "stop"} {set levels [lreverse $levels]}
+
+    # Are we finally done?
+    if { [llength $levels] == 0 } {
+        set ::ALLCMD(current_level_${cmd}) ""
+        return
+    }
+    # If there are levels left, continue with next one
+    set ::ALLCMD(current_level_${cmd}) [lindex $levels 0]
+    set level $::ALLCMD(current_level_${cmd})
+    # and trigger all running groups
+    foreach {group} $::ALLCMD(running_groups) {
+        set next [lindex $::ALLCMD(pending_levels_$group) 0]
+        if { ($cmd == "start" && $next <= $level) ||
+             ($cmd == "stop"  && $next >= $level) } {
+            after idle all_cmd_signal $group
+        }
+    }
+}
+
+# signal interruption for active all_cmds of given groups
 proc all_cmd_interrupt {groups} {
     # interrupt all groups?
     if {$groups == "all"} {set groups "$::GROUPS"}
@@ -665,10 +745,10 @@ proc all_cmd_interrupt {groups} {
     foreach group "all $groups" {
         if {$::ALLCMD(intr_$group) != 0} {
             set ::ALLCMD(intr_$group) -2
+            after idle all_cmd_signal $group
             set ret 1
         }
     }
-    if {$ret == 1} {all_cmd_signal}
     return $ret
 }
 proc all_cmd_update_gui {cmd group status style} {
@@ -684,57 +764,69 @@ proc all_cmd_update_gui {cmd group status style} {
     .main.allcmd.$group.$cmd configure -style $style
 }
 
-set ::ALLCMD(pending) [list]
+set ::ALLCMD(pending_cmds) [list]
 proc all_cmd_next_pending {} {
     # is there a pending command?
-    if {[llength $::ALLCMD(pending)] == 0} {return ""}
+    if {[llength $::ALLCMD(pending_cmds)] == 0} {return ""}
     # peek next command
-    set next [lindex $::ALLCMD(pending) 0]
+    set next [lindex $::ALLCMD(pending_cmds) 0]
     set group [lindex [split $next] 2]
 
     # check whether next command will conflict with active ones
     if {[all_cmd_interrupt $group]} {return ""}
 
     # no active + conflicting all_cmd() call: pop first element and return next
-    set ::ALLCMD(pending) [lreplace $::ALLCMD(pending) 0 0]
+    set ::ALLCMD(pending_cmds) [lreplace $::ALLCMD(pending_cmds) 0 0]
     return $next
 }
 
 proc all_cmd {cmd {group "all"} {lazy 1}} {
-    ### preparation
+    # initially defined ::ALLCMD(current_level_${cmd}) if not yet done
+    if { ![info exists ::ALLCMD(current_level_${cmd})] } { set ::ALLCMD(current_level_${cmd}) "" }
+
     # disable gui buttons
     all_cmd_update_gui $cmd $group "disabled" "starting.cmd.TButton"
+
+    # get list of levels to process (in correct order)
+    set levels $::LEVELS
+    if {"$cmd" == "stop"} {set levels [lreverse $levels]}
+
     # ensure that other all_cmds from same $group are interrupted
-    set doWait [expr [lsearch -exact [list "start" "stop"] $cmd] >= 0]
-    if {$doWait} {
+    set sync [expr [lsearch -exact [list "start" "stop"] $cmd] >= 0]
+    if {$sync} {
         if {[all_cmd_interrupt $group]} {
             # there is an active, conflicting all_cmd() call, postpone this new one
-            lappend ::ALLCMD(pending) "all_cmd $cmd $group $lazy"
+            lappend ::ALLCMD(pending_cmds) "all_cmd $cmd $group $lazy"
             return
         }
         # cmd accepted
         set ::ALLCMD(intr_$group) 1
-        set ::ALLCMD(mode_$group) $cmd
-    }
+        set ::ALLCMD(mode_$group) "$cmd $lazy"
+        lappend ::ALLCMD(running_groups) "$group"
 
-    ### run all components by level
-    set levels $::LEVELS
-    if {"$cmd" == "stop"} {set levels [lreverse $levels]}
-    foreach {level} "$levels" {
-        # if ALLCMD_INTR was set negative, we break the loop
-        if {$::ALLCMD(intr_$group) < 0} {
-            break
+        # schedule all levels for execution
+        set ::ALLCMD(pending_levels_$group) $levels
+        all_cmd_signal $group
+    } else {
+        # trigger execution for all levels
+        foreach {level} "$levels" {
+            level_cmd $cmd $level $group $lazy
         }
-        level_cmd $cmd $level $group $lazy
+        # finish
+        all_cmd_finish $cmd $group $sync
     }
+}
 
-    ### cleanup
+# finish execution of an all_cmd for $group
+proc all_cmd_finish {cmd group synced} {
     # enable gui buttons
     set stylePrefix [expr {$::ALLCMD(intr_$group) == -1 ? "failed." : ""}]
     all_cmd_update_gui $cmd $group "!disabled" "${stylePrefix}cmd.TButton"
-    if {$doWait} {
+
+    if {$synced} {
         all_cmd_reset $group
-        # if there is a pending all_cmd, now we can execute it
+        all_cmd_continue $cmd
+        # if there is a pending all_cmd, now we can schedule it for execution
         if {[set next [all_cmd_next_pending]] != ""} {after idle $next}
     }
 }
@@ -750,14 +842,12 @@ proc all_cmd_comp_stopped {status} { return [string match "*_noscreen" $status] 
 
 # called when component's status changed
 proc all_cmd_comp_set_status {group comp status} {
-
-
     if {$group == ""} return
 
     set started [all_cmd_comp_started $status]
     set stopped [all_cmd_comp_stopped $status]
 
-    switch -exact -- $::ALLCMD(mode_$group) {
+    switch -exact -- [lindex $::ALLCMD(mode_$group) 0] {
         start {
             if {!$started} {
                 # if component is not starting anymore, it failed -> cancel
@@ -773,17 +863,9 @@ proc all_cmd_comp_set_status {group comp status} {
         default {return}
     }
     set ::ALLCMD(list_$group) [lsearch -inline -all -not -exact $::ALLCMD(list_$group) $comp]
+    all_cmd_signal $group
+}
 
-    all_cmd_signal
-}
-# wait until all components from this group (at specific level) are finished
-proc all_cmd_wait {group} {
-    # do not break from loop on interrupt!
-    # Otherwise components might be in an intermediate state
-    while {[llength $::ALLCMD(list_$group)] > 0} {
-        vwait ::ALLCMD_COND
-    }
-}
 # set ALLCMD_INTR to -1 to indicate cancelling
 proc all_cmd_cancel {group comp} {
     if {$group == "" || $::ALLCMD(mode_$group) == ""} return
@@ -794,11 +876,10 @@ proc all_cmd_cancel {group comp} {
         set ::ALLCMD(intr_$group) -1
     }
     blink_start $::WIDGET($comp).check
-    all_cmd_signal
+    all_cmd_signal $group
 }
 proc level_cmd { cmd level group {lazy 0} } {
-    # wait for the component to finish the start/stop cmd? -> add it to the list
-    set doWait [expr [lsearch -exact [list "start" "stop"] $cmd] >= 0]
+    set synced [expr [lsearch -exact [list "start" "stop"] $cmd] >= 0]
 
     set components $::COMPONENTS
     if {"$cmd" == "stop"} {set components [lreverse $::COMPONENTS]}
@@ -811,19 +892,20 @@ proc level_cmd { cmd level group {lazy 0} } {
                 start {set doIt [expr (!$lazy || ![all_cmd_comp_started $::COMPSTATUS($comp)]) && !$::NOAUTO($comp)]}
             }
             if {$doIt} {
-                if {$doWait} {all_cmd_add_comp $group $comp}
+                if {$synced} {all_cmd_add_comp $group $comp}
                 set res [component_cmd $comp $cmd $group]
-                if {$doWait && $res != 0} { # component_cmd failed
+                if {$synced && $res != 0} { # component_cmd failed
                     all_cmd_cancel $group $comp
                 }
             } else {
                 blink_stop $::WIDGET($comp).check
             }
             # break from loop, when manually requested (ALLCMD_INTR == -2)
-            if {$doWait && $::ALLCMD(intr_$group) == -2} {break}
+            if {$synced && $::ALLCMD(intr_$group) == -2} {break}
         }
     }
-    if {$doWait} {all_cmd_wait $group}
+    # in case of empty component list, we need to retrigger all_cmd_signal
+    after idle all_cmd_signal $group
 }
 
 proc remote_xterm {host} {
@@ -1603,7 +1685,13 @@ proc gui_exit {} {
             set ans yes
         }
         switch -- $ans {
-            yes {all_cmd stop "all" 1}
+            yes {
+                all_cmd stop "all" 0
+                # wait for all stop cmds to be finished
+                while { $::ALLCMD(current_level_stop) != "" } {
+                    vwait ::ALLCMD(current_level_stop)
+                }
+            }
             cancel {return}
         }
     }
