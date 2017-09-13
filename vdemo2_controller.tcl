@@ -1015,6 +1015,7 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
                 $WIDGET($comp).stop state disabled
                 $WIDGET($comp).start state !disabled
             }
+            set old_status $::COMPSTATUS($comp)
             set_status $comp unknown
             cancel_detach_timer $comp
 
@@ -1026,6 +1027,17 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
             if {$res != -1 && $cmd != "stopwait"} {
                 # Asynchronously wait for component to stop (triggering check every 100ms)
                 after 100 component_cmd $comp check $allcmd_group
+            } else { # an error occurred when issuing the ssh_command
+                $WIDGET($comp).stop state !disabled
+                # restore old status
+                set_status $comp $old_status
+                if {[running $comp]} { # if component was running, indicate an error
+                    return 1
+                } else { # otherwise, pretend everything is fine
+                    # pretend that component stopped, such that all_cmd loop can proceed
+                    all_cmd_comp_set_status $allcmd_group $comp failed_noscreen
+                    return 0
+                }
             }
         }
         screen {
