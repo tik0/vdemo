@@ -657,6 +657,9 @@ proc all_cmd_reset {group} {
     set ::ALLCMD(pending_levels_$group) [list]
     # remove $group from list of running groups
     set ::ALLCMD(running_groups) [lsearch -inline -all -not -exact $::ALLCMD(running_groups) $group]
+    if { [llength $::ALLCMD(running_groups)] == 0 } {
+        set ::ALLCMD(ignore_hosts) [list]
+    }
 }
 
 # a process from group succeeded, failed, or group's all_cmd was interrupted -> proceed with next jobs
@@ -781,7 +784,7 @@ proc all_cmd_next_pending {} {
 }
 
 proc all_cmd {cmd {group "all"} {lazy 1}} {
-    # initially defined ::ALLCMD(current_level_${cmd}) if not yet done
+    # initially define ::ALLCMD(current_level_${cmd}) if not yet done
     if { ![info exists ::ALLCMD(current_level_${cmd})] } { set ::ALLCMD(current_level_${cmd}) "" }
 
     # disable gui buttons
@@ -846,21 +849,27 @@ proc all_cmd_comp_set_status {group comp status} {
 
     set started [all_cmd_comp_started $status]
     set stopped [all_cmd_comp_stopped $status]
+    set ignored [expr [lsearch -exact $::ALLCMD(ignore_hosts) $::HOST($comp)] >= 0]
 
     switch -exact -- [lindex $::ALLCMD(mode_$group) 0] {
         start {
             if {!$started} {
                 # if component is not starting anymore, it failed -> cancel
-                if {"$status" != "starting"} { all_cmd_cancel $group $comp}
-                # otherwise, it simply isn't ready yet
-                return
+                if {"$status" != "starting"} {
+                    if { !$ignored } { #  only cancel if host connection is not ignored
+                        all_cmd_cancel $group $comp
+                        return
+                    }
+                } else { # otherwise, component isn't ready yet, be more patient...
+                    return
+                }
             }
         }
         stop  {
             # if component isn't stopped yet, simply be patient...
-            if {!$stopped } { return }
+            if {!$stopped && !$ignored} { return }
         }
-        default {return}
+        check {return}
     }
     set ::ALLCMD(list_$group) [lsearch -inline -all -not -exact $::ALLCMD(list_$group) $comp]
     all_cmd_signal $group
@@ -884,8 +893,9 @@ proc level_cmd { cmd level group {lazy 0} } {
     set components $::COMPONENTS
     if {"$cmd" == "stop"} {set components [lreverse $::COMPONENTS]}
     foreach {comp} "$components" {
+        set ignore [expr [lsearch -exact $::ALLCMD(ignore_hosts) $::HOST($comp)] >= 0]
         if {$::COMP_LEVEL($comp) == $level && \
-                ($group == "all" || $::GROUP($comp) == $group)} {
+                ($group == "all" || $::GROUP($comp) == $group) && !$ignore} {
             switch -exact -- $cmd {
                 check {set doIt 1}
                 stop  {set doIt [expr  !$lazy || ![all_cmd_comp_stopped $::COMPSTATUS($comp)]]}
@@ -894,7 +904,8 @@ proc level_cmd { cmd level group {lazy 0} } {
             if {$doIt} {
                 if {$synced} {all_cmd_add_comp $group $comp}
                 set res [component_cmd $comp $cmd $group]
-                if {$synced && $res != 0} { # component_cmd failed
+                set ignore [expr [lsearch -exact $::ALLCMD(ignore_hosts) $::HOST($comp)] >= 0]
+                if {$synced && $res != 0 && !$ignore} { # component_cmd failed
                     all_cmd_cancel $group $comp
                 }
             } else {
@@ -955,6 +966,7 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
             if {$res == -1} {
                 puts "no master connection to $HOST($comp)"
                 $WIDGET($comp).start state !disabled
+                all_cmd_comp_set_status $allcmd_group $comp unknown
                 return 1
             } elseif {$res == 0} {
                 dputs "$TITLE($comp): already running, stopping first..."
@@ -1024,10 +1036,7 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
             set SCREENED($comp) 0
 
             set ::LAST_GUI_INTERACTION($comp) [clock milliseconds]
-            if {$res != -1 && $cmd != "stopwait"} {
-                # Asynchronously wait for component to stop (triggering check every 100ms)
-                after 100 component_cmd $comp check $allcmd_group
-            } else { # an error occurred when issuing the ssh_command
+            if {$res == -1} { # an error occurred when issuing the ssh_command
                 $WIDGET($comp).stop state !disabled
                 # restore old status
                 set_status $comp $old_status
@@ -1038,6 +1047,9 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
                     all_cmd_comp_set_status $allcmd_group $comp failed_noscreen
                     return 0
                 }
+            } elseif {$cmd != "stopwait"} {
+                # Asynchronously wait for component to stop (triggering check every 100ms)
+                after 100 component_cmd $comp check $allcmd_group
             }
         }
         screen {
@@ -1085,8 +1097,8 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
 
             if {$res == -1} {
                 dputs "no master connection to $HOST($comp)";
-                all_cmd_cancel $allcmd_group $comp
                 $WIDGET($comp).start state !disabled
+                all_cmd_comp_set_status $allcmd_group $comp unknown
                 return 1
             }
 
@@ -1227,6 +1239,8 @@ proc reconnect_host {host msg} {
         # try to connect to host
         set fifo [get_fifo_name $host]
         set res [connect_host $fifo $host]
+    } elseif { [llength $::ALLCMD(running_groups)] > 0 } {
+        lappend ::ALLCMD(ignore_hosts) $host
     }
     gui_update_host $host $res
     return $res
