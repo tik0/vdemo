@@ -112,15 +112,20 @@ function vdemo_start_component {
 			"-l"|"--logging")
 				local logfiledir="${VDEMO_logfile%/*}"
 				if [ ! -d "$logfiledir" ]; then mkdir -p "$logfiledir"; fi
-				if [ "$LOG_ROTATION" == "ON" ]; then
-					echo "logrotation is enabled." >&2
-					export -f launch_logrotation
-					export -f vdemo_pidFromScreen
-					log_rotation_command="(launch_logrotation $VDEMO_logfile ${VDEMO_title})& "
-				fi
 				echo "logging to ${VDEMO_logfile}" >&2
 				# exec allows to redirect output of current shell
-				local VDEMO_logging="set -x; exec 1> >(tee -a \"${VDEMO_logfile}\") 2>&1;"
+				if [ "$LOG_ROTATION" == "ON" ]; then
+					echo "logrotation is enabled." >&2
+					read -r -d '' log_init_msg <<- EOM
+					###################################
+					vdemo component start: ${VDEMO_title}
+					$(date -Ins)
+					###################################
+					EOM
+					local VDEMO_logging="exec 1> >(rotatelogs -L \"${VDEMO_logfile}\" -f -e \"${VDEMO_logfile}\" 10M) 2>&1; echo \"$log_init_msg\";set -x;"
+				else
+					local VDEMO_logging="exec 1> >(tee -a \"${VDEMO_logfile}\") 2>&1;set -x;"
+				fi
 				;;
 			--)
 				shift
@@ -140,23 +145,11 @@ function vdemo_start_component {
 	# remove old log file if we do not want to rotate/append
 	if [ ! "$LOG_ROTATION" == "ON" ]; then
 		rm -f "${VDEMO_logfile}" # remove any old log file
-	else
-		cat >> ${VDEMO_logfile} <<- EOX
-
-
-			#################################
-			new VDEMO component start
-			component name: ${VDEMO_title}
-			`date`
-			#################################
-
-
-		EOX
 	fi
 
 	# Logging has missing lines at the end (or is completely empty) when finishing fast.
 	# Adding a small sleep seems to fix this issue.
-	local cmd="${VDEMO_logging} ${log_rotation_command} LD_LIBRARY_PATH=${LD_LIBRARY_PATH} DISPLAY=${VDEMO_componentDisplay} component $*; sleep 0.01"
+	local cmd="${VDEMO_logging} LD_LIBRARY_PATH=${LD_LIBRARY_PATH} DISPLAY=${VDEMO_componentDisplay} component $*; sleep 0.01"
 
     # bash needs to be started in in interactive mode to have job control available
     # --norc is used to prevent inclusion of the use configuration in the execution.
@@ -168,60 +161,6 @@ function vdemo_start_component {
 		screen -t "$VDEMO_title" -S "${VDEMO_title}_" -d -m \
 			stdbuf -oL bash --norc -i -c "$cmd"
 	fi
-}
-
-# creates a logrotation configuration file and enters a logrotate loop until
-# the process dies
-#
-#
-# $1 : logfile to rotate
-# $2 : $VDEMO_title of process which is responsible (makes sure logrotation loop
-#      is ended if process dies)
-#
-# Note: start this function in the background using &
-function launch_logrotation {
-	# disabled for now
-	# echo "[VDEMO_LOGROTATE] initiating logrotation for component $2 - file to watch: $1" >&2
-
-	# Create the configuration files
-	component_logrotate_configfile=$1.rotation.conf
-	component_logrotate_statefile=$1.rotation.state
-	cat > ${component_logrotate_configfile} <<- EOX
-		$1 {
-		    size ${LOG_ROTATION_SIZE-50M}
-		    rotate ${LOG_ROTATION_COUNT-8}
-		    missingok
-		    notifempty
-		    copytruncate
-		    ${LOG_ROTATION_OPTIONS-compress}
-		}
-	EOX
-
-	# unset -x to not spam the logfile with logroation stuff
-	set +x
-
-	# wait a bit until the process is up in a screen session (we have time here)
-	sleep 10
-
-	# obtain the pid of screen session
-	local initial_VDEMO_pid=$(vdemo_pidFromScreen $2)
-
-	# loop until process dies
-	echo "[VDEMO_LOGROTATE] entering logrotation loop ($2 - $1)" >&2
-	while true
-	do
-
-		# check if there was a component death/restart
-		if ! ps -p ${initial_VDEMO_pid} > /dev/null; then
-			echo "[VDEMO_LOGROTATE] vdemo log rotation stops for $2 - component seems to have died/restarted/crashed (pid $initial_VDEMO_pid is gone)" >&2
-			break
-		fi
-
-		# rotate the logfile
-		# echo "[VDEMO_LOGROTATE] logrotatting file '$1' now (component '$2')" >&2
-		/usr/sbin/logrotate ${component_logrotate_configfile} -s ${component_logrotate_statefile}
-		sleep ${LOG_ROTATION_INTERVALL-300}
-	done
 }
 
 # get all direct and indirect children of a process (including process itself)
