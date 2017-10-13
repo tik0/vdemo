@@ -1,0 +1,15 @@
+#!/bin/bash
+# deletes old logfiles following the pattern logfile.<numeric timestamp>
+# requires VDEMO_logfile and VDEMO_LOG_ROTATE
+shopt -s extglob
+shopt -s nullglob
+if [ -z "$VDEMO_logfile" ] || [ -z "$VDEMO_LOG_ROTATION" ]; then
+	echo "this helper script removes old logfiles and requires VDEMO_logfile=<filename> and VDEMO_LOG_ROTATION=<N> to be set"
+	exit 1
+fi
+# deletes all files in the argument list except the N last files.
+function keepN {
+	rm -f "${@:1:$(($# > ${VDEMO_LOG_ROTATION} ? $#-${VDEMO_LOG_ROTATION} : 0))}"
+}
+# globbing returns sorted lists. Files with older timestamp suffix are listed first.
+keepN "${VDEMO_logfile}".+([0-9])
