@@ -38,7 +38,7 @@ vdemo starter
                              size. Uses default value (\"$GEOMETRY\") otherwise.
   -Q  --quit <components>    space separated list of components to quit vdemo on
 
- authors: Marc Hanheide, Robert Haschke, Florian Lier
+ authors: Marc Hanheide, Robert Haschke, Lars Schillingmann, Florian Lier
 "
 
 # exit script on all non-zero return values
@@ -68,7 +68,11 @@ while [ $# -gt 0 ]; do
         ;;
     "-r"|"--logrotate")
         echo "Enable log rotation"
-        export VDEMO_LOG_ROTATION="yes"
+        export VDEMO_LOG_ROTATION=5
+        if [[ $2 =~ ^[0-9]+$ ]] ; then
+            VDEMO_LOG_ROTATION=$2
+            shift
+        fi
         ;;
     "-v"|"--verbose")
         export VDEMO_DEBUG_LEVEL=1

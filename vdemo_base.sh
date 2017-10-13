@@ -99,7 +99,7 @@ function vdemo_start_component {
 	local VDEMO_componentDisplay="${DISPLAY}"
 	local VDEMO_startDetached="no"
 	local COLOR="white"
-	local VDEMO_logfile="${VDEMO_logfile_prefix}${VDEMO_title}.log"
+	export VDEMO_logfile="${VDEMO_logfile_prefix}${VDEMO_title}.log"
 	while [ $# -gt 0 ]; do
 		case $1 in
 			"-D"|"--detached")
@@ -114,7 +114,7 @@ function vdemo_start_component {
 				if [ ! -d "$logfiledir" ]; then mkdir -p "$logfiledir"; fi
 				echo "logging to ${VDEMO_logfile}" >&2
 				# exec allows to redirect output of current shell
-				if [ "$VDEMO_LOG_ROTATION" == "yes" ]; then
+				if [[ "$VDEMO_LOG_ROTATION" =~ ^[0-9]+$ ]] ; then
 					echo "logrotation is enabled." >&2
 					read -r -d '' log_init_msg <<- EOM
 					###################################
@@ -122,7 +122,8 @@ function vdemo_start_component {
 					$(date -Ins)
 					###################################
 					EOM
-					local VDEMO_logging="exec 1> >(rotatelogs -L \"${VDEMO_logfile}\" -f -e \"${VDEMO_logfile}\" 10M) 2>&1; echo \"$log_init_msg\";set -x;"
+					local VDEMO_logging="exec 1> >(rotatelogs -p ${VDEMO_root}/vdemo_remove_logfiles -L \"${VDEMO_logfile}\""
+					VDEMO_logging+=" -f -e \"${VDEMO_logfile}\" 10M) 2>&1; echo \"$log_init_msg\";set -x;"
 				else
 					local VDEMO_logging="exec 1> >(tee -a \"${VDEMO_logfile}\") 2>&1;set -x;"
 				fi
