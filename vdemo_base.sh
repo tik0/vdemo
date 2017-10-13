@@ -114,7 +114,7 @@ function vdemo_start_component {
 				if [ ! -d "$logfiledir" ]; then mkdir -p "$logfiledir"; fi
 				echo "logging to ${VDEMO_logfile}" >&2
 				# exec allows to redirect output of current shell
-				if [ "$LOG_ROTATION" == "ON" ]; then
+				if [ "$VDEMO_LOG_ROTATION" == "yes" ]; then
 					echo "logrotation is enabled." >&2
 					read -r -d '' log_init_msg <<- EOM
 					###################################
@@ -142,10 +142,7 @@ function vdemo_start_component {
 
 	export -f component
 
-	# remove old log file if we do not want to rotate/append
-	if [ ! "$LOG_ROTATION" == "ON" ]; then
-		rm -f "${VDEMO_logfile}" # remove any old log file
-	fi
+	rm -f "${VDEMO_logfile}" # remove any old log file
 
 	# Logging has missing lines at the end (or is completely empty) when finishing fast.
 	# Adding a small sleep seems to fix this issue.

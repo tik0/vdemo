@@ -68,8 +68,7 @@ while [ $# -gt 0 ]; do
         ;;
     "-r"|"--logrotate")
         echo "Enable log rotation"
-        export LOG_ROTATION="ON"
-        export VDEMO_exports="$VDEMO_exports LOG_ROTATION"
+        export VDEMO_LOG_ROTATION="yes"
         ;;
     "-v"|"--verbose")
         export VDEMO_DEBUG_LEVEL=1
