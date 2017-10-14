@@ -99,7 +99,18 @@ function vdemo_start_component {
 	local VDEMO_componentDisplay="${DISPLAY}"
 	local VDEMO_startDetached="no"
 	local COLOR="white"
-	export VDEMO_logfile="${VDEMO_logfile_prefix}${VDEMO_title}.log"
+	local VDEMO_logfile="${VDEMO_logfile_prefix}${VDEMO_title}.log"
+	local logfiledir="${VDEMO_logfile%/*}"
+	if [ ! -d "$logfiledir" ]; then mkdir -p "$logfiledir"; fi
+	local VDEMO_logging
+	IFS= read -r -d '' VDEMO_logging <<- EOF
+		function vdemo_screendump {
+			screen -S "\$STY" -X -p0 hardcopy -h "${VDEMO_logfile}"
+			sed -i -e '1i#VDEMO note: screen hardcopy' -e '/./,\$!d' "${VDEMO_logfile}"
+		}
+		trap vdemo_screendump EXIT
+	EOF
+	echo "$VDEMO_logging" >&2
 	while [ $# -gt 0 ]; do
 		case $1 in
 			"-D"|"--detached")
@@ -110,22 +121,21 @@ function vdemo_start_component {
 				VDEMO_componentDisplay="$1"
 				;;
 			"-l"|"--logging")
-				local logfiledir="${VDEMO_logfile%/*}"
-				if [ ! -d "$logfiledir" ]; then mkdir -p "$logfiledir"; fi
 				echo "logging to ${VDEMO_logfile}" >&2
 				# exec allows to redirect output of current shell
 				if [[ "$VDEMO_LOG_ROTATION" =~ ^[0-9]+$ ]] ; then
 					echo "logrotation is enabled." >&2
-					read -r -d '' log_init_msg <<- EOM
-					###################################
-					vdemo component start: ${VDEMO_title}
-					$(date -Ins)
-					###################################
-					EOM
-					local VDEMO_logging="exec 1> >(rotatelogs -p ${VDEMO_root}/vdemo_remove_logfiles -L \"${VDEMO_logfile}\""
-					VDEMO_logging+=" -f -e \"${VDEMO_logfile}\" 10M) 2>&1; echo \"$log_init_msg\";set -x;"
+					IFS= read -r -d '' VDEMO_logging <<- EOF
+						exec 1> >(VDEMO_logfile="${VDEMO_logfile}" rotatelogs -p "${VDEMO_root}"/vdemo_remove_logfiles \
+						-L "${VDEMO_logfile}" -f -e "${VDEMO_logfile}" 10M) 2>&1
+						echo "#########################################
+						vdemo component start: ${VDEMO_title}
+						$(date -Ins)
+						#########################################"
+						set -x
+					EOF
 				else
-					local VDEMO_logging="exec 1> >(tee -a \"${VDEMO_logfile}\") 2>&1;set -x;"
+					VDEMO_logging="exec 1> >(tee -a \"${VDEMO_logfile}\") 2>&1;set -x;"
 				fi
 				;;
 			--)
@@ -147,7 +157,7 @@ function vdemo_start_component {
 
 	# Logging has missing lines at the end (or is completely empty) when finishing fast.
 	# Adding a small sleep seems to fix this issue.
-	local cmd="${VDEMO_logging} LD_LIBRARY_PATH=${LD_LIBRARY_PATH} DISPLAY=${VDEMO_componentDisplay} component $*; sleep 0.01"
+	local cmd="${VDEMO_logging} LD_LIBRARY_PATH=${LD_LIBRARY_PATH} DISPLAY=${VDEMO_componentDisplay} component $*; sleep 0.01;"
 
     # bash needs to be started in in interactive mode to have job control available
     # --norc is used to prevent inclusion of the use configuration in the execution.
