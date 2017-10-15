@@ -1263,16 +1263,16 @@ proc ssh_check_connection {hostname {connect 1}} {
     } else {
         # Issue a dummy command to check whether connection is still alive. If not, we get a timeout after 1s.
         # Without checking, reading $fifo.out will last forever when ssh connection is broken.
-        # The error code of the timeout is 124. Tcl creates an exception on timeout.
+        # The same applies to writing to $fifo.in. The error code of the timeout is 124.
         # Instead of timing out on the real ssh_command, we timeout here on a dummy, because here we
         # know, that the command shouldn't last long. However, the real ssh_command could last rather
         # long, e.g. stopping a difficult component. This would generate a spurious timeout.
-        catch { set res 124; set res [exec bash -c "echo 'echo 0' > $fifo.in; timeout 1 cat $fifo.out"] }
+        set res [exec bash -c "exec 5<>$fifo.in; echo 'echo 0' >&5; exec 5>&-; IFS= read -rt 1 <>$fifo.out; echo \$REPLY"]
         dputs "connection check result: $res" 2
 
-        # cat might also fetch the result of a previous, delayed ssh command. Hence, if we didn't
-        # timed out, set the result always to zero.
-        if {$res != 124} {set res 0} {set msg "Timeout on connection to $hostname. Reconnect?"}
+        # we might also fetch the result of a previous, delayed ssh command. Really?
+        # if ssh is killed we receive "ssh connection timeout" due to the subshell ( ssh || echo ...) ssh is started in.
+        if {$res != 0} {set msg "Timeout on connection to $hostname. Reconnect?"; set res 0}
     }
 
     # actually try to reconnect
@@ -1353,7 +1353,7 @@ proc connect_host {fifo host} {
     set endtime [expr [clock seconds] + 30]
     set xterm_shown 0
     while {$endtime > [clock seconds]} {
-        set res [exec bash -c "timeout 1 cat $fifo.out; echo $?"]
+        set res [exec bash -c "IFS= read -rt 1 <>$fifo.out; echo \$REPLY; echo \$?"]
         set noScreen [catch {exec bash -c "screen -wipe | fgrep -q .$screenid"} ]
         # continue waiting on timeout (124), otherwise break from loop
         if {$res == 124} { puts -nonewline "."; flush stdout } { break }
