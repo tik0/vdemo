@@ -1263,15 +1263,15 @@ proc ssh_check_connection {hostname {connect 1}} {
     } else {
         # Issue a dummy command to check whether connection is still alive. If not, we get a timeout after 1s.
         # Without checking, reading $fifo.out will last forever when ssh connection is broken.
-        # The same applies to writing to $fifo.in. The error code of the timeout is 124.
+        # The same applies to writing to $fifo.in thus it is opened as a filedescriptor in bash in read/write mode
+        # which makes it non-blocking. The error code of the read timeout is 124.
         # Instead of timing out on the real ssh_command, we timeout here on a dummy, because here we
         # know, that the command shouldn't last long. However, the real ssh_command could last rather
         # long, e.g. stopping a difficult component. This would generate a spurious timeout.
-        set res [exec bash -c "exec 5<>$fifo.in; echo 'echo 0' >&5; exec 5>&-; IFS= read -rt 1 s <>$fifo.out; echo \$s"]
+        set res [exec bash -c "exec 5<>$fifo.in; echo 'echo -ne 0\\\\0' >&5; read -d '' -rt 1 s <>$fifo.out; echo \$s"]
         dputs "connection check result: $res" 2
 
         # we might also fetch the result of a previous, delayed ssh command. Really?
-        # if ssh is killed we receive "ssh connection timeout" due to the subshell ( ssh || echo ...) ssh is started in.
         if {$res != 0} {set msg "Timeout on connection to $hostname. Reconnect?"; set res 0}
     }
 
@@ -1304,9 +1304,9 @@ proc ssh_command {cmd hostname {check 1} {verbose 1}} {
         dputs "run '$cmd' on host '$hostname'"
         set verbose "echo 1>&2; date +\"*** %X %a, %x ***********************\" 1>&2; echo \"*** RUN $cmd\" 1>&2;"
     } else {set verbose ""}
-
-    set res [exec bash -c "echo '$verbose $cmd 1>&2; echo \$?' > $f.in; IFS= read -r s <$f.out; echo \$s"]
-    dputs "ssh result: $res" 3
+    # read '' uses the 0 byte as delimiter. This is not necessary here but enables collecting multiline output...
+    set res [exec bash -c "exec 5<>$f.in; echo '$verbose $cmd 1>&2; echo -ne \$?\\\\0' >&5; read -d '' -r s <>$f.out; echo \$s"]
+    dputs "ssh result: '$res'" 3
     return $res
 }
 
@@ -1341,19 +1341,20 @@ proc connect_host {fifo host} {
     # Here we establish the master connection. Commands pushed into $fifo.in get piped into
     # the remote bash (over ssh) and the result is read again and piped into $fifo.out.
     # This way, the remote stdout goes into $fifo.out, while remote stderr is displayed here.
+    # ssh will not see an eof because each fifo is openend in read/write mode.
     set screenid [get_master_screen_name $host]
-    exec screen -dmS $screenid bash -c "exec 5<>$fifo.in; (ssh $::SSHOPTS -Y $host bash || echo ssh connection timeout) <&5 | while read s; do echo \$s > $fifo.out; done"
+    exec screen -dmS $screenid bash -c "exec 5<>$fifo.in; exec 6<>$fifo.out; ssh $::SSHOPTS -Y $host bash <&5 >&6"
 
     # Wait until connection is established.
     # Issue a echo command on remote host that only returns if a connection was established.
     puts -nonewline "connecting to $host: "; flush stdout
-    exec bash -c "echo 'echo connected' > $fifo.in"
+    exec bash -c "echo 'echo -ne connected\\\\0' > $fifo.in"
     # Loop will wait for at most 30 seconds to allow entering a password if necessary.
     # This will break earlier if ssh connection returns, e.g. due to timeout.
     set endtime [expr [clock seconds] + 30]
     set xterm_shown 0
     while {$endtime > [clock seconds]} {
-        set res [exec bash -c "IFS= read -rt 1 s <>$fifo.out; echo \$s; echo \$?"]
+        set res [exec bash -c "read -d '' -rt 1 s <>$fifo.out; echo \$s; echo \$?"]
         set noScreen [catch {exec bash -c "screen -wipe | fgrep -q .$screenid"} ]
         # continue waiting on timeout (124), otherwise break from loop
         if {$res == 124} { puts -nonewline "."; flush stdout } { break }
