@@ -1267,7 +1267,7 @@ proc ssh_check_connection {hostname {connect 1}} {
         # Instead of timing out on the real ssh_command, we timeout here on a dummy, because here we
         # know, that the command shouldn't last long. However, the real ssh_command could last rather
         # long, e.g. stopping a difficult component. This would generate a spurious timeout.
-        set res [exec bash -c "exec 5<>$fifo.in; echo 'echo 0' >&5; exec 5>&-; IFS= read -rt 1 <>$fifo.out; echo \$REPLY"]
+        set res [exec bash -c "exec 5<>$fifo.in; echo 'echo 0' >&5; exec 5>&-; IFS= read -rt 1 s <>$fifo.out; echo \$s"]
         dputs "connection check result: $res" 2
 
         # we might also fetch the result of a previous, delayed ssh command. Really?
@@ -1305,7 +1305,7 @@ proc ssh_command {cmd hostname {check 1} {verbose 1}} {
         set verbose "echo 1>&2; date +\"*** %X %a, %x ***********************\" 1>&2; echo \"*** RUN $cmd\" 1>&2;"
     } else {set verbose ""}
 
-    set res [exec bash -c "echo '$verbose $cmd 1>&2; echo \$?' > $f.in; cat $f.out"]
+    set res [exec bash -c "echo '$verbose $cmd 1>&2; echo \$?' > $f.in; IFS= read -r s <$f.out; echo \$s"]
     dputs "ssh result: $res" 3
     return $res
 }
@@ -1342,7 +1342,7 @@ proc connect_host {fifo host} {
     # the remote bash (over ssh) and the result is read again and piped into $fifo.out.
     # This way, the remote stdout goes into $fifo.out, while remote stderr is displayed here.
     set screenid [get_master_screen_name $host]
-    exec screen -dmS $screenid bash -c "tail -s 0.1 -f $fifo.in | (ssh $::SSHOPTS -Y $host bash || echo ssh connection timeout) | while read s; do echo \$s > $fifo.out; done"
+    exec screen -dmS $screenid bash -c "exec 5<>$fifo.in; (ssh $::SSHOPTS -Y $host bash || echo ssh connection timeout) <&5 | while read s; do echo \$s > $fifo.out; done"
 
     # Wait until connection is established.
     # Issue a echo command on remote host that only returns if a connection was established.
@@ -1353,7 +1353,7 @@ proc connect_host {fifo host} {
     set endtime [expr [clock seconds] + 30]
     set xterm_shown 0
     while {$endtime > [clock seconds]} {
-        set res [exec bash -c "IFS= read -rt 1 <>$fifo.out; echo \$REPLY; echo \$?"]
+        set res [exec bash -c "IFS= read -rt 1 s <>$fifo.out; echo \$s; echo \$?"]
         set noScreen [catch {exec bash -c "screen -wipe | fgrep -q .$screenid"} ]
         # continue waiting on timeout (124), otherwise break from loop
         if {$res == 124} { puts -nonewline "."; flush stdout } { break }
