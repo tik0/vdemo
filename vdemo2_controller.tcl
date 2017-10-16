@@ -1264,7 +1264,7 @@ proc ssh_check_connection {hostname {connect 1}} {
         # Issue a dummy command to check whether connection is still alive. If not, we get a timeout after 1s.
         # Without checking, reading $fifo.out will last forever when ssh connection is broken.
         # The same applies to writing to $fifo.in thus it is opened as a filedescriptor in bash in read/write mode
-        # which makes it non-blocking. The error code of the read timeout is 124.
+        # which makes it non-blocking. The error code of the read timeout is 142.
         # Instead of timing out on the real ssh_command, we timeout here on a dummy, because here we
         # know, that the command shouldn't last long. However, the real ssh_command could last rather
         # long, e.g. stopping a difficult component. This would generate a spurious timeout.
@@ -1354,10 +1354,10 @@ proc connect_host {fifo host} {
     set endtime [expr [clock seconds] + 30]
     set xterm_shown 0
     while {$endtime > [clock seconds]} {
-        set res [exec bash -c "read -d '' -rt 1 s <>$fifo.out; echo \$s; echo \$?"]
+        set res [exec bash -c "read -d '' -rt 1 s <>$fifo.out; echo \$s\$?"]
         set noScreen [catch {exec bash -c "screen -wipe | fgrep -q .$screenid"} ]
-        # continue waiting on timeout (124), otherwise break from loop
-        if {$res == 124} { puts -nonewline "."; flush stdout } { break }
+        # continue waiting on timeout (142), otherwise break from loop
+        if {$res == 142} { puts -nonewline "."; flush stdout } { break }
         # break from loop, when screen session was stopped
         if {$noScreen} {set res -2; break}
 
@@ -1376,9 +1376,9 @@ proc connect_host {fifo host} {
         puts " OK"
     } else { # some failure
         switch -exact -- $res {
-            124 {puts " timeout"}
+            142 {puts " timeout"}
              -2 {puts " aborted"}
-            default {puts "error: $res"; set res -2}
+            default {puts "error: '$res'"; set res -2}
         }
         # quit screen session
         catch {exec screen -XS $screenid quit}
