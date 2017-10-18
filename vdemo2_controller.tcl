@@ -1448,7 +1448,7 @@ proc disconnect_hosts {} {
             set cmd "rm -f $::env(SPREAD_CONFIG)"
             exec bash -c "echo 'echo \"*** RUN $cmd\" 1>&2; $cmd 1>&2; echo \$?' > $fifo.in"
         }
-        catch {exec bash -c "screen -list $screenid | grep vdemo | cut -d. -f1 | xargs kill 2>&1"}
+        catch {exec bash -c "screen -S $screenid -X quit 2>&1"}
         exec rm -f "$fifo.in"
         exec rm -f "$fifo.out"
 
