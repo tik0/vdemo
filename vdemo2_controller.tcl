@@ -1335,8 +1335,8 @@ proc monitoring_disabled {host} {
 }
 
 proc connect_host {fifo host} {
-    exec rm -f "$fifo.in"
-    exec rm -f "$fifo.out"
+    file delete "$fifo.in"
+    file delete "$fifo.out"
     exec mkfifo "$fifo.in"
     exec mkfifo "$fifo.out"
 
@@ -1389,8 +1389,8 @@ proc connect_host {fifo host} {
         }
         # quit screen session
         catch {exec screen -XS $screenid quit}
-        exec rm -f "$fifo.in"
-        exec rm -f "$fifo.out"
+        file delete "$fifo.in"
+        file delete "$fifo.out"
         return $res
     }
 
@@ -1455,8 +1455,8 @@ proc disconnect_hosts {} {
             exec bash -c "echo 'echo \"*** RUN $cmd\" 1>&2; $cmd 1>&2; echo \$?' > $fifo.in"
         }
         catch {exec bash -c "screen -S $screenid -X quit 2>&1"}
-        exec rm -f "$fifo.in"
-        exec rm -f "$fifo.out"
+        file delete "$fifo.in"
+        file delete "$fifo.out"
 
         disconnect_screen_monitoring $h
     }
@@ -1473,7 +1473,7 @@ proc kill_buffer {} {
 proc finish {} {
     disconnect_hosts
     kill_buffer
-    catch {exec rmdir "$::TEMPDIR"}
+    catch {file delete "$::TEMPDIR"}
     exit
 }
 
@@ -1872,7 +1872,7 @@ proc setup_ctrl_fifo { { filename "" } } {
     if {$filename == ""} return
 
     exec mkdir -p [file dirname $filename.in]
-    exec rm -f $filename.in
+    exec file delete $filename.in
     exec mkfifo $filename.in
 
     # Check if buffer is supported
