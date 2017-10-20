@@ -1361,12 +1361,10 @@ proc connect_host {fifo host} {
     set xterm_shown 0
     while {$endtime > [clock seconds]} {
         set res [exec bash -c "read -d '' -rt 1 s <>$fifo.out; echo \$s\$?"]
-        set noScreen 0
-        catch {set noScreen [llength [wait -nohang $::screenMasterPID($host)]]}
         # continue waiting on timeout (142), otherwise break from loop
         if {$res == 142} { puts -nonewline "."; flush stdout } { break }
         # break from loop, when screen session was stopped
-        if {$noScreen} {set res -2; break}
+        if { [pid_exists $::screenMasterPID($host)] == 0} {set res -2; break}
 
         # show screen session in xterm after 1s (allow entering password, etc.)
         if { ! $xterm_shown } {
