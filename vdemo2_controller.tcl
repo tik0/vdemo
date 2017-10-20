@@ -1216,10 +1216,16 @@ proc blink_stop {widget} {
 
 # {{{ ssh and command procs
 
+proc pid_exists {procid} {
+    set pidok 0
+    catch {set pidok [expr [llength [wait -nohang $procid]] eq 0]}
+    return $pidok
+}
+
 proc screen_ssh_master {h} {
     set screenid [get_master_screen_name $h]
     if {$::SCREENED_SSH($h) == 1} {
-        if { [catch {exec bash -c "screen -wipe | fgrep -q .$screenid"} ] } {
+        if { [pid_exists $::screenMasterPID($h)] == 0 } {
             set f [get_fifo_name $h]
             set res [connect_host $f $h]
             gui_update_host $h $res
@@ -1248,11 +1254,10 @@ proc reconnect_host {host msg} {
 
 proc ssh_check_connection {hostname {connect 1}} {
     set fifo [get_fifo_name $hostname]
-    set screenid [get_master_screen_name $hostname]
     # error code to indicate missing master connection
     set res -1
     set msg ""
-    if { [catch {exec bash -c "screen -wipe | fgrep -q .$screenid"} ] } {
+    if { [pid_exists $::screenMasterPID($hostname)] == 0 } {
         if {[file exists "$fifo.in"] == 0} {
             # fifo not yet in place / connection never succeeded yet
             set msg "Establish connection to $hostname?"
@@ -1342,8 +1347,9 @@ proc connect_host {fifo host} {
     # the remote bash (over ssh) and the result is read again and piped into $fifo.out.
     # This way, the remote stdout goes into $fifo.out, while remote stderr is displayed here.
     # ssh will not see an eof because each fifo is openend in read/write mode.
+    # here screen remains a child process of vdemo (-D), so we can save the pid.
     set screenid [get_master_screen_name $host]
-    exec screen -dmS $screenid bash -c "exec 5<>$fifo.in; exec 6<>$fifo.out; ssh $::SSHOPTS -Y $host bash <&5 >&6"
+    set ::screenMasterPID($host) [exec screen -DmS $screenid bash -c "exec 5<>$fifo.in; exec 6<>$fifo.out; ssh $::SSHOPTS -Y $host bash <&5 >&6" &]
 
     # Wait until connection is established.
     # Issue a echo command on remote host that only returns if a connection was established.
@@ -1355,7 +1361,8 @@ proc connect_host {fifo host} {
     set xterm_shown 0
     while {$endtime > [clock seconds]} {
         set res [exec bash -c "read -d '' -rt 1 s <>$fifo.out; echo \$s\$?"]
-        set noScreen [catch {exec bash -c "screen -wipe | fgrep -q .$screenid"} ]
+        set noScreen 0
+        catch {set noScreen [llength [wait -nohang $::screenMasterPID($host)]]}
         # continue waiting on timeout (142), otherwise break from loop
         if {$res == 142} { puts -nonewline "."; flush stdout } { break }
         # break from loop, when screen session was stopped
@@ -1442,8 +1449,7 @@ proc disconnect_hosts {} {
         dputs "disconnecting from $h"
         set screenid [get_master_screen_name $h]
         set fifo [get_fifo_name $h]
-        set screenPID [exec bash -c "screen -list $screenid | grep vdemo | cut -d. -f1"]
-        if {$::AUTO_SPREAD_CONF == 1 && "$screenPID" != "" && [file exists "$fifo.in"]} {
+        if {$::AUTO_SPREAD_CONF == 1 && [info exists ::screenMasterPID($h)] && [pid_exists $::screenMasterPID($h)] && [file exists "$fifo.in"]} {
             # send ssh command, but do not wait for result
             set cmd "rm -f $::env(SPREAD_CONFIG)"
             exec bash -c "echo 'echo \"*** RUN $cmd\" 1>&2; $cmd 1>&2; echo \$?' > $fifo.in"
@@ -1674,6 +1680,7 @@ proc connect_screen_monitoring {host} {
     set ::MONITOR_CHAN($host) $chan
     fconfigure $chan -blocking 0 -buffering line -translation auto
     fileevent $chan readable [list handle_screen_failure $chan $host]
+    dputs "connected screen monitoring channel $chan for host $host" 2
 }
 
 proc disconnect_screen_monitoring {host} {
@@ -1682,7 +1689,7 @@ proc disconnect_screen_monitoring {host} {
     if {[string match "err:*" $chan]} return
 
     dputs "disconnecting monitor channel $chan for host $host" 2
-    exec kill -HUP [lindex [pid $chan] 0]
+    kill HUP [lindex [pid $chan] 0]
     close $chan
 
     # indicate, that we are not monitoring anymore
