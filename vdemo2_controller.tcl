@@ -1252,6 +1252,36 @@ proc reconnect_host {host msg} {
     return $res
 }
 
+proc handle_ssh_fifo_data {chan host} {
+    if {![eof $chan]} {
+        set data [split [read -nonewline $chan] \0]
+        append ::SSH_DATA_IN($host) [lindex $data 0]
+        if { [llength $data] == 2 } {
+            set ::SSH_DATA_STATE($host) received
+        }
+    }
+}
+
+proc communicate_ssh {host cmd {timeout 0}} {
+    set chan $::SSH_DATA_INCHAN($host)
+    set ::SSH_DATA_STATE($host) waiting
+    set ::SSH_DATA_IN($host) ""
+    puts $chan $cmd
+    if { $timeout > 0 } {
+        after 1000 set ::SSH_DATA_STATE($host) timeout
+        vwait ::SSH_DATA_STATE($host)
+        after cancel set ::SSH_DATA_STATE($host) timeout
+        if { $::SSH_DATA_STATE($host) == "timeout" } {
+            return -code error "timeout waiting for ssh cmd: '$cmd'"
+        } else {
+            return $::SSH_DATA_IN($host)
+        }
+    } else {
+        vwait ::SSH_DATA_STATE($host)
+        return $::SSH_DATA_IN($host)
+    }
+}
+
 proc ssh_check_connection {hostname {connect 1}} {
     set fifo [get_fifo_name $hostname]
     # error code to indicate missing master connection
@@ -1273,7 +1303,9 @@ proc ssh_check_connection {hostname {connect 1}} {
         # Instead of timing out on the real ssh_command, we timeout here on a dummy, because here we
         # know, that the command shouldn't last long. However, the real ssh_command could last rather
         # long, e.g. stopping a difficult component. This would generate a spurious timeout.
-        set res [exec bash -c "exec 5<>$fifo.in; echo 'echo -ne 0\\\\0' >&5; read -d '' -rt 1 s <>$fifo.out; echo \$s"]
+        set res 1
+        catch {set res [communicate_ssh $hostname "echo -ne 0\\\\0" 3000]}
+        #set res [exec bash -c "exec 5<>$fifo.in; echo 'echo -ne 0\\\\0' >&5; read -d '' -rt 1 s <>$fifo.out; echo \$s"]
         dputs "connection check result: $res" 2
 
         # we might also fetch the result of a previous, delayed ssh command. Really?
@@ -1309,8 +1341,9 @@ proc ssh_command {cmd hostname {check 1} {verbose 1}} {
         dputs "run '$cmd' on host '$hostname'"
         set verbose "echo 1>&2; date +\"*** %X %a, %x ***********************\" 1>&2; echo \"*** RUN $cmd\" 1>&2;"
     } else {set verbose ""}
+    set res [communicate_ssh $hostname "$verbose $cmd 1>&2; echo -ne \$?\\\\0"]
     # read '' uses the 0 byte as delimiter. This is not necessary here but enables collecting multiline output...
-    set res [exec bash -c "exec 5<>$f.in; echo '$verbose $cmd 1>&2; echo -ne \$?\\\\0' >&5; read -d '' -r s <>$f.out; echo \$s"]
+    #set res [exec bash -c "exec 5<>$f.in; echo '$verbose $cmd 1>&2; echo -ne \$?\\\\0' >&5; read -d '' -r s <>$f.out; echo \$s"]
     dputs "ssh result: '$res'" 3
     return $res
 }
@@ -1392,6 +1425,18 @@ proc connect_host {fifo host} {
         return $res
     }
 
+    if {[info exists ::SSH_DATA_INCHAN($host)]} { close $::SSH_DATA_INCHAN($host) }
+    if {[info exists ::SSH_DATA_OUTCHAN($host)]} { close $::SSH_DATA_OUTCHAN($host) }
+    set outchan [open "$fifo.out" r+]
+    fconfigure $outchan -buffering none
+    fconfigure $outchan -blocking 0
+    fileevent $outchan readable [list handle_ssh_fifo_data $outchan $host]
+    set inchan [open "$fifo.in" r+]
+    fconfigure $inchan -buffering none
+    fconfigure $inchan -blocking 0
+    set ::SSH_DATA_INCHAN($host) $inchan
+    set ::SSH_DATA_OUTCHAN($host) $outchan
+    
     dputs "issuing remote initialization commands" 2
     set res [ssh_command "source $::env(VDEMO_demoConfig)" $host 0 $::DEBUG_LEVEL]
     set res [ssh_command "ls \$VDEMO_root 2> /dev/null" $host 0 $::DEBUG_LEVEL]
@@ -1412,7 +1457,7 @@ proc connect_host {fifo host} {
 
     if {$::AUTO_SPREAD_CONF == 1} {
         set content [exec cat $::env(SPREAD_CONFIG)]
-        exec bash -c "echo 'echo \"$content\" > $::env(SPREAD_CONFIG)' > $fifo.in"
+        communicate_ssh $hostname "echo \"$content\" > $::env(SPREAD_CONFIG); echo -ne \$?\\\\0"
     }
     return 0
 }
