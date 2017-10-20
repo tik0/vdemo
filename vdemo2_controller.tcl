@@ -1252,34 +1252,21 @@ proc reconnect_host {host msg} {
     return $res
 }
 
-proc handle_ssh_fifo_data {chan host} {
-    if {![eof $chan]} {
-        set data [split [read -nonewline $chan] \0]
-        append ::SSH_DATA_IN($host) [lindex $data 0]
-        if { [llength $data] == 2 } {
-            set ::SSH_DATA_STATE($host) received
-        }
-    }
-}
-
 proc communicate_ssh {host cmd {timeout 0}} {
     set chan $::SSH_DATA_INCHAN($host)
-    set ::SSH_DATA_STATE($host) waiting
-    set ::SSH_DATA_IN($host) ""
     puts $chan $cmd
-    if { $timeout > 0 } {
-        after 1000 set ::SSH_DATA_STATE($host) timeout
-        vwait ::SSH_DATA_STATE($host)
-        after cancel set ::SSH_DATA_STATE($host) timeout
-        if { $::SSH_DATA_STATE($host) == "timeout" } {
-            return -code error "timeout waiting for ssh cmd: '$cmd'"
-        } else {
-            return $::SSH_DATA_IN($host)
+    set chan $::SSH_DATA_OUTCHAN($host)
+    set result ""
+    set endtime [expr [clock seconds] + $timeout]
+    while {$timeout == 0 || $endtime > [clock seconds]} {
+        set data [split [read -nonewline $chan] \0]
+        append result [lindex $data 0]
+        if { [llength $data] == 2 } {
+            break
         }
-    } else {
-        vwait ::SSH_DATA_STATE($host)
-        return $::SSH_DATA_IN($host)
+        after 1
     }
+    return $result
 }
 
 proc ssh_check_connection {hostname {connect 1}} {
@@ -1303,8 +1290,9 @@ proc ssh_check_connection {hostname {connect 1}} {
         # Instead of timing out on the real ssh_command, we timeout here on a dummy, because here we
         # know, that the command shouldn't last long. However, the real ssh_command could last rather
         # long, e.g. stopping a difficult component. This would generate a spurious timeout.
-        set res 1
-        catch {set res [communicate_ssh $hostname "echo -ne 0\\\\0" 3000]}
+        set res 0
+        set res [communicate_ssh $hostname "echo -ne 0\\\\0" 3]
+        #catch {set res [communicate_ssh $hostname "echo -ne 0\\\\0" 3000]}
         #set res [exec bash -c "exec 5<>$fifo.in; echo 'echo -ne 0\\\\0' >&5; read -d '' -rt 1 s <>$fifo.out; echo \$s"]
         dputs "connection check result: $res" 2
 
@@ -1430,7 +1418,6 @@ proc connect_host {fifo host} {
     set outchan [open "$fifo.out" r+]
     fconfigure $outchan -buffering none
     fconfigure $outchan -blocking 0
-    fileevent $outchan readable [list handle_ssh_fifo_data $outchan $host]
     set inchan [open "$fifo.in" r+]
     fconfigure $inchan -buffering none
     fconfigure $inchan -blocking 0
