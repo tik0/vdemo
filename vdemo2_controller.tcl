@@ -1872,7 +1872,7 @@ proc setup_ctrl_fifo { { filename "" } } {
     if {$filename == ""} return
 
     exec mkdir -p [file dirname $filename.in]
-    exec file delete $filename.in
+    file delete $filename.in
     exec mkfifo $filename.in
 
     # Check if buffer is supported
