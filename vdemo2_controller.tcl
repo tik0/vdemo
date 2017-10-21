@@ -1252,10 +1252,7 @@ proc reconnect_host {host msg} {
     return $res
 }
 
-proc communicate_ssh {host cmd {timeout 0}} {
-    set chan $::SSH_DATA_INCHAN($host)
-    puts $chan $cmd
-    set chan $::SSH_DATA_OUTCHAN($host)
+proc read_chan {chan {timeout 0}} {
     set result ""
     set endtime [expr [clock seconds] + $timeout]
     while {$timeout == 0 || $endtime > [clock seconds]} {
@@ -1267,6 +1264,11 @@ proc communicate_ssh {host cmd {timeout 0}} {
         after 1
     }
     return $result
+}
+
+proc communicate_ssh {host cmd {timeout 0}} {
+    puts $::SSH_DATA_INCHAN($host) $cmd
+    return [read_chan $::SSH_DATA_OUTCHAN($host) $timeout]
 }
 
 proc ssh_check_connection {hostname {connect 1}} {
@@ -1358,7 +1360,18 @@ proc connect_host {fifo host} {
     file delete "$fifo.out"
     exec mkfifo "$fifo.in"
     exec mkfifo "$fifo.out"
-
+    # open fifos in rw mode, so they do not receive an eof
+    if {[info exists ::SSH_DATA_INCHAN($host)]} { close $::SSH_DATA_INCHAN($host) }
+    if {[info exists ::SSH_DATA_OUTCHAN($host)]} { close $::SSH_DATA_OUTCHAN($host) }
+    set outchan [open "$fifo.out" r+]
+    fconfigure $outchan -buffering none
+    fconfigure $outchan -blocking 0
+    set inchan [open "$fifo.in" r+]
+    fconfigure $inchan -buffering none
+    fconfigure $inchan -blocking 0
+    set ::SSH_DATA_INCHAN($host) $inchan
+    set ::SSH_DATA_OUTCHAN($host) $outchan
+    
     # temporarily ignore failed connections on this host
     disable_monitoring $host
 
@@ -1373,15 +1386,15 @@ proc connect_host {fifo host} {
     # Wait until connection is established.
     # Issue a echo command on remote host that only returns if a connection was established.
     puts -nonewline "connecting to $host: "; flush stdout
-    exec bash -c "echo 'echo -ne connected\\\\0' > $fifo.in"
+    puts $::SSH_DATA_INCHAN($host) "echo -ne connected\\\\0"
     # Loop will wait for at most 30 seconds to allow entering a password if necessary.
     # This will break earlier if ssh connection returns, e.g. due to timeout.
     set endtime [expr [clock seconds] + 30]
     set xterm_shown 0
     while {$endtime > [clock seconds]} {
-        set res [exec bash -c "read -d '' -rt 1 s <>$fifo.out; echo \$s\$?"]
-        # continue waiting on timeout (142), otherwise break from loop
-        if {$res == 142} { puts -nonewline "."; flush stdout } { break }
+        set res [read_chan $::SSH_DATA_OUTCHAN($host) 1]
+        # continue waiting on timeout (""), otherwise break from loop
+        if {$res == ""} { puts -nonewline "."; flush stdout } { break }
         # break from loop, when screen session was stopped
         if { [pid_exists $::screenMasterPID($host)] == 0} {set res -2; break}
 
@@ -1411,17 +1424,6 @@ proc connect_host {fifo host} {
         return $res
     }
 
-    if {[info exists ::SSH_DATA_INCHAN($host)]} { close $::SSH_DATA_INCHAN($host) }
-    if {[info exists ::SSH_DATA_OUTCHAN($host)]} { close $::SSH_DATA_OUTCHAN($host) }
-    set outchan [open "$fifo.out" r+]
-    fconfigure $outchan -buffering none
-    fconfigure $outchan -blocking 0
-    set inchan [open "$fifo.in" r+]
-    fconfigure $inchan -buffering none
-    fconfigure $inchan -blocking 0
-    set ::SSH_DATA_INCHAN($host) $inchan
-    set ::SSH_DATA_OUTCHAN($host) $outchan
-    
     dputs "issuing remote initialization commands" 2
     set res [ssh_command "source $::env(VDEMO_demoConfig)" $host 0 $::DEBUG_LEVEL]
     set res [ssh_command "ls \$VDEMO_root 2> /dev/null" $host 0 $::DEBUG_LEVEL]
