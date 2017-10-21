@@ -1628,7 +1628,7 @@ proc handle_screen_failure {chan host} {
 
     # check for a lost master connection
     set remoteHost ""
-    regexp "^\[\[:digit:]]+\.vdemo-$::VDEMOID-(.*)\$" $line matched remoteHost
+    regexp "^\[\[:digit:]]+\.$::VDEMOID-(.*)\$" $line matched remoteHost
     if {"$remoteHost" != ""} {
         set ::SCREENED_SSH($remoteHost) 0
         # only ask for reconnection when $host == localhost && monitoring is enabled
