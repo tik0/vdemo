@@ -1254,8 +1254,8 @@ proc reconnect_host {host msg} {
 
 proc read_chan {chan {timeout 0}} {
     set result ""
-    set endtime [expr [clock seconds] + $timeout]
-    while {$timeout == 0 || $endtime > [clock seconds]} {
+    set endtime [expr [clock milliseconds] + $timeout]
+    while {$timeout == 0 || $endtime > [clock milliseconds]} {
         set data [split [read -nonewline $chan] \0]
         append result [lindex $data 0]
         if { [llength $data] == 2 } {
@@ -1292,7 +1292,7 @@ proc ssh_check_connection {hostname {connect 1}} {
         # Instead of timing out on the real ssh_command, we timeout here on a dummy, because here we
         # know, that the command shouldn't last long. However, the real ssh_command could last rather
         # long, e.g. stopping a difficult component. This would generate a spurious timeout.
-        set res [communicate_ssh $hostname "echo -ne 0\\\\0" 3]
+        set res [communicate_ssh $hostname "echo -ne 0\\\\0" 3000]
         #set res [exec bash -c "exec 5<>$fifo.in; echo 'echo -ne 0\\\\0' >&5; read -d '' -rt 1 s <>$fifo.out; echo \$s"]
         dputs "connection check result: $res" 2
 
@@ -1392,7 +1392,7 @@ proc connect_host {fifo host} {
     set endtime [expr [clock seconds] + 30]
     set xterm_shown 0
     while {$endtime > [clock seconds]} {
-        set res [read_chan $::SSH_DATA_OUTCHAN($host) 1]
+        set res [read_chan $::SSH_DATA_OUTCHAN($host) 1000]
         # continue waiting on timeout (""), otherwise break from loop
         if {$res == ""} { puts -nonewline "."; flush stdout } { break }
         # break from loop, when screen session was stopped
