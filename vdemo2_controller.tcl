@@ -1286,13 +1286,11 @@ proc ssh_check_connection {hostname {connect 1}} {
         # Issue a dummy command to check whether connection is still alive. If not, we get a timeout after 1s.
         # Without checking, reading $fifo.out will last forever when ssh connection is broken.
         # The same applies to writing to $fifo.in thus it is opened as a filedescriptor in bash in read/write mode
-        # which makes it non-blocking. The error code of the read timeout is 142.
+        # which makes it non-blocking. The error code of the bash read timeout is 142.
         # Instead of timing out on the real ssh_command, we timeout here on a dummy, because here we
         # know, that the command shouldn't last long. However, the real ssh_command could last rather
         # long, e.g. stopping a difficult component. This would generate a spurious timeout.
-        set res 0
         set res [communicate_ssh $hostname "echo -ne 0\\\\0" 3]
-        #catch {set res [communicate_ssh $hostname "echo -ne 0\\\\0" 3000]}
         #set res [exec bash -c "exec 5<>$fifo.in; echo 'echo -ne 0\\\\0' >&5; read -d '' -rt 1 s <>$fifo.out; echo \$s"]
         dputs "connection check result: $res" 2
 
