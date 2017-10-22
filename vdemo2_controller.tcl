@@ -1,12 +1,10 @@
-#!/bin/bash
 # kate: replace-tabs on; indent-width 4;
-# the next line restarts using wish \
-exec wish "$0" "$@"
 
 # required for scrollable frame
 package require Iwidgets 4.0
 # required for signal handling
 package require Tclx
+
 
 set VDEMO_CONNECTION_TIMEOUT 5
 catch {set VDEMO_CONNECTION_TIMEOUT $::env(VDEMO_CONNECTION_TIMEOUT)}
@@ -49,8 +47,6 @@ ttk::style configure alert.TLabel -foreground blue -background yellow
 ttk::style configure info.TLabel -foreground blue -background yellow
 ttk::style configure log.TLabel -justify left -anchor e -relief sunken -foreground gray30
 
-# Output buffer PID
-set buffer_pid 0
 set current_group ""
 set current_group_stopped ""
 set current_group_started ""
@@ -611,7 +607,7 @@ proc clearLogger {} {
 }
 
 proc init_logger {filename} {
-    exec mkdir -p [file dirname $filename]
+    file mkdir [file dirname $filename]
     exec touch $filename
     if { [catch {open "|tail -n 5 --pid=$::mypid -F $filename"} infile] } {
         puts  "Could not open $filename for reading."
@@ -1252,6 +1248,7 @@ proc reconnect_host {host msg} {
     return $res
 }
 
+# read_chan ignores data after \0 in the same read cycle.
 proc read_chan {chan {timeout 0}} {
     set result ""
     set endtime [expr [clock milliseconds] + $timeout]
@@ -1261,7 +1258,7 @@ proc read_chan {chan {timeout 0}} {
         if { [llength $data] == 2 } {
             break
         }
-        after 1
+        after 10
     }
     return $result
 }
@@ -1450,7 +1447,11 @@ proc connect_host {fifo host} {
 }
 
 proc connect_hosts {} {
-    set geometry ${::geometry}
+    if {[info exists ::geometry]} {
+        set geometry ${::geometry}
+    } else {
+        set geometry {}
+    }
     wm geometry . ""
     update
     label .vdemoinit -text "init VDemo - be patient..." -foreground darkgreen -font "helvetica 30 bold"
@@ -1492,17 +1493,8 @@ proc disconnect_hosts {} {
     }
 }
 
-proc kill_buffer {} {
-    global buffer_pid
-    if { $buffer_pid != 0 } {
-        puts "killing buffer process PID: ${buffer_pid}"
-        catch { exec kill -2 ${buffer_pid} }
-    }
-}
-
 proc finish {} {
     disconnect_hosts
-    kill_buffer
     catch {file delete "$::TEMPDIR"}
     exit
 }
@@ -1657,7 +1649,7 @@ proc handle_screen_failure {chan host} {
                     [lsearch -exact $::VDEMO_QUIT_COMPONENTS "$::TITLE($comp)"] >= 0} {
                     puts "$::TITLE($comp) finished on $host: quitting vdemo"
                     all_cmd "stop"
-                    finish
+                    after idle finish
                 } else {
                     dputs "$::TITLE($comp) died on $host." 0
                     if {$::RESTART($comp) == 2 || \
@@ -1759,7 +1751,7 @@ proc gui_exit {} {
             cancel {return}
         }
     }
-    finish
+    after idle finish
 }
 
 wm protocol . WM_DELETE_WINDOW {
@@ -1775,161 +1767,52 @@ proc setup_temp_dir { } {
     set VDEMOID [ file tail $TEMPDIR ]
 }
 
-proc handle_ctrl_fifo { _infile _outfile } {
-    global GROUP COMPONENTS
+proc handle_remote_request { request args } {
+    global GROUP COMPONENTS TITLE HOST GROUP COMP_LEVEL
 
-    if { [gets $_infile line] >= 0 } {
-
-        set args [regexp -all -inline {\S+} $line]
-        set cmd [lindex $args 0]
-
-        # Flush the Buffer before each remote command
-        if {$_outfile != ""} {
-            exec echo "unknown:unknown" > $_outfile
+    dputs "got remote request: $request $args"
+    switch $request {
+        "list" {
+            dputs "remote cmd: ${request}ing components"
+            set result {}
+            foreach {comp} $COMPONENTS {
+                 lappend result "$comp\t$COMP_LEVEL($comp)\t$TITLE($comp)\t$HOST($comp)\t$GROUP($comp)\t$::COMPSTATUS($comp)"
+            }
+            return [join $result "\n"]
         }
-
-        if {"$cmd" == "FINISH"} {
-            puts "remote cmd: stopping all components and finish"
-            all_cmd "stop"
-            finish
-            return
+        "grouplist" {
+            return [join $::GROUPS "\n"]
         }
-
-        # Check if the input is a valid command
-        if {[lsearch -exact [ list "start" "stop" "check" "list" "grouplist" ] $cmd] == -1} {
-            puts "unknown remote control command: $cmd"
-            return
-        }
-
-        set comp [lindex $args 1]
-
-        if {$comp == "ALL"} {
-            puts "remote cmd: ${cmd}ing all components"
-            all_cmd $cmd
-            return
-        }
-
-        # If the component is in $GROUPS and the command is check, loop through all
-        # components in that group. Check if they really exist and perform the check.
-        # If one check fails, echo failed command into the output buffer.
-        if {[lsearch -exact "$::GROUPS" $comp] != -1 && $cmd == "check"} {
-            puts "remote cmd: checking group ${comp}"
-            foreach {key value} [array get GROUP] {
-                if {$value == $comp} {
-                    if {[lsearch -exact $::COMPONENTS $key] >= 0} {
-                        set result [ component_cmd $key $cmd ]
-                        # puts "remote cmd: ${cmd}ing component $key result=${result}"
-                        if {${result} == "1"} {
-                            append result ":"
-                            append result $comp
-                            puts "group ${comp} is not running"
-                            if {$_outfile != ""} {
-                                exec echo ${result} > $_outfile
-                            }
-                            return
-                        }
-                    }
+        "all" {
+            if { [llength $args] > 1 } {
+                set grp [lindex $args 1]
+                if { [lsearch -exact $::GROUPS $grp] == -1 && $grp != "all" } {
+                    return "ERROR: non-existent group"
                 }
             }
-            puts "group ${comp} is running"
-            if {$_outfile != ""} {
-                exec echo "0:${comp}" > $_outfile
+            all_cmd {*}$args
+            return "OK"
+        }
+        "terminate" {
+            all_cmd stop
+            while { $::ALLCMD(current_level_stop) != "" } {
+                vwait ::ALLCMD(current_level_stop)
             }
-            return
+            after idle finish
+            return "OK"
         }
-
-        if {[lsearch -exact "$::GROUPS" $comp] != -1} {
-            all_cmd $cmd $comp
-            return
-        }
-
-        if {${cmd} == "list"} {
-            set comps ""
-            foreach {c} "$::COMPONENTS" {
-                append comps ${c}
-                append comps ", "
+        "component" {
+            set comp [lindex $args 0]
+            if { [lsearch -exact $COMPONENTS $comp] == -1 } {
+                return "ERROR: non-existent component"
             }
-            puts "remote cmd: ${cmd}ing components result=${comps}"
-            if {$_outfile != ""} {
-                exec echo ${comps} > $_outfile
-            }
-            return
+            component_cmd {*}$args
+            return "OK"
         }
-
-        if {${cmd} == "grouplist"} {
-            foreach {key value} [array get GROUP] {
-                puts "\"$key\": $value"
-            }
-            return
-        }
-
-        foreach {c} "$::COMPONENTS" {
-            if {$c == $comp} {
-                set result [ component_cmd $comp $cmd ]
-                puts "remote cmd: ${cmd}ing component $comp result=${result}"
-                append result ":"
-                append result $comp
-                if {$_outfile != ""} {
-                    exec echo ${result} > $_outfile
-                }
-                return
-            }
-        }
-
-        puts "unknown component or group: $comp"
-        set result "1"
-        append result ":"
-        append result "unknown"
-
-        if {$_outfile != ""} {
-            exec echo ${result} > $_outfile
-        }
-
-    } else {
-        close $_infile
-    }
-}
-
-proc setup_ctrl_fifo { { filename "" } } {
-    global buffer_pid global_outfilename
-
-    if {$filename == ""} {
-        # fetch default from environment variable
-        if {[info exists ::env(VDEMO_CONTROL_FIFO)]} {
-            set filename $::env(VDEMO_CONTROL_FIFO)
+        default {
+            return "ERROR"
         }
     }
-    if {$filename == ""} return
-
-    exec mkdir -p [file dirname $filename.in]
-    file delete $filename.in
-    exec mkfifo $filename.in
-
-    # Check if buffer is supported
-    set buffer_avail [ auto_execok buffer ]
-
-    if { $buffer_pid == 0 && $buffer_avail != ""} {
-        set buffer_pid [ exec buffer -o $filename.out & ]
-        set global_outfilename $filename.out
-    } else {
-        set buffer_avail -1
-        puts "failed creating control output buffer $filename.out. No buffer support?"
-        set global_outfilename ""
-    }
-
-    if { [ catch { open "|tail -n 5 --pid=[pid] -F $filename.in" } infile] } {
-        puts "failed creating control input fifo $filename.in"
-    }
-
-    fconfigure $infile -blocking false -buffering line
-    fileevent $infile readable [list handle_ctrl_fifo $infile $global_outfilename ]
-
-    if {$global_outfilename != ""} {
-        puts "connected to remote control $filename.in (fifo) and $global_outfilename (buffer)"
-    } else {
-        puts "connected to remote control $filename.in (fifo) no buffer support."
-    }
-
 }
 
 signal trap SIGINT finish
@@ -1950,7 +1833,6 @@ connect_hosts
 update
 gui_tcl
 update
-setup_ctrl_fifo
 
 # autostart
 if {[info exists ::env(VDEMO_autostart)] && $::env(VDEMO_autostart) == "true"} {

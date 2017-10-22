@@ -18,4 +18,4 @@ CONFIGURE_FILE(vdemo_component.in vdemo_component @ONLY)
 
 INSTALL(FILES ${PROJECT_BINARY_DIR}/vdemo.pc DESTINATION ${LIBDIR}/pkgconfig)
 INSTALL(PROGRAMS ${PROJECT_BINARY_DIR}/vdemo2 ${PROJECT_BINARY_DIR}/vdemo_component DESTINATION ${BINDIR})
-INSTALL(PROGRAMS vdemo_base.sh vdemo2_controller.tcl vdemo_standard_component_suffix.sh vdemo_remove_logfiles DESTINATION ${VDEMO_root})
+INSTALL(PROGRAMS vdemo_base.sh vdemo2_controller.tcl vdemo_standard_component_suffix.sh vdemo_remove_logfiles vdemo_controller.py DESTINATION ${VDEMO_root})
