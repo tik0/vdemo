@@ -7,6 +7,9 @@ import threading
 import tkinter
 import logging
 import re
+import ssl
+import subprocess
+import tempfile
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse
 
@@ -95,7 +98,15 @@ class VDemo:
         # This is thread safe, although frequently something else is assumed and a polling strategy is suggested.
         vdemo_request.trace("w", self.handle_request)
         if "VDEMO_SERVER_PORT" in os.environ:
+            pemfile, pemfilename = tempfile.mkstemp(prefix="vdemo", suffix=".pem")
+            subprocess.call(["bash", "-c", "openssl req -newkey rsa:2048 -x509 -nodes -keyout %s "
+                                           "-new -out %s -subj /CN=localhost -reqexts SAN -extensions SAN "
+                                           "-config <(cat /etc/ssl/openssl.cnf; printf '[SAN]\\nsubjectAltName=DNS:localhost') "
+                                           "-sha256 -days 3650 &>/dev/null || echo error generating ssl certificate" % (pemfilename, pemfilename)])
             server = HTTPServer(('localhost', int(os.environ["VDEMO_SERVER_PORT"])), ServerRequestHandler)
+            server.socket = ssl.wrap_socket(server.socket, certfile=pemfilename, server_side=True)
+            os.close(pemfile)
+            os.remove(pemfilename)
             thread = threading.Thread(None, server.serve_forever)
             thread.daemon = True
             thread.start()
