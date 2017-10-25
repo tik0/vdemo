@@ -106,6 +106,7 @@ class ServerRequestHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         return
 
+
 class VdemoApiServer(HTTPServer):
 
     def __init__(self, server_address, RequestHandlerClass, pemfilename, authkey):
@@ -128,7 +129,6 @@ class VdemoApiServer(HTTPServer):
         reply = tkroot.eval('if { [catch { set response [handle_remote_request {*}$%s] } msg] } { '
                             'return "ERROR\n$msg" } { return $response }' % varname)
         self.replyQueue.put(reply)
-
 
 
 class VDemo:

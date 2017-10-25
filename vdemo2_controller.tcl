@@ -9,6 +9,7 @@ package require Tclx
 set VDEMO_CONNECTION_TIMEOUT 5
 catch {set VDEMO_CONNECTION_TIMEOUT $::env(VDEMO_CONNECTION_TIMEOUT)}
 append SSHOPTS "-oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -oConnectTimeout=" ${VDEMO_CONNECTION_TIMEOUT}
+set VDEMO_CONNCHECK_TIMEOUT [expr $VDEMO_CONNECTION_TIMEOUT*1000]
 
 # Theme settings
 proc define_theme_color {stylePrefix defaultBgnd mapping} {
@@ -1289,7 +1290,7 @@ proc ssh_check_connection {hostname {connect 1}} {
         # Instead of timing out on the real ssh_command, we timeout here on a dummy, because here we
         # know, that the command shouldn't last long. However, the real ssh_command could last rather
         # long, e.g. stopping a difficult component. This would generate a spurious timeout.
-        set res [communicate_ssh $hostname "echo -ne 0\\\\0" 3000]
+        set res [communicate_ssh $hostname "echo -ne 0\\\\0" $VDEMO_CONNCHECK_TIMEOUT]
         #set res [exec bash -c "exec 5<>$fifo.in; echo 'echo -ne 0\\\\0' >&5; read -d '' -rt 1 s <>$fifo.out; echo \$s"]
         dputs "connection check result: $res" 2
 
