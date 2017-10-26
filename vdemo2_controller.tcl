@@ -1270,6 +1270,7 @@ proc communicate_ssh {host cmd {timeout 0}} {
 }
 
 proc ssh_check_connection {hostname {connect 1}} {
+    global VDEMO_CONNCHECK_TIMEOUT
     set fifo [get_fifo_name $hostname]
     # error code to indicate missing master connection
     set res -1
