@@ -22,6 +22,18 @@ tkroot = tkinter.Tk()
 
 
 class ServerRequestHandler(BaseHTTPRequestHandler):
+    help_msg = bytes(
+        "<html><head><title>vdemo help</title></head>"
+        "<body>"
+        "<p>Examples:</p>"
+        "<p>http://localhost:4443/vdemo/api/list</p>"
+        "<p>http://localhost:4443/vdemo/api/grouplist</p>"
+        "<p>http://localhost:4443/vdemo/api/all/(start|stop|check)</p>"
+        "<p>http://localhost:4443/vdemo/api/group/NAME/(start|stop|check)</p>"
+        "<p>http://localhost:4443/vdemo/api/component/NAME/(start|stop|check)</p>"
+        "<p>http://localhost:4443/vdemo/api/terminate</p>"
+        "<p>http://localhost:4443/vdemo/api/busy</p>"
+        "</body></html>", "utf-8")
 
     def __init__(self, request, client_address, server):
         self.transforms = (
@@ -29,6 +41,7 @@ class ServerRequestHandler(BaseHTTPRequestHandler):
             (re.compile("/vdemo/api/grouplist/?"), "grouplist", 200),
             (re.compile("/vdemo/api/all/(?P<cmd>start|stop|check)/?"), "all %(cmd)s all", 202),
             (re.compile("/vdemo/api/terminate/?"), "terminate", 200),
+            (re.compile("/vdemo/api/busy/?"), "busy", 200),
             (re.compile("/vdemo/api/group/(?P<group>[^/]+)/(?P<cmd>start|stop|check)/?"), "all %(cmd)s %(group)s", 202),
             (re.compile("/vdemo/api/component/(?P<comp>[^/]+)/(?P<cmd>start|stop|check|stopwait)/?"), "component %(comp)s %(cmd)s", 202),
         )
@@ -82,17 +95,7 @@ class ServerRequestHandler(BaseHTTPRequestHandler):
             self.wfile.write(content)
 
         elif purl.path == "/vdemo/api/help":
-            content = bytes(
-                "<html><head><title>vdemo help</title></head>"
-                "<body>"
-                "<p>Examples:</p>"
-                "<p>http://localhost:4443/vdemo/api/list</p>"
-                "<p>http://localhost:4443/vdemo/api/grouplist</p>"
-                "<p>http://localhost:4443/vdemo/api/all/(start|stop|check)</p>"
-                "<p>http://localhost:4443/vdemo/api/group/NAME/(start|stop|check)</p>"
-                "<p>http://localhost:4443/vdemo/api/component/NAME/(start|stop|check)</p>"
-                "<p>http://localhost:4443/vdemo/api/terminate</p>"
-                "</body></html>", "utf-8")
+            content = self.help_msg
             self.send_response(200)
             self.send_header("Content-type", "text/html")
             self.send_header("Content-length", len(content))
@@ -147,7 +150,7 @@ class VDemo:
             pemfile, pemfilename = tempfile.mkstemp(prefix="vdemo", suffix=".pem")
             subprocess.run(["bash", "-c", "openssl req -newkey rsa:2048 -x509 -nodes -keyout %s "
                             "-new -out %s -subj /CN=%s -reqexts SAN -extensions SAN "
-                            "-config <(cat /etc/ssl/openssl.cnf; printf '[SAN]\\nsubjectAltName=DNS:%s') "
+                            "-config <(cat /etc/ssl/openssl.cnf - <<< $'[SAN]\\nsubjectAltName=DNS:%s') "
                             "-sha256 -days 3650 &>/dev/null || echo error generating ssl certificate"
                             % (pemfilename, pemfilename, fqdn, fqdn)])
             server = VdemoApiServer(('', serverport), ServerRequestHandler, pemfilename,
