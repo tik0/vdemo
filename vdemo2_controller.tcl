@@ -1353,7 +1353,7 @@ proc monitoring_disabled {host} {
     return [expr [lsearch -exact $::MONITOR_IGNORE_HOSTS $host] >= 0]
 }
 
-proc connect_host {fifo host} {
+proc init_connect_host {fifo host} {
     file delete "$fifo.in"
     file delete "$fifo.out"
     exec mkfifo "$fifo.in"
@@ -1383,12 +1383,15 @@ proc connect_host {fifo host} {
 
     # Wait until connection is established.
     # Issue a echo command on remote host that only returns if a connection was established.
-    puts -nonewline "connecting to $host: "; flush stdout
     puts $::SSH_DATA_INCHAN($host) "echo -ne connected\\\\0"
+}
+
+proc process_connect_host {fifo host} {
     # Loop will wait for at most 30 seconds to allow entering a password if necessary.
     # This will break earlier if ssh connection returns, e.g. due to timeout.
     set endtime [expr [clock seconds] + 30]
     set xterm_shown 0
+    puts -nonewline "connecting to $host: "; flush stdout
     while {$endtime > [clock seconds]} {
         set res [read_chan $::SSH_DATA_OUTCHAN($host) 1000]
         # continue waiting on timeout (""), otherwise break from loop
@@ -1447,6 +1450,11 @@ proc connect_host {fifo host} {
     return 0
 }
 
+proc connect_host {fifo host} {
+    init_connect_host $fifo $host
+    return [process_connect_host $fifo $host]
+}
+
 proc connect_hosts {} {
     if {[info exists ::geometry]} {
         set geometry ${::geometry}
@@ -1460,12 +1468,17 @@ proc connect_hosts {} {
     pack .vdemoinit
     pack .vdemoinit2
     update
-
     foreach {h} $::HOSTS {
-        .vdemoinit2 configure -text "connect to $h"
+        .vdemoinit2 configure -text "init connect to $h"
         update
         set fifo [get_fifo_name $h]
-        connect_host $fifo $h
+        init_connect_host $fifo $h
+    }
+    foreach {h} $::HOSTS {
+        .vdemoinit2 configure -text "wait connect to $h"
+        update
+        set fifo [get_fifo_name $h]
+        process_connect_host $fifo $h
     }
     # establish screen monitoring locally (for master connections)
     connect_screen_monitoring localhost
