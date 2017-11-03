@@ -147,16 +147,8 @@ class VDemo:
             serverport = int(os.environ["VDEMO_SERVER_PORT"])
             fqdn = socket.getfqdn()
             logging.info("vdemo api url: https://vdemo:%s@%s:%s/vdemo/api" % (authkey, fqdn, serverport))
-            pemfile, pemfilename = tempfile.mkstemp(prefix="vdemo", suffix=".pem")
-            subprocess.run(["bash", "-c", "openssl req -newkey rsa:2048 -x509 -nodes -keyout %s "
-                            "-new -out %s -subj /CN=%s -reqexts SAN -extensions SAN "
-                            "-config <(cat /etc/ssl/openssl.cnf - <<< $'[SAN]\\nsubjectAltName=DNS:%s') "
-                            "-sha256 -days 3650 &>/dev/null || echo error generating ssl certificate"
-                            % (pemfilename, pemfilename, fqdn, fqdn)])
-            server = VdemoApiServer(('', serverport), ServerRequestHandler, pemfilename,
+            server = VdemoApiServer(('', serverport), ServerRequestHandler, os.path.join(os.path.dirname(__file__), "vdemo_cert.pem"),
                                     base64.b64encode(bytes("vdemo:" + authkey, "utf-8")).decode('ascii'))
-            os.close(pemfile)
-            os.remove(pemfilename)
             thread = threading.Thread(None, server.serve_forever)
             thread.daemon = True
             thread.start()
