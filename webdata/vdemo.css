@@ -39,6 +39,10 @@ body {
 .row.blue {
   background: #2980b9;
 }
+.row.green {
+  background: #27ae60;
+}
+
 @media screen and (max-width: 580px) {
   .row {
     padding: 8px 0;
