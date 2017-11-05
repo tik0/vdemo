@@ -133,7 +133,7 @@ class ServerRequestHandler(BaseHTTPRequestHandler):
             response = None
         if response:
             content = bytes(response.content, "utf-8")
-            logging.info("webpath:'%(path)s' params:'%(params)s' query:'%(query)s'" % purl._asdict())
+            logging.debug("webpath:'%(path)s' params:'%(params)s' query:'%(query)s'" % purl._asdict())
             self.send_response(response.code)
             self.send_header("Content-type", response.content_type)
             self.send_header("Content-length", len(content))
@@ -182,7 +182,7 @@ class VdemoApiServer(HTTPServer):
     def vdemo_request_callback(self, varname, index, op):
         # Note: a tcl error causes a segfault here
         reply = tkroot.eval('if { [catch { global %s; set response [handle_remote_request {*}$%s] } msg] } { '
-                            'return "ERROR\n$msg" } { return $response }' % (varname, varname))
+                            'return "ERROR\n$msg\n$::errorInfo" } { return $response }' % (varname, varname))
         self.replyQueue.put(reply)
 
     def load_templates(self, path):
@@ -214,12 +214,19 @@ class VDemo:
                 thread.start()
             tkroot.eval('source "%s"' % sys.argv[1])
             tkroot.mainloop()
-        except:
+        except OSError:
             logging.exception("vdemo startup failed (if applicable use -s or VDEMO_SERVER_PORT to specifiy a different port)")
             tkroot.eval('catch { finish }')
+        except SystemExit as ex:
+            return ex.code
+        except:
+            logging.exception("error in vdemo controller")
+        return 0
 
 
 
 if __name__ == "__main__":
+    if os.getenv("VDEMO_DEBUG_LEVEL", None):
+        logging.basicConfig(level=logging.DEBUG)
     vd = VDemo()
-    vd.run()
+    sys.exit(vd.run())
