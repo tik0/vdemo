@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>vdemo $vdemo_id</title>
+    <style class="cp-pen-styles">
+$style
+
+    </style>
+    <script type="text/javascript">
+var HttpClient = function() {
+    this.get = function(aUrl, aCallback) {
+        var anHttpRequest = new XMLHttpRequest();
+        anHttpRequest.onreadystatechange = function() {
+            if (anHttpRequest.readyState == 4)
+                aCallback(anHttpRequest.responseText, anHttpRequest.status, anHttpRequest.getResponseHeader("Location"));
+        }
+
+        anHttpRequest.open( "GET", aUrl, true );
+        anHttpRequest.send( null );
+    }
+}
+var client = new HttpClient();
+
+var waitready = function(response, status, lochdr) {
+    if (lochdr == null) {
+        location.reload(true);
+    } else {
+        setTimeout(function() {client.get(lochdr, waitready);}, 1000);
+    }
+}
+var handleresponse = function(response, status, lochdr) {
+    if (status == 202) {
+        client.get(lochdr, waitready);
+    }
+}
+
+    </script>
+</head>
+<body>
+<div class="wrapper">
+    <h1>vdemo $vdemo_id</h1>
+    <div class="table">
+        <div class="row header blue">
+            <div class="cell">Level</div>
+            <div class="cell">Title</div>
+            <div class="cell">Host</div>
+            <div class="cell">Group</div>
+            <div class="cell wider">Status</div>
+            <div class="cell">Commands</div>
+        </div>
+        $rows
+    </div>
+
+    <div class="table">
+        <div class="row header blue">
+            <div class="cell">Group</div>
+            <div class="cell">Commands</div>
+        </div>
+        <div class="row">
+            <div class="cell">all</div>
+            <div class="cell">
+                <input type="button" value="start" onclick="client.get('api/all/start', handleresponse);"/>
+                <input type="button" value="stop" onclick="client.get('api/all/stop', handleresponse);"/>
+                <input type="button" value="check" onclick="client.get('api/all/check', handleresponse);"/>
+            </div>
+        </div>
+        $grouprows
+    </div>
+</div>
+</body>
+</html>

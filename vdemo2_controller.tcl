@@ -1781,13 +1781,13 @@ proc setup_temp_dir { } {
 }
 
 proc handle_remote_request { request args } {
-    global GROUP COMPONENTS TITLE HOST GROUP COMP_LEVEL
+    global GROUP COMPONENTS TITLE HOST GROUP COMP_LEVEL WIDGET
 
     dputs "got remote request: $request $args"
     switch $request {
         "list" {
             dputs "remote cmd: ${request}ing components"
-            set result {}
+            set result {"component\tlevel\ttitle\thost\tgroup\tstatus"}
             foreach {comp} $COMPONENTS {
                  lappend result "$comp\t$COMP_LEVEL($comp)\t$TITLE($comp)\t$HOST($comp)\t$GROUP($comp)\t$::COMPSTATUS($comp)"
             }
@@ -1826,6 +1826,9 @@ proc handle_remote_request { request args } {
             set busy 0
             foreach group "all $::GROUPS" {
                 set busy [expr  $busy || $::ALLCMD(intr_$group) != 0]
+            }
+            foreach {comp} $COMPONENTS {
+                set busy [expr  $busy || [$WIDGET($comp).stop instate disabled] || [$WIDGET($comp).start instate disabled]]
             }
             return $busy
         }
