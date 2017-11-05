@@ -1,0 +1,9 @@
+#!/bin/bash
+
+title="sleep"
+
+function component {
+  sleep infinity
+}
+
+source "$VDEMO_root/vdemo_standard_component_suffix.sh"

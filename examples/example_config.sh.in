@@ -1,0 +1,15 @@
+source "$VDEMO_demoRoot/vdemo_aux_functions.sh"
+
+# user / other system variables
+export logPath=/tmp/vdemo-${USER}
+export demoName="$(basename "${BASH_SOURCE[0]}" .sh)"
+export prefix="@prefix@"
+export PATH="$prefix/bin:$PATH"
+
+# variables interpreted by vdemo
+export VDEMO_root="@vdemo_prefix@/lib/vdemo"
+export VDEMO_componentPath="$VDEMO_demoRoot/component_scripts"
+export VDEMO_watchfile=${logPath}/${demoName}_watchfile.log
+export VDEMO_logfile_prefix=${logPath}/VDEMO_component_
+
+mkdir -p ${logPath}

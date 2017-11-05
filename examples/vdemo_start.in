@@ -1,0 +1,2 @@
+#!/bin/bash
+exec @vdemo_prefix@/bin/vdemo2 -r 5 -w "$@" @VDEMO_launchfile@
