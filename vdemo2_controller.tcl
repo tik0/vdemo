@@ -552,7 +552,7 @@ proc gui_tcl {} {
     ttk::frame .ssh
     pack .ssh -side left -fill x
     ttk::label .ssh.label -text "ssh to"
-    pack .ssh.label -side left
+    grid .ssh.label -column 0 -row 0
     foreach {h} $::HOSTS {
         gui_add_host $h
     }
@@ -582,15 +582,18 @@ proc gui_add_host {host} {
     set ::SCREENED_SSH($host) 0
 
     if {[catch {.ssh.$lh.xterm configure -style $style}]} {
+        set idx [lsearch $::HOSTS $host]
+        set col [expr $idx % 6]
+        set row [expr $idx / 6]
         # create buttons
         ttk::frame  .ssh.$lh
         ttk::button .ssh.$lh.xterm -style $style -text "$host" -command "remote_xterm $host"
         ttk::button .ssh.$lh.clock -style cmd.TButton -text "⌚" -command "remote_clock $host" -width -2
         ttk::checkbutton .ssh.$lh.screen -text "" -command "screen_ssh_master $host" -variable ::SCREENED_SSH($host) -onvalue 1 -offvalue 0
-        pack .ssh.$lh -side left -fill x -padx 3
-        pack .ssh.$lh.xterm  -side left -fill x
-        pack .ssh.$lh.clock  -side left -fill x
-        pack .ssh.$lh.screen -side left -fill x
+        grid .ssh.$lh -column [expr $col*4+1] -row $row
+        grid .ssh.$lh.xterm -column [expr $col*4+2] -row $row
+        grid .ssh.$lh.clock -column [expr $col*4+3] -row $row
+        grid .ssh.$lh.screen -column [expr $col*4+4] -row $row
     }
 }
 
