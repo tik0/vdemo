@@ -197,22 +197,27 @@ class VdemoApiServer(HTTPServer):
 class VDemo:
 
     def run(self):
-        tkroot.eval('source "%s"' % sys.argv[1])
-        authkey = os.getenv("VDEMO_SERVER_KEY", None)
-        serverport = os.getenv("VDEMO_SERVER_PORT", None)
-        if serverport:
-            if not authkey:
-                logging.warning("environment variable VDEMO_SERVER_KEY not set, generating random key")
-                authkey = ''.join(random.SystemRandom().choice(string.ascii_uppercase + string.digits) for _ in range(12))
-            serverport = int(serverport)
-            fqdn = socket.getfqdn()
-            logging.info("vdemo api url: https://vdemo:%s@%s:%s/vdemo/api" % (authkey, fqdn, serverport))
-            server = VdemoApiServer(('', serverport), ServerRequestHandler,
-                                    base64.b64encode(bytes("vdemo:" + authkey, "utf-8")).decode('ascii'))
-            thread = threading.Thread(None, server.serve_forever)
-            thread.daemon = True
-            thread.start()
-        tkroot.mainloop()
+        try:
+            authkey = os.getenv("VDEMO_SERVER_KEY", None)
+            serverport = os.getenv("VDEMO_SERVER_PORT", None)
+            if serverport:
+                if not authkey:
+                    logging.warning("environment variable VDEMO_SERVER_KEY not set, generating random key")
+                    authkey = ''.join(random.SystemRandom().choice(string.ascii_uppercase + string.digits) for _ in range(12))
+                serverport = int(serverport)
+                fqdn = socket.getfqdn()
+                logging.info("vdemo api url: https://vdemo:%s@%s:%s/vdemo/api" % (authkey, fqdn, serverport))
+                server = VdemoApiServer(('', serverport), ServerRequestHandler,
+                                        base64.b64encode(bytes("vdemo:" + authkey, "utf-8")).decode('ascii'))
+                thread = threading.Thread(None, server.serve_forever)
+                thread.daemon = True
+                thread.start()
+            tkroot.eval('source "%s"' % sys.argv[1])
+            tkroot.mainloop()
+        except:
+            logging.exception("vdemo startup failed (if applicable use -s or VDEMO_SERVER_PORT to specifiy a different port)")
+            tkroot.eval('catch { finish }')
+
 
 
 if __name__ == "__main__":
