@@ -433,11 +433,11 @@ proc gui_tcl {} {
 
         ttk::label $w.$c.level -style level.TLabel -text "$COMP_LEVEL($c)"
         ttk::label $w.$c.label -width 20 -style label.TLabel -text "$TITLE($c)@"
-        ttk::entry $w.$c.host  -width 10 -textvariable HOST($c)
+        ttk::entry $w.$c.host  -width 14 -textvariable HOST($c)
         # disable host field for spreaddaemon: cannot add/change hosts in spread config
         if {"$COMMAND($c)" == "spreaddaemon"} { $w.$c.host state disabled }
 
-        ttk::label $w.$c.group -style group.TLabel -text "$GROUP($c)"
+        ttk::label $w.$c.group -style group.TLabel -width 12 -text "$GROUP($c)"
 
         ttk::button $w.$c.start -style cmd.TButton -text "start" -command "component_cmd $c start"
         ttk::button $w.$c.stop  -style cmd.TButton -text "stop" -command "component_cmd $c stop"
