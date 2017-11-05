@@ -37,6 +37,7 @@ vdemo starter
 # exit script on all non-zero return values
 set -e
 
+VDEMO_DO_REDIRECT=""
 # option checks
 while [ $# -gt 0 ]; do
     case $1 in
@@ -74,6 +75,9 @@ while [ $# -gt 0 ]; do
             shift
         fi
         echo "Using verbosity level $VDEMO_DEBUG_LEVEL"
+        ;;
+    "-w"|"--watch")
+        VDEMO_DO_REDIRECT=1
         ;;
     "-s"|"--server")
         export VDEMO_SERVER_PORT=$2
@@ -114,8 +118,12 @@ source "$VDEMO_demoConfig"
 
 export VDEMO_exports="SPREAD_CONFIG $VDEMO_exports"
 
+if [ ! -z "$VDEMO_DO_REDIRECT" ] && [ ! -z "$VDEMO_watchfile" ]; then
+    exec &> >(tee -i "$VDEMO_watchfile")
+fi
+
 if [ -z "$VDEMO_SERVER_PORT" ]; then
-	exec wish $VDEMO_root/vdemo2_controller.tcl -geometry "$GEOMETRY"
+    exec wish $VDEMO_root/vdemo2_controller.tcl
 else
-	exec python3 $VDEMO_root/vdemo_controller.py $VDEMO_root/vdemo2_controller.tcl
+    exec python3 $VDEMO_root/vdemo_controller.py $VDEMO_root/vdemo2_controller.tcl
 fi

@@ -1844,6 +1844,7 @@ proc handle_remote_request { request args } {
 
 signal trap SIGINT finish
 signal trap SIGHUP finish
+catch {set geometry $::env(GEOMETRY)}
 
 setup_temp_dir
 set mypid [pid]
