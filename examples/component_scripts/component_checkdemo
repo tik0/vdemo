@@ -1,0 +1,15 @@
+#!/bin/bash
+
+title="sleep"
+
+function component {
+  sleep infinity
+}
+
+function on_check {
+    pid=$(vdemo_pidFromScreen "${VDEMO_component_title}")
+    [ ! -z "$pid" ] && [ $(ps -o etimes= -p $pid) -gt 5 ]
+    return $?
+}
+
+source "$VDEMO_root/vdemo_standard_component_suffix.sh"

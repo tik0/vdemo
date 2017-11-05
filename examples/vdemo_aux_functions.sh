@@ -15,7 +15,7 @@ export -f vdemo_coredump
 
 function vdemo_inspect_cmd {
     source "$VDEMO_root/vdemo_base.sh"
-    pid=$(vdemo_pidFromScreen)
+    pid=$(vdemo_pidFromScreen "${VDEMO_component_title}")
     if [ -z "$pid" ]; then
         echo "component not running"
     else

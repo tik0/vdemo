@@ -1,6 +1,18 @@
 export VDEMO_demoRoot="$(dirname "${BASH_SOURCE[0]}")"
 source "$VDEMO_demoRoot/example_config.sh"
 
+host01=${host01:-localhost}
+host02=${host02:-localhost}
+host03=${host03:-localhost}
+host04=${host04:-localhost}
+host05=${host05:-localhost}
+host06=${host06:-localhost}
+host07=${host07:-localhost}
+host08=${host08:-localhost}
+host09=${host09:-localhost}
+host10=${host10:-localhost}
+
+
 ##############################################################################
 # COMPONENT LIST
 ##############################################################################
