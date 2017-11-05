@@ -1394,6 +1394,7 @@ proc process_connect_host {fifo host} {
     # This will break earlier if ssh connection returns, e.g. due to timeout.
     set endtime [expr [clock seconds] + 30]
     set xterm_shown 0
+    set screenid [get_master_screen_name $host]
     puts -nonewline "connecting to $host: "; flush stdout
     while {$endtime > [clock seconds]} {
         set res [read_chan $::SSH_DATA_OUTCHAN($host) 1000]

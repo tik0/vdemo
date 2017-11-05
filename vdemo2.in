@@ -60,7 +60,7 @@ while [ $# -gt 0 ]; do
         fi
         ;;
     "-r"|"--logrotate")
-        echo "Enable log rotation"
+        echo "Enabling log rotation"
         export VDEMO_LOG_ROTATION=5
         if [[ $2 =~ ^[0-9]+$ ]] ; then
             VDEMO_LOG_ROTATION=$2
