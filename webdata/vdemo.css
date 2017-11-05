@@ -62,3 +62,13 @@ body {
     display: block;
   }
 }
+.footnote {
+  color: #8b8b8b;
+}
+a {
+    color: #27ae60;
+    text-decoration: none;
+}
+.title {
+  color: #8b8b8b;
+}
