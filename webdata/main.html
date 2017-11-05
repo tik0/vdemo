@@ -42,18 +42,6 @@ var handleresponse = function(response, status, lochdr) {
     <h1>vdemo $vdemo_id</h1>
     <div class="table">
         <div class="row header blue">
-            <div class="cell">Level</div>
-            <div class="cell">Title</div>
-            <div class="cell">Host</div>
-            <div class="cell">Group</div>
-            <div class="cell wider">Status</div>
-            <div class="cell">Commands</div>
-        </div>
-        $rows
-    </div>
-
-    <div class="table">
-        <div class="row header green">
             <div class="cell">Group</div>
             <div class="cell">Commands</div>
         </div>
@@ -66,6 +54,17 @@ var handleresponse = function(response, status, lochdr) {
             </div>
         </div>
         $grouprows
+    </div>
+    <div class="table">
+        <div class="row header blue">
+            <div class="cell">Level</div>
+            <div class="cell">Title</div>
+            <div class="cell">Host</div>
+            <div class="cell">Group</div>
+            <div class="cell wider">Status</div>
+            <div class="cell">Commands</div>
+        </div>
+        $rows
     </div>
 </div>
 </body>
