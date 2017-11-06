@@ -1644,7 +1644,6 @@ proc handle_screen_failure {chan host} {
         reconnect_host $remoteHost "Lost connection to $remoteHost. Reconnect?"
         return
     }
-
     # a component crashed
     foreach {comp} "$::COMPONENTS" {
         if {$::HOST($comp) == $host && \
@@ -1684,7 +1683,6 @@ proc handle_screen_failure {chan host} {
             return
         }
     }
-    dputs "on $host: $line"
 }
 
 # setup inotifywait on remote hosts to monitor deletions in screen-directory
@@ -1714,7 +1712,7 @@ proc connect_screen_monitoring {host} {
         return
     }
     set ::MONITOR_CHAN($host) $chan
-    fconfigure $chan -blocking 0 -buffering line -translation binary
+    fconfigure $chan -blocking 0 -buffering line -translation auto
     fileevent $chan readable [list handle_screen_failure $chan $host]
     dputs "connected screen monitoring channel $chan for host $host" 2
 }
