@@ -616,7 +616,7 @@ proc init_logger {filename} {
     if { [catch {open "|tail -n 5 --pid=$::mypid -F $filename"} infile] } {
         puts  "Could not open $filename for reading."
     } else {
-        fconfigure $infile -blocking no -buffering line
+        fconfigure $infile -blocking no -buffering line -translation binary
         fileevent $infile readable [list insertLog $infile]
     }
 }
@@ -1255,14 +1255,14 @@ proc reconnect_host {host msg} {
 # read_chan ignores data after \0 in the same read cycle.
 proc read_chan {chan {timeout 0}} {
     set result ""
-    set endtime [expr [clock milliseconds] + $timeout]
+    if {[expr $timeout != 0]} {set endtime [expr [clock milliseconds] + $timeout]}
     while {$timeout == 0 || $endtime > [clock milliseconds]} {
         set data [split [read -nonewline $chan] \0]
         append result [lindex $data 0]
         if { [llength $data] == 2 } {
             break
         }
-        after 10
+        after 1
     }
     return $result
 }
@@ -1365,11 +1365,9 @@ proc init_connect_host {fifo host} {
     if {[info exists ::SSH_DATA_INCHAN($host)]} { close $::SSH_DATA_INCHAN($host) }
     if {[info exists ::SSH_DATA_OUTCHAN($host)]} { close $::SSH_DATA_OUTCHAN($host) }
     set outchan [open "$fifo.out" r+]
-    fconfigure $outchan -buffering none
-    fconfigure $outchan -blocking 0
+    fconfigure $outchan -buffering none -blocking 0 -translation binary
     set inchan [open "$fifo.in" r+]
-    fconfigure $inchan -buffering none
-    fconfigure $inchan -blocking 0
+    fconfigure $inchan -buffering none -blocking 0 -translation binary
     set ::SSH_DATA_INCHAN($host) $inchan
     set ::SSH_DATA_OUTCHAN($host) $outchan
     
@@ -1716,7 +1714,7 @@ proc connect_screen_monitoring {host} {
         return
     }
     set ::MONITOR_CHAN($host) $chan
-    fconfigure $chan -blocking 0 -buffering line -translation auto
+    fconfigure $chan -blocking 0 -buffering line -translation binary
     fileevent $chan readable [list handle_screen_failure $chan $host]
     dputs "connected screen monitoring channel $chan for host $host" 2
 }

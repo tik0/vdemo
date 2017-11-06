@@ -1,5 +1,10 @@
 source "$VDEMO_demoRoot/example_config.sh"
 
+# instead of launching vdemo2 with -s we specify the port here to allow for
+# different ports for different configurations
+export VDEMO_SERVER_PORT=4443
+export VDEMO_SERVER_KEY=demo
+
 host01=${host01:-localhost}
 host02=${host02:-localhost}
 host03=${host03:-localhost}
@@ -10,7 +15,6 @@ host07=${host07:-localhost}
 host08=${host08:-localhost}
 host09=${host09:-localhost}
 host10=${host10:-localhost}
-
 
 ##############################################################################
 # COMPONENT LIST
