@@ -24,7 +24,7 @@ FILE(GLOB shfiles RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" *.sh)
 
 SET(launchfiles ${shfiles})
 FOREACH(item ${launchfiles})
-    IF(${item} MATCHES "^vdemo_[^/]*$")
+    IF(${item} MATCHES "^vdemo_[^/]*$|.*[_-]config.sh$")
         LIST(REMOVE_ITEM launchfiles ${item})
     ENDIF()
 ENDFOREACH(item)
