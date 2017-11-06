@@ -86,7 +86,33 @@ function vdemo_showlog {
 
 function vdemo_inspect {
 	xterm -fg white -bg black -title "inspect ${1}@${HOSTNAME}" -e \
-		vdemo_inspect_cmd &
+		vdemo_inspect_cmd "$@" &
+}
+
+function vdemo_logging {
+	case $1 in
+		"onexit")
+			function vdemo_screendump {
+				screen -S "\$STY" -X -p0 hardcopy -h "${VDEMO_logfile}"
+				sed -i -e '1i#VDEMO note: screen hardcopy' -e '/./,\$!d' "${VDEMO_logfile}"
+			}
+			trap vdemo_screendump EXIT
+			;;
+		"rotatelogs")
+			exec 1> >(VDEMO_logfile="${VDEMO_logfile}" rotatelogs -p "${VDEMO_root}"/vdemo_remove_logfiles \
+			-L "${VDEMO_logfile}" -f -e "${VDEMO_logfile}" 10M) 2>&1
+			read -d '' startmsg <<- EOF
+			#########################################
+			vdemo component start: ${VDEMO_component_title}
+			$(date -Ins)
+			#########################################
+			EOF
+			echo "$startmsg"
+			;;
+		"tee")
+			exec &> >(tee -i -a "${VDEMO_logfile}")
+			;;
+		esac
 }
 
 # start a component. This function has the following options:
@@ -95,22 +121,14 @@ function vdemo_inspect {
 #   -D    start detached
 # remaining arguments are treated as command line of the component to start
 function vdemo_start_component {
-	local VDEMO_title=$1; shift
+	export VDEMO_component_title=$1; shift
 	local VDEMO_componentDisplay="${DISPLAY}"
 	local VDEMO_startDetached="no"
 	local COLOR="white"
-	local VDEMO_logfile="${VDEMO_logfile_prefix}${VDEMO_title}.log"
+	export VDEMO_logfile="${VDEMO_logfile_prefix}${VDEMO_title}.log"
 	local logfiledir="${VDEMO_logfile%/*}"
 	if [ ! -d "$logfiledir" ]; then mkdir -p "$logfiledir"; fi
-	local VDEMO_logging
-	IFS= read -r -d '' VDEMO_logging <<- EOF
-		function vdemo_screendump {
-			screen -S "\$STY" -X -p0 hardcopy -h "${VDEMO_logfile}"
-			sed -i -e '1i#VDEMO note: screen hardcopy' -e '/./,\$!d' "${VDEMO_logfile}"
-		}
-		trap vdemo_screendump EXIT
-	EOF
-	echo "$VDEMO_logging" >&2
+	local VDEMO_logging="onexit"
 	while [ $# -gt 0 ]; do
 		case $1 in
 			"-D"|"--detached")
@@ -125,17 +143,9 @@ function vdemo_start_component {
 				# exec allows to redirect output of current shell
 				if [[ "$VDEMO_LOG_ROTATION" =~ ^[0-9]+$ ]] ; then
 					echo "logrotation is enabled." >&2
-					IFS= read -r -d '' VDEMO_logging <<- EOF
-						exec 1> >(VDEMO_logfile="${VDEMO_logfile}" rotatelogs -p "${VDEMO_root}"/vdemo_remove_logfiles \
-						-L "${VDEMO_logfile}" -f -e "${VDEMO_logfile}" 10M) 2>&1
-						echo "#########################################
-						vdemo component start: ${VDEMO_title}
-						$(date -Ins)
-						#########################################"
-						set -x
-					EOF
+					VDEMO_logging="rotatelogs"
 				else
-					VDEMO_logging="exec 1> >(tee -a \"${VDEMO_logfile}\") 2>&1;set -x;"
+					VDEMO_logging="tee"
 				fi
 				;;
 			--)
@@ -151,23 +161,24 @@ function vdemo_start_component {
 		shift
 	done
 
-	export -f component
-
-	rm -f "${VDEMO_logfile}" # remove any old log file
-
 	# Logging has missing lines at the end (or is completely empty) when finishing fast.
 	# Adding a small sleep seems to fix this issue.
-	local cmd="${VDEMO_logging} LD_LIBRARY_PATH=${LD_LIBRARY_PATH} DISPLAY=${VDEMO_componentDisplay} component $*; sleep 0.01;"
+	eval "function vdemo_component { vdemo_logging $VDEMO_logging; LD_LIBRARY_PATH=${LD_LIBRARY_PATH} DISPLAY=${VDEMO_componentDisplay} component $*; sleep 0.01; }"
+
+	export -f vdemo_logging
+	export -f component
+	export -f vdemo_component
+	rm -f "${VDEMO_logfile}" # remove any old log file
 
     # bash needs to be started in in interactive mode to have job control available
     # --norc is used to prevent inclusion of the use configuration in the execution.
 	if [ "x$VDEMO_startDetached" == "xno" ]; then
-		xterm -fg $COLOR -bg black -title "starting $VDEMO_title" -e \
-			screen -t "$VDEMO_title" -S "${VDEMO_title}_" \
-			stdbuf -oL bash --norc -i -c "$cmd" &
+		xterm -fg $COLOR -bg black -title "starting $VDEMO_component_title" -e \
+			screen -t "$VDEMO_component_title" -S "${VDEMO_component_title}_" \
+			stdbuf -oL bash --norc -i -c "vdemo_component" &
 	else
-		screen -t "$VDEMO_title" -S "${VDEMO_title}_" -d -m \
-			stdbuf -oL bash --norc -i -c "$cmd"
+		screen -t "$VDEMO_component_title" -S "${VDEMO_component_title}_" -d -m \
+			stdbuf -oL bash --norc -i -c "vdemo_component"
 	fi
 }
 
@@ -200,18 +211,18 @@ function all_children {
 # stop a component
 # $1: title of the component
 function vdemo_stop_component {
-	local VDEMO_title="$1"
-	local VDEMO_pid=$(vdemo_pidFromScreen ${VDEMO_title})
+	export VDEMO_component_title="$1"
+	local VDEMO_pid=$(vdemo_pidFromScreen ${VDEMO_component_title})
 	if [ "$VDEMO_pid" ]; then
 		echo "stopping $VDEMO_title: screen pid: ${VDEMO_pid}" >&2
 		local PIDS=$(all_children $VDEMO_pid)
 		# call stop_component if that function exists
 		if declare -F stop_component > /dev/null; then
 			echo "calling stop_component"
-			stop_component $1
+			stop_component "$1"
 		else
 			# by default we first kill children processes with SIGINT (2s timeout)
-			vdemo_stop_signal_children $1 SIGINT 2
+			vdemo_stop_signal_children "$1" SIGINT 2
 		fi
 		# kill remaining children processes
 		local REMAIN_PIDS=$(ps --no-headers -o pid,comm -p $PIDS)
@@ -221,7 +232,7 @@ function vdemo_stop_component {
 
 		# call on_stop function
 		if declare -F on_stop > /dev/null; then
-			on_stop
+			on_stop "$1"
 		fi
 	fi
 }
@@ -232,7 +243,7 @@ function vdemo_stop_component {
 # $2 - signal to use (default: SIGINT)
 # $3 - timeout, waiting for a single component (default: 2s)
 function vdemo_stop_signal_children {
-	local VDEMO_title="$1"
+	local VDEMO_component_title="$1"
 	# get pids of screen and of all children
 	local VDEMO_pid=$(vdemo_pidFromScreen ${VDEMO_title})
 	local VDEMO_compo_pids=$(all_children $VDEMO_pid)

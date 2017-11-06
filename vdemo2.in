@@ -19,6 +19,7 @@ vdemo starter
   -h  --help                 display this help
   -a  --auto                 automatically start all components
   -l  --log                  enable logging for all components
+  -w  --watch                watch own output in vdemo window
   -d  --detach time          set default detach time in seconds
                               0: start detached
                              <0: never detach
@@ -30,6 +31,8 @@ vdemo starter
   -g  --geometry <geometry>  sets the main vdemo windows geometry to the specified
                              size. Uses default value (\"$GEOMETRY\") otherwise.
   -Q  --quit <components>    space separated list of components to quit vdemo on
+  -p  --prefix <path>        set variable VDEMO_prefix to <path> and export over ssh
+                             (default: @PREFIX@)
 
  authors: Marc Hanheide, Robert Haschke, Lars Schillingmann, Florian Lier
 "
@@ -83,18 +86,22 @@ while [ $# -gt 0 ]; do
         VDEMO_DO_REDIRECT=1
         ;;
     "-s"|"--server")
-        export VDEMO_SERVER_PORT=$2
+        export VDEMO_SERVER_PORT="$2"
         shift
         ;;
     "-g"|"--geometry")
-        export GEOMETRY=$2
+        export GEOMETRY="$2"
         shift
         ;;
     "-Q"|"--quit")
         export VDEMO_QUIT_COMPONENTS=$2
         shift
         ;;
-    -*)
+    "-p"|"--prefix")
+        export VDEMO_prefix="$2"
+        shift
+        ;;
+     -*)
         echo "illegal option $1" >& 2
         echo "$USAGE" >& 2
         exit 1
