@@ -17,7 +17,6 @@ host10=${host10:-localhost}
 ##############################################################################
 #   Options:
 #      -w <n> wait n seconds for process to start completely
-#      -c     run check every second during wait and break if component is running
 #      -W <n> set delay an asynchronous check is performed in case -w is not specified
 #      -l     activate initial logging for the component
 #      -x     use own X server for the component
