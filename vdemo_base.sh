@@ -93,26 +93,26 @@ function vdemo_logging {
 	case $1 in
 		"onexit")
 			function vdemo_screendump {
-				screen -S "\$STY" -X -p0 hardcopy -h "${VDEMO_logfile}"
-				sed -i -e '1i#VDEMO note: screen hardcopy' -e '/./,\$!d' "${VDEMO_logfile}"
+				screen -S "$STY" -X -p0 hardcopy -h "${VDEMO_logfile}"
+				sed -i -e '1i#VDEMO note: screen hardcopy' -e '/./,$!d' "${VDEMO_logfile}"
 			}
 			trap vdemo_screendump EXIT
 			;;
 		"rotatelogs")
-			exec 1> >(VDEMO_logfile="${VDEMO_logfile}" rotatelogs -p "${VDEMO_root}"/vdemo_remove_logfiles \
-			-L "${VDEMO_logfile}" -f -e "${VDEMO_logfile}" 10M) 2>&1
-			read -d '' startmsg <<- EOF
-			#########################################
-			vdemo component start: ${VDEMO_component_title}
-			$(date -Ins)
-			#########################################
-			EOF
-			echo "$startmsg"
+			exec &> >(VDEMO_logfile="${VDEMO_logfile}" exec rotatelogs -p "${VDEMO_root}"/vdemo_remove_logfiles \
+			-L "${VDEMO_logfile}" -f -e "${VDEMO_logfile}" 10M)
 			;;
 		"tee")
-			exec &> >(tee -i -a "${VDEMO_logfile}")
+			exec &> >(exec tee -i -a "${VDEMO_logfile}")
 			;;
 		esac
+		read -d '' startmsg <<- EOF
+		#########################################
+		vdemo component start: ${VDEMO_component_title}
+		$(date -Ins)
+		#########################################
+		EOF
+		echo "$startmsg"
 }
 
 # start a component. This function has the following options:
@@ -125,7 +125,7 @@ function vdemo_start_component {
 	local VDEMO_componentDisplay="${DISPLAY}"
 	local VDEMO_startDetached="no"
 	local COLOR="white"
-	export VDEMO_logfile="${VDEMO_logfile_prefix}${VDEMO_title}.log"
+	export VDEMO_logfile="${VDEMO_logfile_prefix}${VDEMO_component_title}.log"
 	local logfiledir="${VDEMO_logfile%/*}"
 	if [ ! -d "$logfiledir" ]; then mkdir -p "$logfiledir"; fi
 	local VDEMO_logging="onexit"
@@ -243,7 +243,7 @@ function vdemo_stop_component {
 # $2 - signal to use (default: SIGINT)
 # $3 - timeout, waiting for a single component (default: 2s)
 function vdemo_stop_signal_children {
-	local VDEMO_component_title="$1"
+	local VDEMO_title="$1"
 	# get pids of screen and of all children
 	local VDEMO_pid=$(vdemo_pidFromScreen ${VDEMO_title})
 	local VDEMO_compo_pids=$(all_children $VDEMO_pid)
