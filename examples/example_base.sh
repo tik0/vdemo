@@ -1,4 +1,3 @@
-export VDEMO_demoRoot="$(dirname "${BASH_SOURCE[0]}")"
 source "$VDEMO_demoRoot/example_config.sh"
 
 host01=${host01:-localhost}

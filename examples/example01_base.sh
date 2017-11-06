@@ -1,4 +1,3 @@
-export VDEMO_demoRoot="$(dirname "${BASH_SOURCE[0]}")"
 source "$VDEMO_demoRoot/example_config.sh"
 
 export VDEMO_SERVER_PORT=4443

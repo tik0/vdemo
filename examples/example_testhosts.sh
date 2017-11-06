@@ -1,5 +1,3 @@
-export VDEMO_demoRoot="$(dirname "${BASH_SOURCE[0]}")"
-
 # instead of launching vdemo2 with -s we specify the port here to allow for
 # different ports for different configurations
 export VDEMO_SERVER_PORT=4443

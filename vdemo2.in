@@ -34,6 +34,9 @@ vdemo starter
  authors: Marc Hanheide, Robert Haschke, Lars Schillingmann, Florian Lier
 "
 
+export VDEMO_root="@VDEMO_root@"
+export VDEMO_prefix="@PREFIX@"
+
 # exit script on all non-zero return values
 set -e
 
@@ -109,14 +112,20 @@ if [ $# -lt 1 ]; then
     exit 1
 fi
 
-export VDEMO_root="@VDEMO_root@"
-
 export VDEMO_demoConfig="$1"
 if [[ "$1" != /* ]]; then VDEMO_demoConfig=$(pwd)/$1; fi
+export VDEMO_demoRoot=$(dirname "$VDEMO_demoConfig")
+export VDEMO_demoName="$(basename "$VDEMO_demoConfig" .sh)"
+export VDEMO_componentPath="$VDEMO_demoRoot/component_scripts"
+export VDEMO_logPath="/tmp/vdemo-${USER}"
+export VDEMO_watchfile="$VDEMO_logPath/${VDEMO_demoName}_watchfile.log"
+export VDEMO_logfile_prefix="$VDEMO_logPath/VDEMO_component_"
+mkdir -p "$VDEMO_logPath"
 
 source "$VDEMO_demoConfig"
 
-export VDEMO_exports="SPREAD_CONFIG VDEMO_LOG_ROTATION $VDEMO_exports"
+export VDEMO_exports="SPREAD_CONFIG VDEMO_LOG_ROTATION VDEMO_root VDEMO_demoRoot \
+VDEMO_componentPath VDEMO_demoName VDEMO_demoConfig VDEMO_prefix VDEMO_logPath VDEMO_logfile_prefix $VDEMO_exports"
 
 if [ ! -z "$VDEMO_DO_REDIRECT" ] && [ ! -z "$VDEMO_watchfile" ]; then
     exec &> >(tee -i "$VDEMO_watchfile")

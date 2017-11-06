@@ -1,3 +1,4 @@
-# For development only. This file will not be installed.
+source "$VDEMO_demoRoot/vdemo_aux_functions.sh"
 
-source $VDEMO_demoRoot/build/example_config.sh
+export prefix="$VDEMO_prefix"
+export PATH="$prefix/bin:$PATH"
