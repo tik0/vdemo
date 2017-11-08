@@ -402,7 +402,7 @@ proc gui_tcl {} {
     # main gui frame
     ttk::frame .main
     # scrollable frame
-    iwidgets::scrolledframe .main.scrollable -vscrollmode dynamic -hscrollmode none -height 300
+    iwidgets::scrolledframe .main.scrollable -vscrollmode dynamic -hscrollmode none -height 400 -width 900
     bind_wheel_sf .main.scrollable
     pack .main.scrollable -side top -fill both -expand yes
 
@@ -485,21 +485,31 @@ proc gui_tcl {} {
     # buttons to control ALL components
     all_cmd_reset "all"
     ttk::frame $allcmd.all -style groove.TFrame
-    pack $allcmd.all -side top -fill x
+    grid $allcmd.all -column 0 -row 0 -sticky w -columnspan 3 -pady 4
     ttk::label $allcmd.all.label -style TLabel -text "ALL COMPONENTS"
     ttk::button $allcmd.all.start -style cmd.TButton -text "start" -command "all_cmd start"
     ttk::button $allcmd.all.stop  -style cmd.TButton -text "stop"  -command "all_cmd stop"
     ttk::button $allcmd.all.check -style cmd.TButton -text "check" -command "all_cmd check"
-    pack $allcmd.all.label -side left -fill x
-    pack $allcmd.all.check $allcmd.all.stop $allcmd.all.start -side right
+    pack $allcmd.all.label -side left -fill x -padx 1 -pady 2
+    pack $allcmd.all.start $allcmd.all.stop $allcmd.all.check -side left -pady 2
+    # search widgets
+    ttk::button $allcmd.all.searchBtn -style cmd.TButton -text "search" -command {find_component $SEARCH_STRING}
+    ttk::entry  $allcmd.all.searchText -textvariable SEARCH_STRING -width 40
+    bind $allcmd.all.searchText <Return> {find_component $SEARCH_STRING}
+    pack $allcmd.all.searchText -side left -fill x -expand 1 -pady 2
+    pack $allcmd.all.searchBtn -side right -ipadx 15 -padx 2 -pady 2
 
     # buttons for group control:
-    set ::GROUPS [lsort -unique "$groups"]
-    foreach {g} "$::GROUPS" {
-        all_cmd_reset "$g"
+    set ::GROUPS [lsort -unique $groups]
+    set maxrows [expr ([llength $::GROUPS] + 2) / 3 ]
+    set idx 0
+    foreach {g} $::GROUPS {
+        all_cmd_reset $g
         ttk::frame $allcmd.$g -style groove.TFrame
-        pack $allcmd.$g -side top -fill x
-        ttk::label $allcmd.$g.label  -style group.TLabel -text "$g" -width 10 -anchor e
+        set col [expr $idx / $maxrows]
+        set row [expr $idx % $maxrows + 1]
+        grid $allcmd.$g -column $col -row $row -padx [expr 1+($col==1)*10] -pady 2 -sticky w
+        ttk::label $allcmd.$g.label  -style group.TLabel -text $g -width 10 -anchor e
         ttk::button $allcmd.$g.start -style cmd.TButton -text "start" -command "all_cmd start $g"
         ttk::button $allcmd.$g.stop  -style cmd.TButton -text "stop"  -command "all_cmd stop  $g"
         ttk::button $allcmd.$g.check -style cmd.TButton -text "check" -command "all_cmd check $g"
@@ -512,21 +522,11 @@ proc gui_tcl {} {
         pack $allcmd.$g.check -side left
         pack $allcmd.$g.noauto -side left
         pack $allcmd.$g.logging -side left -padx 2
+        incr idx
     }
 
     ttk::frame .main.log
     pack .main.log -side left
-    ttk::frame .main.log.row
-    pack .main.log.row -side top -fill x
-    # search widgets
-    ttk::button .main.log.row.searchBtn -style cmd.TButton -text "search" -command {find_component $SEARCH_STRING}
-    ttk::entry  .main.log.row.searchText -textvariable SEARCH_STRING
-    bind .main.log.row.searchText <Return> {find_component $SEARCH_STRING}
-
-    # clear logger button
-    ttk::button .main.log.row.clearLogger -text "clear logger" -command "clearLogger"
-    pack .main.log.row.searchText -side left -fill x -expand 1
-    pack .main.log.row.searchBtn -side left -ipadx 15
     pack .main.log -side left -fill both -expand 1
     pack .main -side top -fill both -expand yes
 
@@ -1437,14 +1437,12 @@ proc connect_hosts {} {
     foreach {h} $::HOSTS {
         .vdemoinit2 configure -text "init connect to $h"
         update
-        set fifo [get_fifo_name $h]
-        init_connect_host $fifo $h
+        init_connect_host [get_fifo_name $h] $h
     }
     foreach {h} $::HOSTS {
         .vdemoinit2 configure -text "wait connect to $h"
         update
-        set fifo [get_fifo_name $h]
-        process_connect_host $fifo $h
+        process_connect_host [get_fifo_name $h] $h
     }
     # establish screen monitoring locally (for master connections)
     connect_screen_monitoring localhost
