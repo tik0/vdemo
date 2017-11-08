@@ -8,7 +8,8 @@ package require Tclx
 
 set VDEMO_CONNECTION_TIMEOUT 5
 catch {set VDEMO_CONNECTION_TIMEOUT $::env(VDEMO_CONNECTION_TIMEOUT)}
-append SSHOPTS "-oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -oConnectTimeout=" ${VDEMO_CONNECTION_TIMEOUT}
+append SSHOPTS "-q -oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -oConnectTimeout=" ${VDEMO_CONNECTION_TIMEOUT}
+append SSHOPTSSLAVE $SSHOPTS " -oPasswordAuthentication=no -oPubkeyAuthentication=no -oGSSAPIAuthentication=no"
 set ::VDEMO_CONNCHECK_TIMEOUT [expr $VDEMO_CONNECTION_TIMEOUT*1000]
 
 # Theme settings
@@ -107,7 +108,6 @@ proc check:tooltip {comp} {
         default  {return "status unknown"}
     }
 }
-
 
 # set some default values from environment variables
 if { ! [info exists ::env(VDEMO_LOGGING)] || \
@@ -1324,6 +1324,7 @@ proc monitoring_disabled {host} {
 proc init_connect_host {fifo host} {
     file delete "$fifo.in"
     file delete "$fifo.out"
+    file delete "$fifo.ctrl"
     exec mkfifo "$fifo.in"
     exec mkfifo "$fifo.out"
     # open fifos in rw mode, so they do not receive an eof
@@ -1345,7 +1346,7 @@ proc init_connect_host {fifo host} {
     # ssh will not see an eof because each fifo is openend in read/write mode.
     # here screen remains a child process of vdemo (-D), so we can save the pid.
     set screenid [get_master_screen_name $host]
-    set ::screenMasterPID($host) [exec screen -DmS $screenid bash -c "exec 5<>$fifo.in; exec 6<>$fifo.out; ssh $::SSHOPTS -Y $host bash <&5 >&6" &]
+    set ::screenMasterPID($host) [exec screen -DmS $screenid bash -c "exec 5<>$fifo.in; exec 6<>$fifo.out; ssh $::SSHOPTS -Y -M -S $fifo.ctrl $host bash <&5 >&6" &]
 
     # Wait until connection is established.
     # Issue a echo command on remote host that only returns if a connection was established.
@@ -1672,7 +1673,8 @@ proc connect_screen_monitoring {host} {
     set cmd "inotifywait -e delete -qm --format %f /var/run/screen/S-$::env(USER)"
     # remote hosts require monitoring through ssh connection
     if {$host != "localhost"} {
-        set cmd "ssh $::SSHOPTS -tt $host $cmd"
+        set fifo [get_fifo_name $host]
+        set cmd "ssh $::SSHOPTSSLAVE -tt -S $fifo.ctrl $host $cmd"
         # If there was never a screen executed on the remote machine,
         # the directory /var/run/screen/S-$USER doesn't yet exist
         # Hence, call screen at least once:
