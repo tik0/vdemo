@@ -34,6 +34,7 @@ host10=${host10:-localhost}
 
 
 export VDEMO_components="
+tab1:
 sleep,             $host01,            -t sleep01-01A -L 1  -g sleepers -w 0 -W 1 -x:
 sleep,             $host01,            -t sleep01-01B -L 1  -g sleepers -w 0 -W 1 -x:
 sleep,             $host02,            -t sleep01-02A -L 1  -g sleepers -w 0 -W 1 -x:
@@ -74,6 +75,7 @@ sleep,             $host09,            -t sleep02-09A -L 2  -g sleepers -w 0 -W 
 sleep,             $host09,            -t sleep02-09B -L 2  -g sleepers -w 0 -W 1 -x:
 sleep,             $host10,            -t sleep02-10A -L 2  -g sleepers -w 0 -W 1 -x:
 sleep,             $host10,            -t sleep02-10B -L 2  -g sleepers -w 0 -W 1 -x:
+tab2:
 sleep,             $host01,            -t sleep03-01A -L 3  -g sleepers -w 0 -W 1 -x:
 sleep,             $host01,            -t sleep03-01B -L 3  -g sleepers -w 0 -W 1 -x:
 sleep,             $host02,            -t sleep03-02A -L 3  -g sleepers -w 0 -W 1 -x:
@@ -114,6 +116,7 @@ sleep,             $host09,            -t sleep04-09A -L 4  -g sleepers -w 0 -W 
 sleep,             $host09,            -t sleep04-09B -L 4  -g sleepers -w 0 -W 1 -x:
 sleep,             $host10,            -t sleep04-10A -L 4  -g sleepers -w 0 -W 1 -x:
 sleep,             $host10,            -t sleep04-10B -L 4  -g sleepers -w 0 -W 1 -x:
+tab3:
 sleep,             $host01,            -t sleep05-01A -L 5  -g sleepers -w 0 -W 1 -x:
 sleep,             $host01,            -t sleep05-01B -L 5  -g sleepers -w 0 -W 1 -x:
 sleep,             $host02,            -t sleep05-02A -L 5  -g sleepers -w 0 -W 1 -x:

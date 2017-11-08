@@ -19,7 +19,6 @@ vdemo starter
   -h  --help                 display this help
   -a  --auto                 automatically start all components
   -l  --log                  enable logging for all components
-  -w  --watch                watch own output in vdemo window
   -d  --detach time          set default detach time in seconds
                               0: start detached
                              <0: never detach
@@ -82,9 +81,6 @@ while [ $# -gt 0 ]; do
         fi
         echo "Using verbosity level $VDEMO_DEBUG_LEVEL"
         ;;
-    "-w"|"--watch")
-        VDEMO_DO_REDIRECT=1
-        ;;
     "-s"|"--server")
         export VDEMO_SERVER_PORT="$2"
         shift
@@ -125,7 +121,6 @@ export VDEMO_demoRoot=$(dirname "$VDEMO_demoConfig")
 export VDEMO_demoName="$(basename "$VDEMO_demoConfig" .sh)"
 export VDEMO_componentPath="$VDEMO_demoRoot/component_scripts"
 export VDEMO_logPath="/tmp/vdemo-${USER}"
-export VDEMO_watchfile="$VDEMO_logPath/${VDEMO_demoName}_watchfile.log"
 export VDEMO_logfile_prefix="$VDEMO_logPath/VDEMO_component_"
 mkdir -p "$VDEMO_logPath"
 
@@ -133,10 +128,6 @@ source "$VDEMO_demoConfig"
 
 export VDEMO_exports="SPREAD_CONFIG VDEMO_LOG_ROTATION VDEMO_root VDEMO_demoRoot \
 VDEMO_componentPath VDEMO_demoName VDEMO_demoConfig VDEMO_prefix VDEMO_logPath VDEMO_logfile_prefix $VDEMO_exports"
-
-if [ ! -z "$VDEMO_DO_REDIRECT" ] && [ ! -z "$VDEMO_watchfile" ]; then
-    exec &> >(tee -i "$VDEMO_watchfile")
-fi
 
 if [ -z "$VDEMO_SERVER_PORT" ]; then
     exec wish $VDEMO_root/vdemo2_controller.tcl

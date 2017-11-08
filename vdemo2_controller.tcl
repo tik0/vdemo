@@ -239,20 +239,17 @@ proc psplit { str sep {protector "\\"}} {
 }
 
 proc parse_env_var {} {
-    global HOST COMPONENTS ARGS USEX WATCHFILE COMMAND TITLE TABS TAB COMPONENTS_ON_TAB
+    global HOST COMPONENTS ARGS USEX COMMAND TITLE TABS TAB COMPONENTS_ON_TAB
     set components_list "$::env(VDEMO_components)"
     set comp [psplit "$components_list" ":"]
     set nCompos [llength "$comp"]
     set COMPONENTS {}
-    set WATCHFILE ""
     set ::HOSTS ""
     set tab "default"
     set TABS [list $tab]
     set COMPONENTS_ON_TAB($tab) [list]
     set components_on_tab_list COMPONENTS_ON_TAB($tab)
 
-    catch {set ::WATCHFILE $::env(VDEMO_watchfile)}
-    dputs "VDEMO_watchfile = $WATCHFILE"
     dputs "COMPONENTS: "
     for {set i 0} { $i < $nCompos } {incr i} {
         set component_def [string trim [lindex "$comp" $i]]
@@ -389,7 +386,7 @@ proc get_tab {name} {
 }
 
 proc gui_tcl {} {
-    global HOST COMPONENTS TERMINAL USEX LOGTEXT NOAUTO LOGGING  GROUP SCREENED  COMP_LEVEL WATCHFILE COMMAND LEVELS TITLE TIMERDETACH TAB WIDGET COMPONENTS_WIDGET
+    global HOST COMPONENTS TERMINAL USEX LOGTEXT NOAUTO LOGGING  GROUP SCREENED  COMP_LEVEL COMMAND LEVELS TITLE TIMERDETACH TAB WIDGET COMPONENTS_WIDGET
     set LOGTEXT "demo configured from '$::env(VDEMO_demoConfig)'"
     wm title . "vdemo_controller: $::env(VDEMO_demoConfig)"
 
@@ -514,7 +511,7 @@ proc gui_tcl {} {
         pack $allcmd.$g.stop -side left
         pack $allcmd.$g.check -side left
         pack $allcmd.$g.noauto -side left
-        pack $allcmd.$g.logging -side left
+        pack $allcmd.$g.logging -side left -padx 2
     }
 
     ttk::frame .main.log
@@ -530,24 +527,8 @@ proc gui_tcl {} {
     ttk::button .main.log.row.clearLogger -text "clear logger" -command "clearLogger"
     pack .main.log.row.searchText -side left -fill x -expand 1
     pack .main.log.row.searchBtn -side left -ipadx 15
-    pack .main.log.row.clearLogger -side left -ipadx 10
-
-    # LOGGER area (WATCHFILE)
-    text .main.log.text -yscrollcommand ".main.log.sb set" -height 8
-
-    ttk::scrollbar .main.log.sb -command ".main.log.text yview"
     pack .main.log -side left -fill both -expand 1
-    pack .main.log.text -side left -fill both -expand 1
-    pack .main.log.sb -side right -fill y
-    if {"$WATCHFILE" != ""} {
-        init_logger "$WATCHFILE"
-    }
-
     pack .main -side top -fill both -expand yes
-
-    # logarea
-    ttk::label .logarea -textvariable LOGTEXT -style log.TLabel
-    pack .logarea -side top -fill both
 
     ttk::frame .ssh
     pack .ssh -side left -fill x
@@ -603,22 +584,6 @@ proc gui_update_host {host status {forceCreate 0}} {
     dputs "gui_update_host: status:$status  forceCreate:$forceCreate" 3
     if {$status == 0} {set style "ok.cmd.TButton"} {set style "failed.cmd.TButton"}
     catch {.ssh.$lh.xterm configure -style $style}
-}
-
-proc clearLogger {} {
-    .main.log.text delete 1.0 end
-    if {$::WATCHFILE != ""} {exec echo -n "" >> "$::WATCHFILE"}
-}
-
-proc init_logger {filename} {
-    file mkdir [file dirname $filename]
-    exec touch $filename
-    if { [catch {open "|tail -n 5 --pid=$::mypid -F $filename"} infile] } {
-        puts  "Could not open $filename for reading."
-    } else {
-        fconfigure $infile -blocking no -buffering line -translation binary
-        fileevent $infile readable [list insertLog $infile]
-    }
 }
 
 proc insertLog {infile} {
@@ -1624,16 +1589,26 @@ proc create_spread_conf {} {
 
 set SCREEN_FAILURE_DELAY 2000
 proc handle_screen_failure {chan host} {
-    gets $chan line
-    dputs "screen failure: $host $chan: $line" 3
-
-    if {[eof $chan] && ! [string match "err:*" $::MONITOR_CHAN($host)]} {
-        puts "component monitoring failed on $host: Is inotifywait installed?"
-        close $chan
-        set ::MONITOR_CHAN($host) "err: no inotify"
+    # eof case
+    if {[gets $chan line] < 0} {
+        fconfigure $chan -blocking 1
+        try {
+            close $chan
+        } on error {results options} {
+            # retrieving the exit code, 127: command not found
+            set status [lindex [dict get $options -errorcode] 2]
+            if {$status == 127} {
+                puts "component monitoring failed on $host: Is inotifywait installed?"
+                set ::MONITOR_CHAN($host) "err: no inotify"
+            }
+        } finally {
+            puts "component monitoring failed on $host"
+        }
+        set ::MONITOR_CHAN($host) err:disconnected
         return
     }
-
+    dputs "screen failure: $host $chan: $line" 3
+    
     # check for a lost master connection
     set remoteHost ""
     regexp "^\[\[:digit:]]+\.$::VDEMOID-(.*)\$" $line matched remoteHost
@@ -1690,7 +1665,6 @@ proc connect_screen_monitoring {host} {
     if { [info exists ::MONITOR_CHAN($host)] } {
         # disconnect old monitoring channel first
         disconnect_screen_monitoring $host
-
         # do not attempt to call inotify again, if it was previously not found
         if {[string match "err: no inotify" $::MONITOR_CHAN($host)]} return
     }
@@ -1705,9 +1679,12 @@ proc connect_screen_monitoring {host} {
         ssh_command "screen -ls 2> /dev/null" $host 0 $::DEBUG_LEVEL
     }
 
-    # pipe-open monitor connection: cmd may fail due to missing ssh or inotifywait
-    if { [ catch {set chan [open "|$cmd" "r+"]} ] } {
-        puts "failed to monitor master connections: Is inotifywait installed?"
+    # pipe-open monitor connection: cmd may fail due to missing ssh or local inotifywait causing POSIX error
+    # nonzero exit codes cannot be detected here but using close on eof in handle_screen_failure
+    try {
+        set chan [open "|$cmd" "r+"]
+    } trap POSIX {chan options} {
+        puts "failed to monitor master connections on $host: Is inotifywait installed?"
         set ::MONITOR_CHAN($host) "err: no inotify"
         return
     }
@@ -1725,7 +1702,6 @@ proc disconnect_screen_monitoring {host} {
     dputs "disconnecting monitor channel $chan for host $host" 2
     kill HUP [lindex [pid $chan] 0]
     close $chan
-
     # indicate, that we are not monitoring anymore
     set ::MONITOR_CHAN($host) "err:disconnected"
 }
