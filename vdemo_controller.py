@@ -19,10 +19,13 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse
 from string import Template
 
-logging.basicConfig(format="++ %(message)s", level=logging.INFO)
+if os.getenv("VDEMO_DEBUG_LEVEL", None):
+    logging.basicConfig(format="++ %(message)s", level=logging.DEBUG)
+else:
+    logging.basicConfig(format="++ %(message)s", level=logging.INFO)
+
 tkroot = tkinter.Tk()
 Response = namedtuple('Response', 'code location content content_type')
-
 
 def make_response(code=200, location=None, content="", content_type="text/plain"):
     return Response(code=code, location=location, content=content, content_type=content_type)
@@ -66,6 +69,8 @@ class ServerRequestHandler(BaseHTTPRequestHandler):
         super().__init__(request, client_address, server)
 
     def process_vdemo_frontpage(self, reply, errormsg):
+        if errormsg:
+            return make_response(content=errormsg, code=404)
         reader = csv.DictReader(io.StringIO(reply), delimiter='\t', quoting=csv.QUOTE_NONE)
         rows = []
         grouprows = []
@@ -82,9 +87,13 @@ class ServerRequestHandler(BaseHTTPRequestHandler):
         return make_response(content=result, content_type="text/html")
 
     def process_vdemo_list(self, reply, errormsg):
+        if errormsg:
+            return make_response(content=errormsg, code=404)
         return make_response(content=reply)
 
     def process_vdemo_grouplist(self, reply, errormsg):
+        if errormsg:
+            return make_response(content=errormsg, code=404)
         return make_response(content=reply)
 
     def process_vdemo_logcmd(self, reply, errormsg):
@@ -94,6 +103,8 @@ class ServerRequestHandler(BaseHTTPRequestHandler):
             return make_response(content=reply)
 
     def process_vdemo_terminate(self, reply, errormsg):
+        if errormsg:
+            return make_response(content=errormsg, code=404)
         return make_response()
 
     def process_vdemo_busy(self, reply, errormsg):
@@ -103,8 +114,6 @@ class ServerRequestHandler(BaseHTTPRequestHandler):
             return make_response(content=reply, location="/vdemo/api/busy")
 
     def process_vdemo_group_all_comp_cmd(self, reply, errormsg):
-        logging.error(reply)
-        logging.error(errormsg)
         if errormsg:
             return make_response(content=errormsg, code=404)
         else:
@@ -242,7 +251,5 @@ class VDemo:
 
 
 if __name__ == "__main__":
-    if os.getenv("VDEMO_DEBUG_LEVEL", None):
-        logging.basicConfig(level=logging.DEBUG)
     vd = VDemo()
     sys.exit(vd.run())

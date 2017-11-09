@@ -1771,15 +1771,13 @@ proc setup_temp_dir { } {
 }
 
 proc handle_remote_request { request args } {
-    global GROUP COMPONENTS TITLE HOST GROUP COMP_LEVEL WIDGET
-
     dputs "got remote request: $request $args"
     switch $request {
         "list" {
             dputs "remote cmd: ${request}ing components"
             set result {"component\tlevel\ttitle\thost\tgroup\tstatus"}
-            foreach {comp} $COMPONENTS {
-                 lappend result "$comp\t$COMP_LEVEL($comp)\t$TITLE($comp)\t$HOST($comp)\t$GROUP($comp)\t$::COMPSTATUS($comp)"
+            foreach {comp} $::COMPONENTS {
+                 lappend result "$comp\t$::COMP_LEVEL($comp)\t$::TITLE($comp)\t$::HOST($comp)\t$::GROUP($comp)\t$::COMPSTATUS($comp)"
             }
             return [join $result "\n"]
         }
@@ -1806,7 +1804,7 @@ proc handle_remote_request { request args } {
         }
         "component" {
             set comp [lindex $args 0]
-            if { [lsearch -exact $COMPONENTS $comp] == -1 } {
+            if { [lsearch -exact $::COMPONENTS $comp] == -1 } {
                 error "component $comp not found"
             }
             component_cmd {*}$args
@@ -1817,14 +1815,14 @@ proc handle_remote_request { request args } {
             foreach group "all $::GROUPS" {
                 set busy [expr  $busy || $::ALLCMD(intr_$group) != 0]
             }
-            foreach {comp} $COMPONENTS {
-                set busy [expr  $busy || [$WIDGET($comp).stop instate disabled] || [$WIDGET($comp).start instate disabled]]
+            foreach {comp} $::COMPONENTS {
+                set busy [expr  $busy || [$::WIDGET($comp).stop instate disabled] || [$::WIDGET($comp).start instate disabled]]
             }
             return $busy
         }
         "log" {
             set comp [lindex $args 0]
-            if { [lsearch -exact $COMPONENTS $comp] == -1 } {
+            if { [lsearch -exact $::COMPONENTS $comp] == -1 } {
                 error "component $comp not found"
             }
             set lines [lindex $args 1]
