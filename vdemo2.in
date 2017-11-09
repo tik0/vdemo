@@ -127,7 +127,8 @@ mkdir -p "$VDEMO_logPath"
 source "$VDEMO_demoConfig"
 
 export VDEMO_exports="SPREAD_CONFIG VDEMO_LOG_ROTATION VDEMO_root VDEMO_demoRoot \
-VDEMO_componentPath VDEMO_demoName VDEMO_demoConfig VDEMO_prefix VDEMO_logPath VDEMO_logfile_prefix $VDEMO_exports"
+VDEMO_componentPath VDEMO_demoName VDEMO_demoConfig VDEMO_prefix VDEMO_logPath \
+VDEMO_logfile_prefix VDEMO_apiurl $VDEMO_exports"
 
 if [ -z "$VDEMO_SERVER_PORT" ]; then
     exec wish $VDEMO_root/vdemo2_controller.tcl

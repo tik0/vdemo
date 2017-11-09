@@ -402,7 +402,7 @@ proc gui_tcl {} {
     # main gui frame
     ttk::frame .main
     # scrollable frame
-    iwidgets::scrolledframe .main.scrollable -vscrollmode dynamic -hscrollmode none -height 400 -width 900
+    iwidgets::scrolledframe .main.scrollable -vscrollmode dynamic -hscrollmode none -height 400 -width 890
     bind_wheel_sf .main.scrollable
     pack .main.scrollable -side top -fill both -expand yes
 
@@ -498,17 +498,12 @@ proc gui_tcl {} {
     bind $allcmd.all.searchText <Return> {find_component $SEARCH_STRING}
     pack $allcmd.all.searchText -side left -fill x -expand 1 -pady 2
     pack $allcmd.all.searchBtn -side right -ipadx 15 -padx 2 -pady 2
-
     # buttons for group control:
     set ::GROUPS [lsort -unique $groups]
-    set maxrows [expr ([llength $::GROUPS] + 2) / 3 ]
     set idx 0
     foreach {g} $::GROUPS {
         all_cmd_reset $g
         ttk::frame $allcmd.$g -style groove.TFrame
-        set col [expr $idx / $maxrows]
-        set row [expr $idx % $maxrows + 1]
-        grid $allcmd.$g -column $col -row $row -padx [expr 1+($col==1)*10] -pady 2 -sticky w
         ttk::label $allcmd.$g.label  -style group.TLabel -text $g -width 10 -anchor e
         ttk::button $allcmd.$g.start -style cmd.TButton -text "start" -command "all_cmd start $g"
         ttk::button $allcmd.$g.stop  -style cmd.TButton -text "stop"  -command "all_cmd stop  $g"
@@ -522,31 +517,48 @@ proc gui_tcl {} {
         pack $allcmd.$g.check -side left
         pack $allcmd.$g.noauto -side left
         pack $allcmd.$g.logging -side left -padx 2
+        # estimate the width of a group item
+        if { ! $idx } {
+            update
+            set winwidth [expr {max([winfo width .], 890)}]
+            set numcols [expr {$winwidth / ([winfo reqwidth $allcmd.$g]+10)}]
+            set maxrows [expr {([llength $::GROUPS] + $numcols - 1) / $numcols} ]
+        }
+        set col [expr $idx / $maxrows]
+        set row [expr $idx % $maxrows + 1]
+        grid $allcmd.$g -column $col -row $row -padx {0 10} -pady 2 -sticky w
         incr idx
     }
-
-    ttk::frame .main.log
-    pack .main.log -side left
-    pack .main.log -side left -fill both -expand 1
     pack .main -side top -fill both -expand yes
-
+    #replaces logger area to keep some compatibility
+    if {[info exists ::env(VDEMO_watchfile)]} {
+        ttk::frame .terminal -height 150 -style groove.TFrame
+        pack .terminal -side top -fill x -expand yes
+        bind .terminal <Map> {
+            bind %W <Map> {}
+            exec xterm -bg white -fg black -geometry 500x500 -into [winfo id %W] -e tail --pid=[pid] -n 100 -f $::env(VDEMO_watchfile) &
+        }
+        
+    }
     ttk::frame .ssh
-    pack .ssh -side left -fill x
+    pack .ssh -side left -fill x -expand 1 -padx 1 -pady 2
     ttk::label .ssh.label -text "ssh to"
     grid .ssh.label -column 0 -row 0
     foreach {h} $::HOSTS {
         gui_add_host $h
     }
 
-    ttk::button .exit -style exit.TButton -text "exit" -command {gui_exit}
-    pack .exit -side right
+    ttk::frame .exit
+    pack .exit -side right -fill y -padx 5 -pady 5
+    ttk::button .exit.btn -style exit.TButton -text "exit" -command {gui_exit}
+    pack .exit.btn -anchor se -side bottom
 
     if {[info exists ::env(VDEMO_alert_string)]} {
-        ttk::label .orlabel -style alert.TLabel -text $::env(VDEMO_alert_string)
-        pack .orlabel -fill x
+        ttk::label .exit.orlabel -style alert.TLabel -text $::env(VDEMO_alert_string)
+        pack .exit.orlabel -fill x
     } elseif {[info exists ::env(VDEMO_info_string)]} {
-        ttk::label .orlabel -style info.TLabel -text $::env(VDEMO_info_string)
-        pack .orlabel -fill x
+        ttk::label .exit.orlabel -style info.TLabel -text $::env(VDEMO_info_string)
+        pack .exit.orlabel -fill x
     }
 }
 
@@ -564,17 +576,20 @@ proc gui_add_host {host} {
 
     if {[catch {.ssh.$lh.xterm configure -style $style}]} {
         set idx [lsearch $::HOSTS $host]
-        set col [expr $idx % 6]
-        set row [expr $idx / 6]
         # create buttons
         ttk::frame  .ssh.$lh
         ttk::button .ssh.$lh.xterm -style $style -text "$host" -command "remote_xterm $host"
         ttk::button .ssh.$lh.clock -style cmd.TButton -text "⌚" -command "remote_clock $host" -width -2
         ttk::checkbutton .ssh.$lh.screen -text "" -command "screen_ssh_master $host" -variable ::SCREENED_SSH($host) -onvalue 1 -offvalue 0
-        grid .ssh.$lh -column [expr $col*4+1] -row $row
-        grid .ssh.$lh.xterm -column [expr $col*4+2] -row $row
-        grid .ssh.$lh.clock -column [expr $col*4+3] -row $row
-        grid .ssh.$lh.screen -column [expr $col*4+4] -row $row
+        pack .ssh.$lh.xterm -side left
+        pack .ssh.$lh.clock -side left
+        pack .ssh.$lh.screen -side left
+        update
+        set winwidth [expr {max([winfo width .], 890)}]
+        set numcols [expr {($winwidth-120) / ([winfo reqwidth .ssh.$lh])}]
+        set col [expr {$idx % $numcols}]
+        set row [expr {$idx / $numcols}]
+        grid .ssh.$lh -column [expr {$col+1}] -row $row
     }
 }
 

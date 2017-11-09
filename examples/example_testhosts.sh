@@ -1,8 +1,3 @@
-# instead of launching vdemo2 with -s we specify the port here to allow for
-# different ports for different configurations
-export VDEMO_SERVER_PORT=4443
-export VDEMO_SERVER_KEY=demo
-
 host01="vdemohost01"
 host02="vdemohost02"
 host03="vdemohost03"
