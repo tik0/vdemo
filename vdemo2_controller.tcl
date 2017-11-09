@@ -1790,7 +1790,7 @@ proc handle_remote_request { request args } {
             if { [llength $args] > 1 } {
                 set grp [lindex $args 1]
                 if { [lsearch -exact $::GROUPS $grp] == -1 && $grp != "all" } {
-                    return "ERROR: non-existent group"
+                    error "group $grp not found"
                 }
             }
             all_cmd {*}$args
@@ -1807,7 +1807,7 @@ proc handle_remote_request { request args } {
         "component" {
             set comp [lindex $args 0]
             if { [lsearch -exact $COMPONENTS $comp] == -1 } {
-                return "ERROR: non-existent component"
+                error "component $comp not found"
             }
             component_cmd {*}$args
             return "OK"
@@ -1822,8 +1822,19 @@ proc handle_remote_request { request args } {
             }
             return $busy
         }
+        "log" {
+            set comp [lindex $args 0]
+            if { [lsearch -exact $COMPONENTS $comp] == -1 } {
+                error "component $comp not found"
+            }
+            set lines [lindex $args 1]
+            set host $HOST($comp)
+            set logname "$::env(VDEMO_logfile_prefix)$::COMMAND($comp).$::TITLE($comp).log"
+            set fifo [get_fifo_name $host]
+            return [exec ssh {*}$::SSHOPTSSLAVE -S $fifo.ctrl $host tail -n $lines $logname]
+        }
         default {
-            return "ERROR"
+            error "no handler for $request"
         }
     }
 }

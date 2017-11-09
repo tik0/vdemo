@@ -47,13 +47,15 @@ class ServerRequestHandler(BaseHTTPRequestHandler):
             (re.compile("/vdemo/?"), "list", self.process_vdemo_frontpage),
             (re.compile("/vdemo/api(/list)?/?"), "list", self.process_vdemo_list),
             (re.compile("/vdemo/api/grouplist/?"), "grouplist", self.process_vdemo_grouplist),
-            (re.compile("/vdemo/api/all/(?P<cmd>start|stop|check)/?"), "all %(cmd)s all", self.process_vdemo_allcmd),
+            (re.compile("/vdemo/api/all/(?P<cmd>start|stop|check)/?"), "all %(cmd)s all", self.process_vdemo_group_all_comp_cmd),
             (re.compile("/vdemo/api/terminate/?"), "terminate", self.process_vdemo_terminate),
             (re.compile("/vdemo/api/busy/?"), "busy", self.process_vdemo_busy),
             (re.compile("/vdemo/api/group/(?P<group>[^/]+)/(?P<cmd>start|stop|check)/?"),
-             "all %(cmd)s %(group)s", self.process_vdemo_groupcmd),
+             "all %(cmd)s %(group)s", self.process_vdemo_group_all_comp_cmd),
             (re.compile("/vdemo/api/component/(?P<comp>[^/]+)/(?P<cmd>start|stop|check|stopwait)/?"),
-             "component %(comp)s %(cmd)s", self.process_vdemo_componentcmd)
+             "component %(comp)s %(cmd)s", self.process_vdemo_group_all_comp_cmd),
+            (re.compile("/vdemo/api/component/(?P<comp>[^/]+)/log/(?P<lines>[0-9]+)/?"),
+             "log %(comp)s %(lines)s", self.process_vdemo_logcmd)
         )
         self.authkey = server.authkey
         self.vdemo_request = server.vdemo_request
@@ -63,7 +65,7 @@ class ServerRequestHandler(BaseHTTPRequestHandler):
         self.vdemo_id = server.vdemo_id
         super().__init__(request, client_address, server)
 
-    def process_vdemo_frontpage(self, reply):
+    def process_vdemo_frontpage(self, reply, errormsg):
         reader = csv.DictReader(io.StringIO(reply), delimiter='\t', quoting=csv.QUOTE_NONE)
         rows = []
         grouprows = []
@@ -79,29 +81,34 @@ class ServerRequestHandler(BaseHTTPRequestHandler):
             grouprows="\n".join(grouprows))
         return make_response(content=result, content_type="text/html")
 
-    def process_vdemo_list(self, reply):
+    def process_vdemo_list(self, reply, errormsg):
         return make_response(content=reply)
 
-    def process_vdemo_grouplist(self, reply):
+    def process_vdemo_grouplist(self, reply, errormsg):
         return make_response(content=reply)
 
-    def process_vdemo_allcmd(self, reply):
-        return make_response(code=202, content=reply, location="/vdemo/api/busy")
+    def process_vdemo_logcmd(self, reply, errormsg):
+        if errormsg:
+            return make_response(content=errormsg, code=404)
+        else:
+            return make_response(content=reply)
 
-    def process_vdemo_terminate(self, reply):
+    def process_vdemo_terminate(self, reply, errormsg):
         return make_response()
 
-    def process_vdemo_busy(self, reply):
+    def process_vdemo_busy(self, reply, errormsg):
         if reply == "0":
             return make_response(code=303, location="/vdemo/api/list")
         else:
             return make_response(content=reply, location="/vdemo/api/busy")
 
-    def process_vdemo_groupcmd(self, reply):
-        return make_response(code=202, content=reply, location="/vdemo/api/busy")
-
-    def process_vdemo_componentcmd(self, reply):
-        return make_response(code=202, content=reply, location="/vdemo/api/busy")
+    def process_vdemo_group_all_comp_cmd(self, reply, errormsg):
+        logging.error(reply)
+        logging.error(errormsg)
+        if errormsg:
+            return make_response(content=errormsg, code=404)
+        else:
+            return make_response(code=202, content=reply, location="/vdemo/api/busy")
 
     def get_vdemo_response(self, purl):
         for pat, fmt, process_func in self.transforms:
@@ -111,9 +118,9 @@ class ServerRequestHandler(BaseHTTPRequestHandler):
                 # the next statement modifies a tcl variable and triggers a trace callback
                 # the result is communicated and popped here from replyQueue
                 self.vdemo_request.set(vdemo_cmd)
-                reply = self.replyQueue.get()
+                reply, errormsg = self.replyQueue.get()
                 self.replyQueue.task_done()
-                return process_func(reply)
+                return process_func(reply, errormsg)
         return None
 
     def do_AUTHHEAD(self):
@@ -125,7 +132,7 @@ class ServerRequestHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         self.error_message_format = "ERROR: Bad request"
-        authorized = (self.headers.get('Authorization') == 'Basic '+self.authkey)
+        authorized = (self.headers.get('Authorization') == 'Basic ' + self.authkey)
         purl = urlparse(self.path)
         if authorized:
             response = self.get_vdemo_response(purl)
@@ -159,7 +166,6 @@ class ServerRequestHandler(BaseHTTPRequestHandler):
 
 
 class VdemoApiServer(HTTPServer):
-
     def __init__(self, server_address, RequestHandlerClass, authkey):
         super().__init__(server_address, RequestHandlerClass)
         vdemodir = os.path.dirname(__file__)
@@ -172,18 +178,25 @@ class VdemoApiServer(HTTPServer):
         context.set_ciphers('EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH')
         self.socket = context.wrap_socket(self.socket, server_side=True)
         self.authkey = authkey
-        self.vdemo_request = tkinter.StringVar(value="")
+        self.vdemo_request = tkinter.StringVar(name="VDEMO_REMOTEREQUEST")
+        self.vdemo_response = tkinter.StringVar(name="VDEMO_REMOTERESPONSE")
         self.replyQueue = queue.Queue()
         # The following statement causes the tcl event loop to callback if vdemo_request changes
         # This is thread safe, although frequently something else is assumed and a polling strategy is suggested.
         self.vdemo_request.trace("w", self.vdemo_request_callback)
 
     # evaluates the command using the tcl interpreter
-    def vdemo_request_callback(self, varname, index, op):
-        # Note: a tcl error causes a segfault here
-        reply = tkroot.eval('if { [catch { global %s; set response [handle_remote_request {*}$%s] } msg] } { '
-                            'return "ERROR\n$msg\n$::errorInfo" } { return $response }' % (varname, varname))
-        self.replyQueue.put(reply)
+    def vdemo_request_callback(self, requestvar, index, op):
+        # Note: uncaught tcl errors cause segfaults here
+        errormsg = tkroot.eval('try {\n'
+                               'set ::VDEMO_REMOTERESPONSE {}\n'
+                               'set ::VDEMO_REMOTERESPONSE [handle_remote_request {*}$::VDEMO_REMOTEREQUEST]\n'
+                               'return {}\n'
+                               '} on error {msg} {'
+                               'return "$::errorInfo"'
+                               '}')
+        response = self.vdemo_response.get()
+        self.replyQueue.put((response, errormsg))
 
     def load_templates(self, path):
         templates = {}
@@ -195,7 +208,6 @@ class VdemoApiServer(HTTPServer):
 
 
 class VDemo:
-
     def run(self):
         try:
             authkey = os.getenv("VDEMO_SERVER_KEY", None)
@@ -203,7 +215,8 @@ class VDemo:
             if serverport:
                 if not authkey:
                     logging.warning("environment variable VDEMO_SERVER_KEY not set, generating random key")
-                    authkey = ''.join(random.SystemRandom().choice(string.ascii_uppercase + string.digits) for _ in range(12))
+                    authkey = ''.join(
+                        random.SystemRandom().choice(string.ascii_uppercase + string.digits) for _ in range(12))
                 serverport = int(serverport)
                 fqdn = socket.getfqdn()
                 apiurl = "https://vdemo:%s@%s:%s/vdemo/api" % (authkey, fqdn, serverport)
@@ -218,14 +231,14 @@ class VDemo:
                 logging.info("vdemo api url: %s" % apiurl)
             tkroot.mainloop()
         except OSError:
-            logging.exception("vdemo startup failed (if applicable use -s or VDEMO_SERVER_PORT to specifiy a different port)")
+            logging.exception(
+                "vdemo startup failed (if applicable use -s or VDEMO_SERVER_PORT to specifiy a different port)")
             tkroot.eval('catch { finish }')
         except SystemExit as ex:
             return ex.code
         except:
             logging.exception("error in vdemo controller")
         return 0
-
 
 
 if __name__ == "__main__":
