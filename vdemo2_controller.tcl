@@ -423,7 +423,7 @@ proc gui_tcl {} {
     } else {
         ttk::frame $COMPONENTS_WIDGET
     }
-    pack $COMPONENTS_WIDGET -side top -fill both -expand yes
+    pack $COMPONENTS_WIDGET -side top -fill both
 
     foreach {c} "$COMPONENTS" {
         set groups "$groups $GROUP($c)"
@@ -439,7 +439,7 @@ proc gui_tcl {} {
         set WIDGET($c) $w.$c
 
         ttk::label $w.$c.level -style level.TLabel -text "$COMP_LEVEL($c)"
-        ttk::label $w.$c.label -width 20 -style label.TLabel -text "$TITLE($c)@"
+        ttk::label $w.$c.label -width -20 -style label.TLabel -text "$TITLE($c)@"
         ttk::entry $w.$c.host  -width 14 -textvariable HOST($c)
         # disable host field for spreaddaemon: cannot add/change hosts in spread config
         if {"$COMMAND($c)" == "spreaddaemon"} { $w.$c.host state disabled }
@@ -461,7 +461,7 @@ proc gui_tcl {} {
         ttk::button $w.$c.inspect -style cmd.TButton -text "inspect" -command "component_cmd $c inspect"
 
         pack $w.$c.level -side left
-        pack $w.$c.label -side left -fill x
+        pack $w.$c.label -side left -fill x -expand yes
         pack $w.$c.host -side left
         pack $w.$c.group -side left -fill x
 
