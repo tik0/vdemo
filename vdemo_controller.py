@@ -32,33 +32,29 @@ def make_response(code=200, location=None, content="", content_type="text/plain"
 
 
 class ServerRequestHandler(BaseHTTPRequestHandler):
-    help_msg = bytes(
-        "<html><head><title>vdemo help</title></head>"
-        "<body>"
-        "<p>Examples:</p>"
-        "<p>http://localhost:4443/vdemo/api/list</p>"
-        "<p>http://localhost:4443/vdemo/api/grouplist</p>"
-        "<p>http://localhost:4443/vdemo/api/all/(start|stop|check)</p>"
-        "<p>http://localhost:4443/vdemo/api/group/NAME/(start|stop|check)</p>"
-        "<p>http://localhost:4443/vdemo/api/component/NAME/(start|stop|check)</p>"
-        "<p>http://localhost:4443/vdemo/api/terminate</p>"
-        "<p>http://localhost:4443/vdemo/api/busy</p>"
-        "</body></html>", "utf-8")
 
     def __init__(self, request, client_address, server):
         self.transforms = (
-            (re.compile("/vdemo/?"), "list", self.process_vdemo_frontpage),
-            (re.compile("/vdemo/api(/list)?/?"), "list", self.process_vdemo_list),
-            (re.compile("/vdemo/api/grouplist/?"), "grouplist", self.process_vdemo_grouplist),
-            (re.compile("/vdemo/api/all/(?P<cmd>start|stop|check)/?"), "all %(cmd)s all", self.process_vdemo_group_all_comp_cmd),
-            (re.compile("/vdemo/api/terminate/?"), "terminate", self.process_vdemo_terminate),
-            (re.compile("/vdemo/api/busy/?"), "busy", self.process_vdemo_busy),
-            (re.compile("/vdemo/api/group/(?P<group>[^/]+)/(?P<cmd>start|stop|check)/?"),
-             "all %(cmd)s %(group)s", self.process_vdemo_group_all_comp_cmd),
-            (re.compile("/vdemo/api/component/(?P<comp>[^/]+)/(?P<cmd>start|stop|check|stopwait)/?"),
-             "component %(comp)s %(cmd)s", self.process_vdemo_group_all_comp_cmd),
-            (re.compile("/vdemo/api/component/(?P<comp>[^/]+)/log/(?P<lines>[0-9]+)/?"),
-             "log %(comp)s %(lines)s", self.process_vdemo_logcmd)
+            (re.compile("/vdemo/?"), "list",
+             self.process_vdemo_frontpage),
+            (re.compile("/vdemo/api(/list)?/?"), "list",
+             self.process_vdemo_list),
+            (re.compile("/vdemo/api/grouplist/?"), "grouplist",
+             self.process_vdemo_grouplist),
+            (re.compile("/vdemo/api/all/(?P<cmd>start|stop|check)/?"), "all %(cmd)s all",
+             self.process_vdemo_group_all_comp_cmd),
+            (re.compile("/vdemo/api/terminate/?"), "terminate",
+             self.process_vdemo_terminate),
+            (re.compile("/vdemo/api/busy/?"), "busy",
+             self.process_vdemo_busy),
+            (re.compile("/vdemo/api/group/(?P<group>[^/]+)/(?P<cmd>start|stop|check)/?"), "all %(cmd)s %(group)s",
+             self.process_vdemo_group_all_comp_cmd),
+            (re.compile("/vdemo/api/component/"
+                        "(?P<method>id|match)/"
+                        "(?P<comp>[^/]+)/"
+                        "(?P<cmd>start|stop|check|log)(/(?<=log/)(?P<lines>[0-9]+)|(?<!log))/?"),
+             "component %(method)s %(comp)s %(cmd)s %(lines)s",
+             self.process_vdemo_group_all_comp_cmd)
         )
         self.authkey = server.authkey
         self.vdemo_request = server.vdemo_request
@@ -66,6 +62,7 @@ class ServerRequestHandler(BaseHTTPRequestHandler):
         self.socket = server.socket
         self.templates = server.templates
         self.vdemo_id = server.vdemo_id
+        self.apiurl = server.apiurl
         super().__init__(request, client_address, server)
 
     def process_vdemo_frontpage(self, reply, errormsg):
@@ -159,7 +156,8 @@ class ServerRequestHandler(BaseHTTPRequestHandler):
             if response.content:
                 self.wfile.write(content)
         elif purl.path == "/vdemo/api/help":
-            content = self.help_msg
+            content = bytes(Template(self.templates['help.html'])
+                            .safe_substitute({'apiurl': self.apiurl}), "utf-8")
             self.send_response(200)
             self.send_header("Content-type", "text/html")
             self.send_header("Content-length", len(content))
@@ -175,12 +173,13 @@ class ServerRequestHandler(BaseHTTPRequestHandler):
 
 
 class VdemoApiServer(HTTPServer):
-    def __init__(self, server_address, RequestHandlerClass, authkey):
+    def __init__(self, server_address, RequestHandlerClass, authkey, apiurl):
         super().__init__(server_address, RequestHandlerClass)
         vdemodir = os.path.dirname(__file__)
         pemfilename = os.path.join(vdemodir, "vdemo_cert.pem")
         self.templates = self.load_templates(os.path.join(vdemodir, "webdata"))
         self.vdemo_id = os.path.splitext(os.path.basename(os.getenv("VDEMO_demoConfig", "vdemo")))[0]
+        self.apiurl = apiurl
         context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         context.load_cert_chain(certfile=pemfilename)  # 1. key, 2. cert, 3. intermediates
         context.options |= ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1  # optional
@@ -201,8 +200,8 @@ class VdemoApiServer(HTTPServer):
                                'set ::VDEMO_REMOTERESPONSE {}\n'
                                'set ::VDEMO_REMOTERESPONSE [handle_remote_request {*}$::VDEMO_REMOTEREQUEST]\n'
                                'return {}\n'
-                               '} on error {msg} {'
-                               'return "$::errorInfo"'
+                               '} on error {msg opts} {'
+                               'return [dict get $opts -errorinfo]'
                                '}')
         response = self.vdemo_response.get()
         self.replyQueue.put((response, errormsg))
@@ -231,22 +230,31 @@ class VDemo:
                 apiurl = "https://vdemo:%s@%s:%s/vdemo/api" % (authkey, fqdn, serverport)
                 os.environ["VDEMO_apiurl"] = apiurl
                 server = VdemoApiServer(('', serverport), ServerRequestHandler,
-                                        base64.b64encode(bytes("vdemo:" + authkey, "utf-8")).decode('ascii'))
+                                        base64.b64encode(bytes("vdemo:" + authkey, "utf-8")).decode('ascii'),
+                                        apiurl)
                 thread = threading.Thread(None, server.serve_forever)
                 thread.daemon = True
                 thread.start()
-            tkroot.eval('source "%s"' % sys.argv[1])
+            errormsg = tkroot.eval('try {\n'
+                                   'source {%s}\n'
+                                   'return {}\n'
+                                   '} on error {msg opts} {'
+                                   'return [dict get $opts -errorinfo]'
+                                   '}' % sys.argv[1])
+            if errormsg:
+                raise tkinter.TclError(errormsg)
             if serverport:
                 logging.info("vdemo api url: %s" % apiurl)
             tkroot.mainloop()
         except OSError:
             logging.exception(
                 "vdemo startup failed (if applicable use -s or VDEMO_SERVER_PORT to specifiy a different port)")
-            tkroot.eval('catch { finish }')
+            return 1
         except SystemExit as ex:
             return ex.code
-        except:
-            logging.exception("error in vdemo controller")
+        except tkinter.TclError:
+            logging.exception("Tcl error in vdemo controller")
+            return 1
         return 0
 
 

@@ -80,6 +80,11 @@ proc backtrace {} {
     }
     return [join $bt { => }]
 }
+proc bgerror {msg} {
+    dputs "background error report begin" 0
+    puts stderr $::errorInfo
+    dputs "background error report end" 0
+}
 
 # tooltips
 proc tooltip { w txt } {
@@ -884,6 +889,7 @@ proc level_cmd { cmd level group {lazy 0} } {
                 check {set doIt 1}
                 stop  {set doIt [expr  {!$lazy || ![all_cmd_comp_stopped $::COMPSTATUS($comp)]}]}
                 start {set doIt [expr {(!$lazy || ![all_cmd_comp_started $::COMPSTATUS($comp)]) && !$::NOAUTO($comp)}]}
+                default {error "invalid cmd: $cmd"}
             }
             if {$doIt} {
                 if {$synced} {all_cmd_add_comp $group $comp}
@@ -1150,6 +1156,9 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
         inspect {
             set cmd_line "$VARS $component_script $component_options inspect"
             ssh_command "$cmd_line" "$HOST($comp)"
+        }
+        default {
+            error "invalid component command: $cmd"
         }
     }
     update
@@ -1805,11 +1814,45 @@ proc handle_remote_request { request args } {
             return "OK"
         }
         "component" {
-            set comp [lindex $args 0]
-            if { [lsearch -exact $::COMPONENTS $comp] == -1 } {
-                error "component $comp not found"
+            set method [lindex $args 0]
+            set compstr [lindex $args 1]
+            switch $method {
+                id { 
+                    set complist [lsearch -exact -inline -all $::COMPONENTS $compstr]
+                }
+                match {
+                    set complist [list]
+                    foreach {c} $::COMPONENTS {
+                        if {[string match $compstr "$::TITLE($c)@$::HOST($c)"]} {
+                            lappend complist $c
+                        }
+                    }
+                }
+                default {error "unknown access method $method"}
             }
-            component_cmd {*}$args
+            dputs "remote cmd: selected components: $complist" 2
+            set cmd [lindex $args 2]
+            set lines [lindex $args 3]
+            switch $cmd {
+                log {
+                    if {[llength $complist] != 1} {
+                        error "$cmd requires a single component but [llength $complist] match."
+                    }
+                    set comp $complist
+                    set host $::HOST($comp)
+                    set logname "$::env(VDEMO_logfile_prefix)$::COMMAND($comp).$::TITLE($comp).log"
+                    set fifo [get_fifo_name $host]
+                    return [exec ssh {*}$::SSHOPTSSLAVE -S $fifo.ctrl $host tail -n $lines $logname]
+                }
+                default {
+                    if {[llength $complist] < 1} {
+                        error "$cmd requires at least one component but no match found."
+                    }
+                    foreach {c} $complist {
+                        after idle component_cmd $c $cmd
+                    }
+                }
+            }
             return "OK"
         }
         "busy" {
@@ -1821,17 +1864,6 @@ proc handle_remote_request { request args } {
                 set busy [expr {$busy || [$::WIDGET($comp).stop instate disabled] || [$::WIDGET($comp).start instate disabled]}]
             }
             return $busy
-        }
-        "log" {
-            set comp [lindex $args 0]
-            if { [lsearch -exact $::COMPONENTS $comp] == -1 } {
-                error "component $comp not found"
-            }
-            set lines [lindex $args 1]
-            set host $HOST($comp)
-            set logname "$::env(VDEMO_logfile_prefix)$::COMMAND($comp).$::TITLE($comp).log"
-            set fifo [get_fifo_name $host]
-            return [exec ssh {*}$::SSHOPTSSLAVE -S $fifo.ctrl $host tail -n $lines $logname]
         }
         default {
             error "no handler for $request"
