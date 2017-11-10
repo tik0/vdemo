@@ -300,11 +300,12 @@ proc bind_wheel_sf {widget} {
     bind all <5> [list $widget yview scroll  5 units]
 }
 
-proc find_component {what} {
+proc find_component {src what} {
     global _SEARCH COMPONENTS_ON_TAB
     set what "*[string trim $what]*"
-    if {$what == "**"} {return}
-
+    if {$what == "**"} {
+        set what ""
+    }
     if {![info exists _SEARCH(string)] || $_SEARCH(string) != $what} {
         set _SEARCH(string) "$what"
         # get name of currently selected tab: will fail if simple frame is used
@@ -329,7 +330,7 @@ proc find_component {what} {
             set comp [lindex $COMPONENTS_ON_TAB($_SEARCH(cur_tab)) $index]
             show_component $comp
             hilite_component $comp
-            .main.log.row.searchText configure -style TEntry
+            $src configure -style TEntry
             break
         }
         # if not found, try on next tab
@@ -341,7 +342,7 @@ proc find_component {what} {
         # reached initial tab again? -> indicate failure
         if {$_SEARCH(cur_idx) == $_SEARCH(start_idx)} {
             hilite_component ""
-            .main.log.row.searchText configure -style failed.TEntry
+            $src configure -style failed.TEntry
             break
         }
     }
@@ -503,9 +504,11 @@ proc gui_tcl {} {
     pack $allcmd.all.label -side left -fill x -padx 1 -pady 2
     pack $allcmd.all.start $allcmd.all.stop $allcmd.all.check -side left -pady 2
     # search widgets
-    ttk::button $allcmd.all.searchBtn -style cmd.TButton -text "search" -command {find_component $SEARCH_STRING}
+    set ::SEARCH_STRING ""
+    ttk::button $allcmd.all.searchBtn -style cmd.TButton -text "search" -command {
+        find_component .main.allcmd.all.searchText $::SEARCH_STRING}
     ttk::entry  $allcmd.all.searchText -textvariable SEARCH_STRING -width 40
-    bind $allcmd.all.searchText <Return> {find_component $SEARCH_STRING}
+    bind $allcmd.all.searchText <Return> {find_component .main.allcmd.all.searchText $::SEARCH_STRING}
     pack $allcmd.all.searchText -side left -fill x -expand 1 -pady 2
     pack $allcmd.all.searchBtn -side right -ipadx 15 -padx 2 -pady 2
     # buttons for group control:
