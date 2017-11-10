@@ -501,7 +501,7 @@ proc gui_tcl {} {
     # buttons to control ALL components
     all_cmd_reset "all"
     ttk::frame $allcmd.all -style groove.TFrame
-    grid $allcmd.all -column 0 -row 0 -sticky w -columnspan 3 -pady 4
+    grid $allcmd.all -column 0 -row 0 -sticky w -columnspan 100 -pady 4
     ttk::label $allcmd.all.label -style TLabel -text "ALL COMPONENTS"
     ttk::button $allcmd.all.start -style cmd.TButton -text "start" -command "all_cmd start"
     ttk::button $allcmd.all.stop  -style cmd.TButton -text "stop"  -command "all_cmd stop"
