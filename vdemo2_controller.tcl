@@ -320,14 +320,18 @@ proc find_component {src what} {
         }
         set _SEARCH(cur_idx) $_SEARCH(start_idx)
         set _SEARCH(index) -1
-        set _SEARCH(found) [lsearch -all $COMPONENTS_ON_TAB($_SEARCH(cur_tab)) $_SEARCH(string)]
+        set _SEARCH(found) [list]
     }
     while 1 {
+         foreach {c} $COMPONENTS_ON_TAB($_SEARCH(cur_tab)) {
+            if {[string match $_SEARCH(string) $::TITLE($c)]} {
+                lappend _SEARCH(found) $c
+            }
+        }
         set _SEARCH(index) [expr {$_SEARCH(index) + 1}]
         if {$_SEARCH(index) < [llength $_SEARCH(found)]} {
             # found on current tab
-            set index [lindex $_SEARCH(found) $_SEARCH(index)]
-            set comp [lindex $COMPONENTS_ON_TAB($_SEARCH(cur_tab)) $index]
+            set comp [lindex $_SEARCH(found) $_SEARCH(index)]
             show_component $comp
             hilite_component $comp
             $src configure -style TEntry
@@ -338,7 +342,6 @@ proc find_component {src what} {
         catch { set _SEARCH(cur_tab) [$::COMPONENTS_WIDGET tab $_SEARCH(cur_idx) -text] }
         # do the search
         set _SEARCH(index) -1
-        set _SEARCH(found) [lsearch -all $COMPONENTS_ON_TAB($_SEARCH(cur_tab)) $_SEARCH(string)]
         # reached initial tab again? -> indicate failure
         if {$_SEARCH(cur_idx) == $_SEARCH(start_idx)} {
             hilite_component ""
