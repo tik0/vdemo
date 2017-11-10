@@ -58,8 +58,13 @@ set global_outfilename ""
 set DEBUG_LEVEL 0
 catch {set DEBUG_LEVEL $::env(VDEMO_DEBUG_LEVEL)}
 proc dputs {args {level 1}} {
-    if [expr {$level <= $::DEBUG_LEVEL}] {
-        puts stderr "-- $args"
+    if {$level <= $::DEBUG_LEVEL} {
+        if {$level} {
+            set ts ""
+        } else {
+            set ts [clock format [clock seconds] -format {[%Y-%m-%dT%H:%M:%S] }]
+        }    
+        puts stderr "-- $ts$args"
     }
 }
 proc assert condition {
@@ -167,7 +172,7 @@ proc parse_options {comp} {
                 incr i
             }
             -c {
-                puts "$comp: arg '-c' is obsolete"
+                dputs "$comp: arg '-c' is obsolete" 0
                 if [string is double -strict $val] {incr i}
             }
             -r {
@@ -209,11 +214,11 @@ proc parse_options {comp} {
                 lappend ::VDEMO_QUIT_COMPONENTS $comp
             }
             default {
-                puts "$comp: unknown component option $arg"
+                dputs "$comp: unknown component option $arg" 0
                 exit
             }
         } } err ] } {
-            puts "$comp: error processing option '$arg $val': $err"
+            dputs "$comp: error processing option '$arg $val': $err"
             exit
         }
     }
@@ -478,7 +483,7 @@ proc gui_tcl {} {
         }
         set ::TABS $tabs
     }
-
+    pack .main -side top -fill both -expand yes
     set allcmd ".main.allcmd"
     ttk::frame $allcmd
     pack $allcmd -side left -fill y
@@ -520,8 +525,8 @@ proc gui_tcl {} {
         # estimate the width of a group item
         if { ! $idx } {
             update
-            set winwidth [expr {max([winfo width .], 200)}]
-            set numcols [expr {$winwidth / ([winfo reqwidth $allcmd.$g]+10)}]
+            set winwidth [expr {[winfo width .]}]
+            set numcols [expr {max($winwidth / ([winfo reqwidth $allcmd.$g]+10),1)}]
             set maxrows [expr {([llength $::GROUPS] + $numcols - 1) / $numcols} ]
         }
         set col [expr {$idx / $maxrows}]
@@ -529,7 +534,6 @@ proc gui_tcl {} {
         grid $allcmd.$g -column $col -row $row -padx {0 10} -pady 2 -sticky w
         incr idx
     }
-    pack .main -side top -fill both -expand yes
     #replaces logger area to keep some compatibility
     if {[info exists ::env(VDEMO_watchfile)]} {
         ttk::frame .terminal -height 150 -style groove.TFrame
@@ -585,8 +589,8 @@ proc gui_add_host {host} {
         pack .ssh.$lh.clock -side left
         pack .ssh.$lh.screen -side left
         update
-        set winwidth [expr {max([winfo width .], 200)}]
-        set numcols [expr {($winwidth-120) / ([winfo reqwidth .ssh.$lh])}]
+        set winwidth [expr {[winfo width .]}]
+        set numcols [expr {max(($winwidth-120) / [winfo reqwidth .ssh.$lh], 1)}]
         set col [expr {$idx % $numcols}]
         set row [expr {$idx / $numcols}]
         grid .ssh.$lh -column [expr {$col+1}] -row $row -sticky w
@@ -937,14 +941,14 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
     switch -exact -- $cmd {
         start {
             if { [$WIDGET($comp).start instate disabled] } {
-                puts "$TITLE($comp): not ready, still waiting for the process"
+                dputs "$TITLE($comp): not ready, still waiting for the process"
                 return 1
             }
             $WIDGET($comp).start state disabled
 
             set res [ssh_command "screen -wipe | fgrep -q .$COMMAND($comp).$TITLE($comp)_" "$HOST($comp)"]
             if {$res == -1} {
-                puts "no master connection to $HOST($comp)"
+                dputs "no master connection to $HOST($comp)"
                 $WIDGET($comp).start state !disabled
                 all_cmd_comp_set_status $allcmd_group $comp unknown
                 return 1
@@ -978,7 +982,7 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
                 if [expr {$::DEBUG_LEVEL >= 0}] {
                     tk_messageBox -message $msg -icon warning -type ok
                 } else {
-                    puts $msg
+                    dputs $msg 0
                 }
                 set_status $comp failed_noscreen
                 $WIDGET($comp).start state !disabled
@@ -1069,14 +1073,14 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
             after idle $WIDGET($comp).check state !disabled
 
             if { ! [string is integer -strict $res] } {
-                puts "internal error: result is not an integer: '$res'"
+                dputs "internal error: result is not an integer: '$res'" 0
                 $WIDGET($comp).start state !disabled
                 if {$allcmd_group != ""} {after 100 component_cmd $comp check $allcmd_group}
                 return 1
             }
 
             if {$res == -1} {
-                dputs "no master connection to $HOST($comp)";
+                dputs "no master connection to $HOST($comp)"
                 $WIDGET($comp).start state !disabled
                 all_cmd_comp_set_status $allcmd_group $comp unknown
                 return 1
@@ -1104,7 +1108,7 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
                 set endtime [expr {$::LAST_GUI_INTERACTION($comp) + $WAIT_READY($comp)}]
                 if {$onCheckResult != 0 && $screenResult == 0} {
                     if {$endtime < [clock milliseconds]} {
-                        puts "$TITLE($comp) failed: timeout"
+                        dputs "$TITLE($comp) failed: timeout" 0
                         set status 1
                     } else {
                         # stay in starting state and retrigger check
@@ -1414,7 +1418,7 @@ proc process_connect_host {fifo host} {
         }
     }
     set res [ssh_command "source $::env(VDEMO_demoConfig)" $host 0 $::DEBUG_LEVEL]
-    if {$res} {puts "on $host: failed to source $::env(VDEMO_demoConfig)"}
+    if {$res} {dputs "on $host: failed to source $::env(VDEMO_demoConfig)" 0}
 
     # detach screen / close xterm
     catch { exec screen -dS $screenid }
@@ -1558,7 +1562,7 @@ proc create_spread_conf {} {
                 }
             }
         }
-        if {"$ip" == ""} {puts "failed to lookup host $h"; continue}
+        if {"$ip" == ""} {dputs "failed to lookup host $h" 0; continue}
         set seg [join [lrange [split $ip .] 0 2] .]
         set segments "$segments $seg"
         set IP($h) $ip
@@ -1609,11 +1613,11 @@ proc handle_screen_failure {chan host} {
             # retrieving the exit code, 127: command not found
             set status [lindex [dict get $options -errorcode] 2]
             if {$status == 127} {
-                puts "component monitoring failed on $host: Is inotifywait installed?"
+                dputs "component monitoring failed on $host: Is inotifywait installed?" 0
                 set ::MONITOR_CHAN($host) "err: no inotify"
             }
         } finally {
-            puts "component monitoring failed on $host"
+            dputs "component monitoring failed on $host" 0
         }
         set ::MONITOR_CHAN($host) err:disconnected
         return
@@ -1646,7 +1650,7 @@ proc handle_screen_failure {chan host} {
                 # if this is not a user initiated stop, exit the system if requested
                 if {[lsearch -exact $::VDEMO_QUIT_COMPONENTS $comp] >= 0 || \
                     [lsearch -exact $::VDEMO_QUIT_COMPONENTS "$::TITLE($comp)"] >= 0} {
-                    puts "$::TITLE($comp) finished on $host: quitting vdemo"
+                    dputs "$::TITLE($comp) finished on $host: quitting vdemo" 0
                     all_cmd "stop"
                     after idle finish
                 } else {
@@ -1697,7 +1701,7 @@ proc connect_screen_monitoring {host} {
     try {
         set chan [open "|$cmd" "r+"]
     } trap POSIX {chan options} {
-        puts "failed to monitor master connections on $host: Is inotifywait installed?"
+        dputs "failed to monitor master connections on $host: Is inotifywait installed?" 0
         set ::MONITOR_CHAN($host) "err: no inotify"
         return
     }
@@ -1738,7 +1742,7 @@ proc gui_exit {} {
                 "There are still running components.\nStop them before quitting?" \
                 -type yesnocancel -default yes -icon question]
         } else {
-            puts "Stopping remaining components before quitting."
+            dputs "Stopping remaining components before quitting." 0
             set ans yes
         }
         switch -- $ans {
@@ -1769,10 +1773,10 @@ proc setup_temp_dir { } {
 }
 
 proc handle_remote_request { request args } {
-    dputs "got remote request: $request $args"
+    dputs "got remote request: $request $args" 1
     switch $request {
         "list" {
-            dputs "remote cmd: ${request}ing components"
+            dputs "remote cmd: ${request}ing components" 2
             set result {"component\tlevel\ttitle\thost\tgroup\tstatus"}
             foreach {comp} $::COMPONENTS {
                  lappend result "$comp\t$::COMP_LEVEL($comp)\t$::TITLE($comp)\t$::HOST($comp)\t$::GROUP($comp)\t$::COMPSTATUS($comp)"
@@ -1841,10 +1845,10 @@ catch {set geometry $::env(GEOMETRY)}
 
 setup_temp_dir
 set mypid [pid]
-puts "my process id: $mypid, vdemo-id: $::VDEMOID"
+dputs "my process id: $mypid, vdemo-id: $::VDEMOID" 0
 
 parse_env_var
-if {"$::VDEMO_QUIT_COMPONENTS" != ""} {puts "quitting on exit of: $::VDEMO_QUIT_COMPONENTS"}
+if {"$::VDEMO_QUIT_COMPONENTS" != ""} {dputs "quitting on exit of: $::VDEMO_QUIT_COMPONENTS" 0}
 remove_duplicates
 create_spread_conf
 
@@ -1857,7 +1861,7 @@ update
 
 # autostart
 if {[info exists ::env(VDEMO_autostart)] && $::env(VDEMO_autostart) == "true"} {
-    puts "Starting all components due to autostart request"
+    dputs "Starting all components due to autostart request" 0
     all_cmd "start"
 }
 

@@ -45,7 +45,7 @@ set -e
 VDEMO_DO_REDIRECT=""
 # option checks
 while [ $# -gt 0 ]; do
-    case $1 in
+    case "$1" in
     "-h"|"--help")
         echo "$HELP" >& 2
         exit 0
@@ -66,12 +66,12 @@ while [ $# -gt 0 ]; do
         fi
         ;;
     "-r"|"--logrotate")
-        echo "Enabling log rotation"
         export VDEMO_LOG_ROTATION=5
-        if [[ $2 =~ ^[0-9]+$ ]] ; then
+        if [[ "$2" =~ ^[0-9]+$ ]] ; then
             VDEMO_LOG_ROTATION=$2
             shift
         fi
+        echo "Enabling log rotation"
         ;;
     "-v"|"--verbose")
         export VDEMO_DEBUG_LEVEL=1
