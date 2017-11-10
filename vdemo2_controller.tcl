@@ -10,7 +10,7 @@ set VDEMO_CONNECTION_TIMEOUT 5
 catch {set VDEMO_CONNECTION_TIMEOUT $::env(VDEMO_CONNECTION_TIMEOUT)}
 append SSHOPTS "-q -oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -oConnectTimeout=" ${VDEMO_CONNECTION_TIMEOUT}
 append SSHOPTSSLAVE $SSHOPTS " -oPasswordAuthentication=no -oPubkeyAuthentication=no -oGSSAPIAuthentication=no"
-set ::VDEMO_CONNCHECK_TIMEOUT [expr $VDEMO_CONNECTION_TIMEOUT*1000]
+set ::VDEMO_CONNCHECK_TIMEOUT [expr {$VDEMO_CONNECTION_TIMEOUT * 1000}]
 
 # Theme settings
 proc define_theme_color {stylePrefix defaultBgnd mapping} {
@@ -58,7 +58,7 @@ set global_outfilename ""
 set DEBUG_LEVEL 0
 catch {set DEBUG_LEVEL $::env(VDEMO_DEBUG_LEVEL)}
 proc dputs {args {level 1}} {
-    if [expr $level <= $::DEBUG_LEVEL] {
+    if [expr {$level <= $::DEBUG_LEVEL}] {
         puts stderr "-- $args"
     }
 }
@@ -93,7 +93,7 @@ proc tooltip:show {w arg} {
     }
     pack [message $top.txt -aspect 10000 -bg lightyellow -text $arg]
     set wmx [winfo rootx $w]
-    set wmy [expr [winfo rooty $w]+[winfo height $w]]
+    set wmy [expr {[winfo rooty $w]+[winfo height $w]}]
     wm geometry $top [winfo reqwidth $top.txt]x[winfo reqheight $top.txt]+$wmx+$wmy
     raise $top
 }
@@ -141,7 +141,7 @@ proc parse_options {comp} {
     set CHECKNOWAIT_TIME($comp) 1000
     set GROUP($comp) ""
     # detach a component after this time
-    set DETACHTIME($comp) [expr 1000 * $::env(VDEMO_DETACH_TIME)]
+    set DETACHTIME($comp) [expr {1000 * $::env(VDEMO_DETACH_TIME)}]
     set NOAUTO($comp) 0
     set TERMINAL($comp) "screen"
     set LOGGING($comp) $::env(VDEMO_LOGGING)
@@ -154,16 +154,16 @@ proc parse_options {comp} {
 
     for {set i 0} { $i < [llength $TOKENS] } {incr i} {
         set arg [lindex $TOKENS $i]
-        set val [lindex $TOKENS [expr $i+1]]
+        set val [lindex $TOKENS [expr {$i+1}]]
         if { "$arg" == "--" } { break }
 
         if { [catch {switch -glob -- $arg {
             -w {
-                set WAIT_READY($comp) [expr 1000 * [number $val double]]
+                set WAIT_READY($comp) [expr {1000 * [number $val double]}]
                 incr i
             }
             -W {
-                set CHECKNOWAIT_TIME($comp) [expr 1000 * [number $val double]]
+                set CHECKNOWAIT_TIME($comp) [expr {1000 * [number $val double]}]
                 incr i
             }
             -c {
@@ -177,7 +177,7 @@ proc parse_options {comp} {
                 set RESTART($comp) 2
             }
             -d {
-                set DETACHTIME($comp) [expr 1000 * [number $val double]]
+                set DETACHTIME($comp) [expr {1000 * [number $val double]}]
                 incr i
             }
             -g {
@@ -218,7 +218,7 @@ proc parse_options {comp} {
         }
     }
     # re-assign remaining arguments:
-    set ARGS($comp) [lrange $TOKENS [expr $i+1] end]
+    set ARGS($comp) [lrange $TOKENS [expr {$i+1}] end]
 }
 
 # split $str on $sep, but don't split when $sep is preceeded by $protector
@@ -262,7 +262,7 @@ proc parse_env_var {} {
             set component_name "${i}_${component_name}"
             set COMMAND($component_name) "$thisCommand"
             set TITLE($component_name) "$thisCommand"
-            set COMPONENTS "$COMPONENTS $component_name"
+            lappend COMPONENTS $component_name
             set TAB($component_name) "$tab"
             lappend $components_on_tab_list $component_name
             if {"$host" != ""} {lappend ::HOSTS $host}
@@ -312,7 +312,7 @@ proc find_component {what} {
         set _SEARCH(found) [lsearch -all $COMPONENTS_ON_TAB($_SEARCH(cur_tab)) $_SEARCH(string)]
     }
     while 1 {
-        set _SEARCH(index) [expr $_SEARCH(index) + 1]
+        set _SEARCH(index) [expr {$_SEARCH(index) + 1}]
         if {$_SEARCH(index) < [llength $_SEARCH(found)]} {
             # found on current tab
             set index [lindex $_SEARCH(found) $_SEARCH(index)]
@@ -323,7 +323,7 @@ proc find_component {what} {
             break
         }
         # if not found, try on next tab
-        set _SEARCH(cur_idx) [expr ($_SEARCH(cur_idx) + 1) % $_SEARCH(end_idx)]
+        set _SEARCH(cur_idx) [expr {($_SEARCH(cur_idx) + 1) % $_SEARCH(end_idx)}]
         catch { set _SEARCH(cur_tab) [$::COMPONENTS_WIDGET tab $_SEARCH(cur_idx) -text] }
         # do the search
         set _SEARCH(index) -1
@@ -343,7 +343,7 @@ proc show_component {comp} {
         $::COMPONENTS_WIDGET select $::COMPONENTS_WIDGET.$::TAB($comp)
     }
     set pos [lsearch -exact $::COMPONENTS_ON_TAB($::TAB($comp)) $comp]
-    .main.scrollable yview moveto [expr double($pos)/$::MAX_NUM]
+    .main.scrollable yview moveto [expr {double($pos)/$::MAX_NUM}]
 }
 
 set _LAST_HILITED ""
@@ -396,7 +396,7 @@ proc gui_tcl {} {
     # determine max number of components in tabs
     set ::MAX_NUM 1
     foreach tab $::TABS {
-        set ::MAX_NUM [ expr max($::MAX_NUM, [llength $::COMPONENTS_ON_TAB($tab)]) ]
+        set ::MAX_NUM [ expr {max($::MAX_NUM, [llength $::COMPONENTS_ON_TAB($tab)])} ]
     }
 
     # main gui frame
@@ -504,28 +504,28 @@ proc gui_tcl {} {
     foreach {g} $::GROUPS {
         all_cmd_reset $g
         ttk::frame $allcmd.$g -style groove.TFrame
-        ttk::label $allcmd.$g.label  -style group.TLabel -text $g -width 10 -anchor e
+        ttk::label $allcmd.$g.label  -style group.TLabel -text $g -anchor w
         ttk::button $allcmd.$g.start -style cmd.TButton -text "start" -command "all_cmd start $g"
         ttk::button $allcmd.$g.stop  -style cmd.TButton -text "stop"  -command "all_cmd stop  $g"
         ttk::button $allcmd.$g.check -style cmd.TButton -text "check" -command "all_cmd check $g"
         ttk::checkbutton $allcmd.$g.noauto -text "no auto" -command "set_group_noauto $g"
         ttk::checkbutton $allcmd.$g.logging -text "logging" -command "set_group_logging $g"
 
-        pack $allcmd.$g.label -side left -padx 2
-        pack $allcmd.$g.start -side left
-        pack $allcmd.$g.stop -side left
-        pack $allcmd.$g.check -side left
-        pack $allcmd.$g.noauto -side left
-        pack $allcmd.$g.logging -side left -padx 2
+        grid $allcmd.$g.label -row 0 -column 0 -columnspan 3 -sticky w -padx {4 0} -pady {2 0}
+        grid $allcmd.$g.start -row 1 -column 0 -padx {3 0} -pady {0 2}
+        grid $allcmd.$g.stop -row 1 -column 1 -padx {0 3} -pady {0 2}
+        grid $allcmd.$g.check -row 1 -column 2 -padx {0 3} -pady {0 2}
+        grid $allcmd.$g.noauto -row 0 -column 3 -padx {0 3} -pady {2 0}
+        grid $allcmd.$g.logging -row 1 -column 3 -padx {0 3} -pady {0 2}
         # estimate the width of a group item
         if { ! $idx } {
             update
-            set winwidth [expr {max([winfo width .], 890)}]
+            set winwidth [expr {max([winfo width .], 200)}]
             set numcols [expr {$winwidth / ([winfo reqwidth $allcmd.$g]+10)}]
             set maxrows [expr {([llength $::GROUPS] + $numcols - 1) / $numcols} ]
         }
-        set col [expr $idx / $maxrows]
-        set row [expr $idx % $maxrows + 1]
+        set col [expr {$idx / $maxrows}]
+        set row [expr {$idx % $maxrows + 1}]
         grid $allcmd.$g -column $col -row $row -padx {0 10} -pady 2 -sticky w
         incr idx
     }
@@ -585,11 +585,11 @@ proc gui_add_host {host} {
         pack .ssh.$lh.clock -side left
         pack .ssh.$lh.screen -side left
         update
-        set winwidth [expr {max([winfo width .], 890)}]
+        set winwidth [expr {max([winfo width .], 200)}]
         set numcols [expr {($winwidth-120) / ([winfo reqwidth .ssh.$lh])}]
         set col [expr {$idx % $numcols}]
         set row [expr {$idx / $numcols}]
-        grid .ssh.$lh -column [expr {$col+1}] -row $row
+        grid .ssh.$lh -column [expr {$col+1}] -row $row -sticky w
     }
 }
 
@@ -775,7 +775,7 @@ proc all_cmd {cmd {group "all"} {lazy 1}} {
     if {"$cmd" == "stop"} {set levels [lreverse $levels]}
 
     # ensure that other all_cmds from same $group are interrupted
-    set sync [expr [lsearch -exact [list "start" "stop"] $cmd] >= 0]
+    set sync [expr {[lsearch -exact [list "start" "stop"] $cmd] >= 0}]
     if {$sync} {
         if {[all_cmd_interrupt $group]} {
             # there is an active, conflicting all_cmd() call, postpone this new one
@@ -829,7 +829,7 @@ proc all_cmd_comp_set_status {group comp status} {
 
     set started [all_cmd_comp_started $status]
     set stopped [all_cmd_comp_stopped $status]
-    set ignored [expr [lsearch -exact $::ALLCMD(ignore_hosts) $::HOST($comp)] >= 0]
+    set ignored [expr {[lsearch -exact $::ALLCMD(ignore_hosts) $::HOST($comp)] >= 0}]
 
     switch -exact -- [lindex $::ALLCMD(mode_$group) 0] {
         start {
@@ -868,23 +868,23 @@ proc all_cmd_cancel {group comp} {
     all_cmd_signal $group
 }
 proc level_cmd { cmd level group {lazy 0} } {
-    set synced [expr [lsearch -exact [list "start" "stop"] $cmd] >= 0]
+    set synced [expr {[lsearch -exact [list "start" "stop"] $cmd] >= 0}]
 
     set components $::COMPONENTS
     if {"$cmd" == "stop"} {set components [lreverse $::COMPONENTS]}
     foreach {comp} "$components" {
-        set ignore [expr [lsearch -exact $::ALLCMD(ignore_hosts) $::HOST($comp)] >= 0]
+        set ignore [expr {[lsearch -exact $::ALLCMD(ignore_hosts) $::HOST($comp)] >= 0}]
         if {$::COMP_LEVEL($comp) == $level && \
                 ($group == "all" || $::GROUP($comp) == $group) && !$ignore} {
             switch -exact -- $cmd {
                 check {set doIt 1}
-                stop  {set doIt [expr  !$lazy || ![all_cmd_comp_stopped $::COMPSTATUS($comp)]]}
-                start {set doIt [expr (!$lazy || ![all_cmd_comp_started $::COMPSTATUS($comp)]) && !$::NOAUTO($comp)]}
+                stop  {set doIt [expr  {!$lazy || ![all_cmd_comp_stopped $::COMPSTATUS($comp)]}]}
+                start {set doIt [expr {(!$lazy || ![all_cmd_comp_started $::COMPSTATUS($comp)]) && !$::NOAUTO($comp)}]}
             }
             if {$doIt} {
                 if {$synced} {all_cmd_add_comp $group $comp}
                 set res [component_cmd $comp $cmd $group]
-                set ignore [expr [lsearch -exact $::ALLCMD(ignore_hosts) $::HOST($comp)] >= 0]
+                set ignore [expr {[lsearch -exact $::ALLCMD(ignore_hosts) $::HOST($comp)] >= 0}]
                 if {$synced && $res != 0 && !$ignore} { # component_cmd failed
                     all_cmd_cancel $group $comp
                 }
@@ -975,7 +975,7 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
                 default { set msg "component_$COMMAND($comp) start: unknown error $res" }
             }
             if {$msg != ""} {
-                if [expr $::DEBUG_LEVEL >= 0] {
+                if [expr {$::DEBUG_LEVEL >= 0}] {
                     tk_messageBox -message $msg -icon warning -type ok
                 } else {
                     puts $msg
@@ -1087,8 +1087,8 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
             # onCheckResult is the result from the on_check function (0 on success)
             # screenResult: 0: success, 1/2: no screen, finished without(1) / with(2) error
             dputs "check result: $res = ([expr $res >> 2] << 2) | [expr $res & 3]" 2
-            set onCheckResult [expr $res >> 2]
-            set screenResult  [expr $res & 3]
+            set onCheckResult [expr {$res >> 2}]
+            set screenResult  [expr {$res & 3}]
             set s unknown
             set status 0
             if {$onCheckResult == 0} { # on_check was successful
@@ -1101,7 +1101,7 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
 
             # handle started component
             if { [$::WIDGET($comp).start instate disabled] } {
-                set endtime [expr $::LAST_GUI_INTERACTION($comp) + $WAIT_READY($comp)]
+                set endtime [expr {$::LAST_GUI_INTERACTION($comp) + $WAIT_READY($comp)}]
                 if {$onCheckResult != 0 && $screenResult == 0} {
                     if {$endtime < [clock milliseconds]} {
                         puts "$TITLE($comp) failed: timeout"
@@ -1170,35 +1170,32 @@ proc set_status {comp status} {
 }
 
 proc blink_start {widget {interval 500}} {
-  global _blink_data
-  set _blink_data($widget.styles) [list [$widget cget -style] "cmd.TButton"]
-  set _blink_data($widget.active) 1
-  set _blink_data($widget.interval) $interval
-  set _blink_data($widget.current) 0
+  set ::blink_data($widget.styles) [list [$widget cget -style] "cmd.TButton"]
+  set ::blink_data($widget.active) 1
+  set ::blink_data($widget.interval) $interval
+  set ::blink_data($widget.current) 0
   after $interval blink_cycle $widget
 }
 
 proc blink_cycle {widget} {
-  global _blink_data
-  if {$_blink_data($widget.active) == 0} {
+  if {$::blink_data($widget.active) == 0} {
     return
   }
-  set style [lindex $_blink_data($widget.styles) $_blink_data($widget.current)]
+  set style [lindex $::blink_data($widget.styles) $::blink_data($widget.current)]
   $widget configure -style $style
-  set _blink_data($widget.current) [expr "($_blink_data($widget.current) + 1) % [llength $_blink_data($widget.styles)]"]
-  after $_blink_data($widget.interval) blink_cycle $widget
+  set ::blink_data($widget.current) [expr {($::blink_data($widget.current) + 1) % [llength $::blink_data($widget.styles)]}]
+  after $::blink_data($widget.interval) blink_cycle $widget
 }
 
 proc blink_stop {widget} {
-  global _blink_data
-  set _blink_data($widget.active) 0
+  set ::blink_data($widget.active) 0
 }
 
 # {{{ ssh and command procs
 
 proc pid_exists {procid} {
     set pidok 0
-    catch {set pidok [expr [llength [wait -nohang $procid]] eq 0]}
+    catch {set pidok [expr {[llength [wait -nohang $procid]] eq 0}]}
     return $pidok
 }
 
@@ -1235,7 +1232,7 @@ proc reconnect_host {host msg} {
 # read_chan ignores data after \0 in the same read cycle.
 proc read_chan {chan {timeout 0}} {
     set result ""
-    if {[expr $timeout != 0]} {set endtime [expr [clock milliseconds] + $timeout]}
+    if {[expr {$timeout != 0}]} {set endtime [expr {[clock milliseconds] + $timeout}]}
     while {$timeout == 0 || $endtime > [clock milliseconds]} {
         set data [split [read -nonewline $chan] \0]
         append result [lindex $data 0]
@@ -1333,7 +1330,7 @@ proc enable_monitoring {host} {
     set ::MONITOR_IGNORE_HOSTS [lsearch -inline -all -not -exact $::MONITOR_IGNORE_HOSTS $host]
 }
 proc monitoring_disabled {host} {
-    return [expr [lsearch -exact $::MONITOR_IGNORE_HOSTS $host] >= 0]
+    return [expr {[lsearch -exact $::MONITOR_IGNORE_HOSTS $host] >= 0}]
 }
 
 proc init_connect_host {fifo host} {
@@ -1371,7 +1368,7 @@ proc init_connect_host {fifo host} {
 proc process_connect_host {fifo host} {
     # Loop will wait for at most 30 seconds to allow entering a password if necessary.
     # This will break earlier if ssh connection returns, e.g. due to timeout.
-    set endtime [expr [clock seconds] + 30]
+    set endtime [expr {[clock seconds] + 30}]
     set xterm_shown 0
     set screenid [get_master_screen_name $host]
     puts -nonewline "connecting to $host: "; flush stdout
@@ -1585,7 +1582,7 @@ proc create_spread_conf {} {
             set sp_seg "$seg.255:$::env(SPREAD_PORT)"
         } else {
             set sp_seg [compute_spread_segment $IP([lindex $hosts($seg) 0]) $num]
-            set num [expr $num + 1]
+            set num [expr {$num + 1}]
         }
         puts $fd "Spread_Segment $sp_seg {"
         foreach {h} $hosts($seg) {
@@ -1640,7 +1637,7 @@ proc handle_screen_failure {chan host} {
             dputs "$comp closed its screen session on $host" 2
             if {[$::WIDGET($comp).stop  instate disabled] || \
                 [$::WIDGET($comp).start instate disabled] ||
-                [expr [clock milliseconds] - $::LAST_GUI_INTERACTION($comp) < $::SCREEN_FAILURE_DELAY]} {
+                [expr {[clock milliseconds] - $::LAST_GUI_INTERACTION($comp) < $::SCREEN_FAILURE_DELAY}]} {
                 # component was stopped or just started via gui -> ignore event
                 # trigger stop: component's on_stop() might do some cleanup
                 # component_cmd $comp stop
@@ -1665,7 +1662,8 @@ proc handle_screen_failure {chan host} {
                         component_cmd $comp stopwait
                         component_cmd $comp check
                         blink_start $::WIDGET($comp).check
-                        show_component $comp
+                        catch {after cancel $::SHOW_COMPONENT_TIMER}
+                        set ::SHOW_COMPONENT_TIMER [after 100 show_component $comp]
                     }
                 }
             }
@@ -1723,7 +1721,7 @@ proc disconnect_screen_monitoring {host} {
 
 proc running {comp} {
     set running_states [list starting ok_screen failed_check]
-    return [expr [lsearch -exact $running_states $::COMPSTATUS($comp)] >= 0]
+    return [expr {[lsearch -exact $running_states $::COMPSTATUS($comp)] >= 0}]
 }
 
 proc gui_exit {} {
@@ -1735,7 +1733,7 @@ proc gui_exit {} {
         }
     }
     if {!$quickexit} {
-        if [expr $::DEBUG_LEVEL >= 0] {
+        if [expr {$::DEBUG_LEVEL >= 0}] {
             set ans [tk_messageBox -message \
                 "There are still running components.\nStop them before quitting?" \
                 -type yesnocancel -default yes -icon question]
@@ -1813,10 +1811,10 @@ proc handle_remote_request { request args } {
         "busy" {
             set busy 0
             foreach group "all $::GROUPS" {
-                set busy [expr  $busy || $::ALLCMD(intr_$group) != 0]
+                set busy [expr  {$busy || $::ALLCMD(intr_$group) != 0}]
             }
             foreach {comp} $::COMPONENTS {
-                set busy [expr  $busy || [$::WIDGET($comp).stop instate disabled] || [$::WIDGET($comp).start instate disabled]]
+                set busy [expr {$busy || [$::WIDGET($comp).stop instate disabled] || [$::WIDGET($comp).start instate disabled]}]
             }
             return $busy
         }
