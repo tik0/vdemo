@@ -301,13 +301,15 @@ proc bind_wheel_sf {widget} {
 }
 
 proc find_component {src what} {
-    global _SEARCH COMPONENTS_ON_TAB
+    global _SEARCH
     set what "*[string trim $what]*"
     if {$what == "**"} {
-        set what ""
+        $src configure -style TEntry
+        hilite_component ""
+        return
     }
     if {![info exists _SEARCH(string)] || $_SEARCH(string) != $what} {
-        set _SEARCH(string) "$what"
+        set _SEARCH(string) $what
         # get name of currently selected tab: will fail if simple frame is used
         if { ! [ catch {set curTab [$::COMPONENTS_WIDGET select]} ] } {
             set _SEARCH(start_idx) [$::COMPONENTS_WIDGET index $curTab]
@@ -320,10 +322,10 @@ proc find_component {src what} {
         }
         set _SEARCH(cur_idx) $_SEARCH(start_idx)
         set _SEARCH(index) -1
-        set _SEARCH(found) [list]
     }
     while 1 {
-         foreach {c} $COMPONENTS_ON_TAB($_SEARCH(cur_tab)) {
+        set _SEARCH(found) [list]
+        foreach {c} $::COMPONENTS_ON_TAB($_SEARCH(cur_tab)) {
             if {[string match $_SEARCH(string) $::TITLE($c)]} {
                 lappend _SEARCH(found) $c
             }
@@ -340,7 +342,6 @@ proc find_component {src what} {
         # if not found, try on next tab
         set _SEARCH(cur_idx) [expr {($_SEARCH(cur_idx) + 1) % $_SEARCH(end_idx)}]
         catch { set _SEARCH(cur_tab) [$::COMPONENTS_WIDGET tab $_SEARCH(cur_idx) -text] }
-        # do the search
         set _SEARCH(index) -1
         # reached initial tab again? -> indicate failure
         if {$_SEARCH(cur_idx) == $_SEARCH(start_idx)} {
@@ -354,7 +355,7 @@ proc find_component {src what} {
 proc show_component {comp} {
     catch {
         # show tab widget containing the component
-        $::COMPONENTS_WIDGET select $::COMPONENTS_WIDGET.$::TAB($comp)
+        $::COMPONENTS_WIDGET select [string tolower $::COMPONENTS_WIDGET.$::TAB($comp)]
     }
     set pos [lsearch -exact $::COMPONENTS_ON_TAB($::TAB($comp)) $comp]
     .main.scrollable yview moveto [expr {double($pos)/$::MAX_NUM}]
@@ -392,6 +393,7 @@ proc set_group_logging {grp} {
 }
 
 proc get_tab {name} {
+    set name [string tolower $name]
     if {[winfo exists $name] == 0} {
         ttk::frame $name
         pack $name -side top -fill both -expand yes
@@ -419,7 +421,6 @@ proc gui_tcl {} {
     iwidgets::scrolledframe .main.scrollable -vscrollmode dynamic -hscrollmode none -height 400 -width 890
     bind_wheel_sf .main.scrollable
     pack .main.scrollable -side top -fill both -expand yes
-
     set COMPONENTS_WIDGET [.main.scrollable childsite].components
 
     if {[llength $::TABS] > 1} {
@@ -464,7 +465,7 @@ proc gui_tcl {} {
         ttk::checkbutton $w.$c.screen -text "show term" -command "component_cmd $c screen" -variable SCREENED($c) -onvalue 1 -offvalue 0
         ttk::button $w.$c.inspect -style cmd.TButton -text "inspect" -command "component_cmd $c inspect"
 
-        pack $w.$c.level -side left
+        pack $w.$c.level -side left -padx {2 0}
         pack $w.$c.label -side left -fill x -expand yes
         pack $w.$c.host -side left
         pack $w.$c.group -side left -fill x
@@ -475,9 +476,9 @@ proc gui_tcl {} {
         pack $w.$c.logging -side right
         pack $w.$c.screen -side right
         pack $w.$c.noauto -side right -padx 2
-        pack $w.$c.check -side right
-        pack $w.$c.stop -side right
-        pack $w.$c.start -side right
+        pack $w.$c.check -side right -pady 2
+        pack $w.$c.stop -side right -pady 2
+        pack $w.$c.start -side right -pady 2
         set_status $c unknown
     }
     set LEVELS [lsort -integer -unique "$LEVELS"]
@@ -486,13 +487,14 @@ proc gui_tcl {} {
         set tabs [list]
         foreach {tab} $::TABS {
             if { [llength $::COMPONENTS_ON_TAB($tab)] > 0 } {
-                $COMPONENTS_WIDGET add $COMPONENTS_WIDGET.$tab -text $tab
+                $COMPONENTS_WIDGET add [string tolower $COMPONENTS_WIDGET.$tab] -text $tab
                 lappend tabs $tab
             }
         }
         set ::TABS $tabs
     }
     pack .main -side top -fill both -expand yes
+    
     set allcmd ".main.allcmd"
     ttk::frame $allcmd
     pack $allcmd -side left -fill y
@@ -504,7 +506,7 @@ proc gui_tcl {} {
     ttk::button $allcmd.all.start -style cmd.TButton -text "start" -command "all_cmd start"
     ttk::button $allcmd.all.stop  -style cmd.TButton -text "stop"  -command "all_cmd stop"
     ttk::button $allcmd.all.check -style cmd.TButton -text "check" -command "all_cmd check"
-    pack $allcmd.all.label -side left -fill x -padx 1 -pady 2
+    pack $allcmd.all.label -side left -fill x -padx {2 10} -pady 2
     pack $allcmd.all.start $allcmd.all.stop $allcmd.all.check -side left -pady 2
     # search widgets
     set ::SEARCH_STRING ""

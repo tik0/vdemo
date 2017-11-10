@@ -34,7 +34,7 @@ host10=${host10:-localhost}
 
 
 export VDEMO_components="
-tab1:
+Tab1:
 sleep,             $host01,            -t sleep01-01A -L 1  -g sleepers -w 0 -W 1 -x:
 sleep,             $host01,            -t sleep01-01B -L 1  -g sleepers -w 0 -W 1 -x:
 sleep,             $host02,            -t sleep01-02A -L 1  -g sleepers -w 0 -W 1 -x:
