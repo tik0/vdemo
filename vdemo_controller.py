@@ -71,9 +71,11 @@ class ServerRequestHandler(BaseHTTPRequestHandler):
         reader = csv.DictReader(io.StringIO(reply), delimiter='\t', quoting=csv.QUOTE_NONE)
         rows = []
         grouprows = []
-        groups = set()
+        groups = []
         for row in reader:
-            groups.add(row['group'])
+            gn = row['group']
+            if not gn in groups:
+                groups.append(gn)
             rows.append(Template(self.templates['row.html']).safe_substitute(row))
         for group in groups:
             grouprows.append(Template(self.templates['grouprow.html']).safe_substitute(group=group))
