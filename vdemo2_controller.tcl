@@ -1522,9 +1522,9 @@ proc disconnect_hosts {} {
     }
 }
 
-proc finish {} {
+proc finish { {hard 0} } {
     lappend ::ALLCMD(current_level_stop)
-    if { [all_cmd_busy] } {
+    if { !$hard && [all_cmd_busy] } {
         after 10 finish
         return
     }
@@ -1892,8 +1892,8 @@ proc handle_remote_request { request args } {
     }
 }
 
-signal trap SIGINT finish
-signal trap SIGHUP finish
+signal trap SIGINT [list finish 1]
+signal trap SIGHUP [list finish 1]
 catch {set geometry $::env(GEOMETRY)}
 
 setup_temp_dir
