@@ -1,0 +1,9 @@
+#!/bin/bash
+
+title="xedit"
+
+function component {
+  xedit
+}
+
+source "$VDEMO_root/vdemo_standard_component_suffix.sh"

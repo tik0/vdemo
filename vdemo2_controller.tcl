@@ -11,6 +11,7 @@ catch {set VDEMO_CONNECTION_TIMEOUT $::env(VDEMO_CONNECTION_TIMEOUT)}
 append SSHOPTS "-q -oUserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -oConnectTimeout=" ${VDEMO_CONNECTION_TIMEOUT}
 append SSHOPTSSLAVE $SSHOPTS " -oPasswordAuthentication=no -oPubkeyAuthentication=no -oGSSAPIAuthentication=no"
 set ::VDEMO_CONNCHECK_TIMEOUT [expr {$VDEMO_CONNECTION_TIMEOUT * 1000}]
+set ::TERMINATED 0
 
 # Theme settings
 proc define_theme_color {stylePrefix defaultBgnd mapping} {
@@ -59,12 +60,12 @@ set DEBUG_LEVEL 0
 catch {set DEBUG_LEVEL $::env(VDEMO_DEBUG_LEVEL)}
 proc dputs {args {level 1}} {
     if {$level <= $::DEBUG_LEVEL} {
-        if {$level} {
-            set ts ""
-        } else {
+        if {$level < 0} {
             set ts [clock format [clock seconds] -format {[%Y-%m-%dT%H:%M:%S] }]
-        }    
-        puts stderr "-- $ts$args"
+            puts stdout "-- $ts$args"
+        } else {
+            puts stderr "-- $args"
+        }
     }
 }
 proc assert condition {
@@ -81,9 +82,11 @@ proc backtrace {} {
     return [join $bt { => }]
 }
 proc bgerror {msg} {
-    dputs "background error report begin" 0
-    puts stderr $::errorInfo
-    dputs "background error report end" 0
+    if {[string length $msg]} {
+        dputs "background error report begin" 0
+        puts stderr $::errorInfo
+        dputs "background error report end" 0
+    }
 }
 
 # tooltips
@@ -495,11 +498,11 @@ proc gui_tcl {} {
     }
     pack .main -side top -fill both -expand yes
     
-    set allcmd ".main.allcmd"
+    set allcmd .main.allcmd
     ttk::frame $allcmd
     pack $allcmd -side left -fill y
     # buttons to control ALL components
-    all_cmd_reset "all"
+    all_cmd_reset all
     ttk::frame $allcmd.all -style groove.TFrame
     grid $allcmd.all -column 0 -row 0 -sticky w -columnspan 100 -pady 4
     ttk::label $allcmd.all.label -style TLabel -text "ALL COMPONENTS"
@@ -751,6 +754,20 @@ proc all_cmd_interrupt {groups} {
     }
     return $ret
 }
+proc all_cmd_busy {} {
+    lappend ::ALLCMD(current_level_start)
+    lappend ::ALLCMD(current_level_stop)
+    if {$::ALLCMD(current_level_stop) != "" || $::ALLCMD(current_level_stop) != ""} {return 1}
+    foreach group "all $::GROUPS" {
+        if {$::ALLCMD(intr_$group) != 0} {return 1}
+    }
+    foreach {comp} $::COMPONENTS {
+        if {[$::WIDGET($comp).stop instate disabled] || [$::WIDGET($comp).start instate disabled]} {return 1}
+    }
+    return 0
+}
+
+
 proc all_cmd_update_gui {cmd group status style} {
     if {$group == "all"} { # also disable group buttons
         foreach g "$::GROUPS" {
@@ -782,7 +799,7 @@ proc all_cmd_next_pending {} {
 
 proc all_cmd {cmd {group "all"} {lazy 1}} {
     # initially define ::ALLCMD(current_level_${cmd}) if not yet done
-    if { ![info exists ::ALLCMD(current_level_${cmd})] } { set ::ALLCMD(current_level_${cmd}) "" }
+    lappend ::ALLCMD(current_level_${cmd})
 
     # disable gui buttons
     all_cmd_update_gui $cmd $group "disabled" "starting.cmd.TButton"
@@ -1238,7 +1255,9 @@ proc screen_ssh_master {h} {
 proc reconnect_host {host msg} {
     # error code to indicate that user cancelled reconnection
     set res -2
-    if { $::DEBUG_LEVEL >= 0 && \
+    gui_update_host $host $res
+    update
+    if { $::DEBUG_LEVEL < 0 || $::DEBUG_LEVEL >= 0 && \
          [tk_messageBox -message $msg -type yesno -icon question] == yes } {
         # try to connect to host
         set fifo [get_fifo_name $host]
@@ -1300,7 +1319,7 @@ proc ssh_check_connection {hostname {connect 1}} {
     }
 
     # actually try to reconnect
-    if { $msg != "" && (!$connect || [reconnect_host $hostname $msg] != 0) } {
+    if { $msg != "" && ($::TERMINATED || !$connect || [reconnect_host $hostname $msg] != 0) } {
         return $res
     } elseif { $msg != "" && $connect } {
         # successfully (re)established connection
@@ -1314,7 +1333,6 @@ proc ssh_check_connection {hostname {connect 1}} {
 
 proc ssh_command {cmd hostname {check 1} {verbose 1}} {
     set f [get_fifo_name $hostname]
-
     # check if master connection is in place
     if $check {
         set res [ssh_check_connection $hostname]
@@ -1428,7 +1446,7 @@ proc process_connect_host {fifo host} {
 
     dputs "issuing remote initialization commands" 2
     if {[info exists ::env(VDEMO_exports)]} {
-        foreach {var} "$::env(VDEMO_exports)" {
+        foreach {var} $::env(VDEMO_exports) {
             if {[info exists ::env($var)]} {
                 ssh_command "export $var=$::env($var)" $host 0 $::DEBUG_LEVEL
             }
@@ -1505,6 +1523,12 @@ proc disconnect_hosts {} {
 }
 
 proc finish {} {
+    lappend ::ALLCMD(current_level_stop)
+    if { [all_cmd_busy] } {
+        after 10 finish
+        return
+    }
+    set ::TERMINATED 1
     disconnect_hosts
     catch {file delete "$::TEMPDIR"}
     exit
@@ -1652,7 +1676,7 @@ proc handle_screen_failure {chan host} {
         return
     }
     # a component crashed
-    foreach {comp} "$::COMPONENTS" {
+    foreach {comp} $::COMPONENTS {
         if {$::HOST($comp) == $host && \
             [string match "*.$::COMMAND($comp).$::TITLE($comp)_" "$line"]} {
             dputs "$comp closed its screen session on $host" 2
@@ -1666,17 +1690,20 @@ proc handle_screen_failure {chan host} {
             } else {
                 # if this is not a user initiated stop, exit the system if requested
                 if {[lsearch -exact $::VDEMO_QUIT_COMPONENTS $comp] >= 0 || \
-                    [lsearch -exact $::VDEMO_QUIT_COMPONENTS "$::TITLE($comp)"] >= 0} {
-                    dputs "$::TITLE($comp) finished on $host: quitting vdemo" 0
-                    all_cmd "stop"
-                    after idle finish
+                    [lsearch -exact $::VDEMO_QUIT_COMPONENTS $::TITLE($comp)] >= 0} {
+                    dputs "$::TITLE($comp) finished on $host: quitting vdemo" -1
+                    all_cmd stop all 0
+                    finish
                 } else {
-                    dputs "$::TITLE($comp) died on $host." 0
-                    if {$::RESTART($comp) == 2 || \
-                        ($::RESTART($comp) == 1 && [tk_messageBox -message \
-                            "$::TITLE($comp) stopped on $host.\nRestart?" \
-                            -type yesno -icon warning] == "yes")} {
-                        dputs "Restarting $::TITLE($comp)." 0
+                    dputs "$::TITLE($comp) died on $host." -1
+                    if {!$::TERMINATED && ( \
+                            $::RESTART($comp) == 2 || ($::RESTART($comp) == 1 && $::DEBUG_LEVEL < 0) || \
+                        ($::RESTART($comp) == 1 && \
+                        [tk_messageBox -message "$::TITLE($comp) stopped on $host.\nRestart?" \
+                            -type yesno -icon warning] == "yes") \
+                        )
+                    } {
+                        dputs "Restarting $::TITLE($comp)." -1
                         component_cmd $comp start
                     } else {
                         # trigger stopwait: component's on_stop() might do some cleanup
@@ -1764,16 +1791,12 @@ proc gui_exit {} {
         }
         switch -- $ans {
             yes {
-                all_cmd stop "all" 0
-                # wait for all stop cmds to be finished
-                while { $::ALLCMD(current_level_stop) != "" } {
-                    vwait ::ALLCMD(current_level_stop)
-                }
+                all_cmd stop all 0
             }
             cancel {return}
         }
     }
-    after idle finish
+    finish
 }
 
 wm protocol . WM_DELETE_WINDOW {
@@ -1814,11 +1837,8 @@ proc handle_remote_request { request args } {
             return "OK"
         }
         "terminate" {
-            all_cmd stop
-            while { $::ALLCMD(current_level_stop) != "" } {
-                vwait ::ALLCMD(current_level_stop)
-            }
-            after idle finish
+            all_cmd stop all 0
+            finish
             return "OK"
         }
         "component" {
@@ -1864,14 +1884,7 @@ proc handle_remote_request { request args } {
             return "OK"
         }
         "busy" {
-            set busy 0
-            foreach group "all $::GROUPS" {
-                set busy [expr  {$busy || $::ALLCMD(intr_$group) != 0}]
-            }
-            foreach {comp} $::COMPONENTS {
-                set busy [expr {$busy || [$::WIDGET($comp).stop instate disabled] || [$::WIDGET($comp).start instate disabled]}]
-            }
-            return $busy
+            return [all_cmd_busy]
         }
         default {
             error "no handler for $request"
@@ -1884,11 +1897,10 @@ signal trap SIGHUP finish
 catch {set geometry $::env(GEOMETRY)}
 
 setup_temp_dir
-set mypid [pid]
-dputs "my process id: $mypid, vdemo-id: $::VDEMOID" 0
+dputs "my process id: [pid], vdemo-id: $::VDEMOID" -1
 
 parse_env_var
-if {"$::VDEMO_QUIT_COMPONENTS" != ""} {dputs "quitting on exit of: $::VDEMO_QUIT_COMPONENTS" 0}
+if {$::VDEMO_QUIT_COMPONENTS != ""} {dputs "quitting on exit of: $::VDEMO_QUIT_COMPONENTS" 0}
 remove_duplicates
 create_spread_conf
 
@@ -1901,8 +1913,8 @@ update
 
 # autostart
 if {[info exists ::env(VDEMO_autostart)] && $::env(VDEMO_autostart) == "true"} {
-    dputs "Starting all components due to autostart request" 0
-    all_cmd "start"
+    dputs "Starting all components due to autostart request" -1
+    all_cmd start all
 }
 
 # Local Variables:
