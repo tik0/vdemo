@@ -1311,7 +1311,6 @@ proc ssh_check_connection {hostname {connect 1}} {
         # know, that the command shouldn't last long. However, the real ssh_command could last rather
         # long, e.g. stopping a difficult component. This would generate a spurious timeout.
         set res [communicate_ssh $hostname "echo -ne 0\\\\0" $::VDEMO_CONNCHECK_TIMEOUT]
-        #set res [exec bash -c "exec 5<>$fifo.in; echo 'echo -ne 0\\\\0' >&5; read -d '' -rt 1 s <>$fifo.out; echo \$s"]
         dputs "connection check result: $res" 2
 
         # we might also fetch the result of a previous, delayed ssh command. Really?
@@ -1341,14 +1340,13 @@ proc ssh_command {cmd hostname {check 1} {verbose 1}} {
     }
 
     # actually issue the command
-    set cmd [string trim "$cmd"]
+    set cmd [string trim $cmd]
     if {$verbose > 0} {
         dputs "run '$cmd' on host '$hostname'"
-        set verbose "echo 1>&2; date +\"*** %X %a, %x ***********************\" 1>&2; echo \"*** RUN $cmd\" 1>&2;"
+        set verbose "echo 1>&2; date +'*** %X %a, %x ***********************' 1>&2; echo '*** RUN $cmd' 1>&2;"
     } else {set verbose ""}
+    # The 0 byte is a delimiter here. it enables collecting multiline output if necessary
     set res [communicate_ssh $hostname "$verbose $cmd 1>&2; echo -ne \$?\\\\0"]
-    # read '' uses the 0 byte as delimiter. This is not necessary here but enables collecting multiline output...
-    #set res [exec bash -c "exec 5<>$f.in; echo '$verbose $cmd 1>&2; echo -ne \$?\\\\0' >&5; read -d '' -r s <>$f.out; echo \$s"]
     dputs "ssh result: '$res'" 3
     return $res
 }
@@ -1461,8 +1459,9 @@ proc process_connect_host {fifo host} {
     connect_screen_monitoring $host
 
     if {$::AUTO_SPREAD_CONF == 1} {
-        set content [exec cat $::env(SPREAD_CONFIG)]
-        communicate_ssh $hostname "echo \"$content\" > $::env(SPREAD_CONFIG); echo -ne \$?\\\\0"
+        dputs "sending spread config $::env(SPREAD_CONFIG) to $host"
+        set content [read_file $::env(SPREAD_CONFIG)]
+        communicate_ssh $host "echo '$content' > $::env(SPREAD_CONFIG); echo -ne \\\\0"
     }
     return 0
 }
@@ -1504,21 +1503,18 @@ proc connect_hosts {} {
 
 proc disconnect_hosts {} {
     disconnect_screen_monitoring localhost
-
     foreach {h} $::HOSTS {
         dputs "disconnecting from $h"
         set screenid [get_master_screen_name $h]
         set fifo [get_fifo_name $h]
         if {$::AUTO_SPREAD_CONF == 1 && [info exists ::screenMasterPID($h)] && [pid_exists $::screenMasterPID($h)] && [file exists "$fifo.in"]} {
             # send ssh command, but do not wait for result
-            set cmd "rm -f $::env(SPREAD_CONFIG)"
-            exec bash -c "echo 'echo \"*** RUN $cmd\" 1>&2; $cmd 1>&2; echo \$?' > $fifo.in"
+            ssh_command "rm -f $::env(SPREAD_CONFIG)" $h
         }
-        catch {exec bash -c "screen -S $screenid -X quit 2>&1"}
+        disconnect_screen_monitoring $h
+        catch {exec screen -S $screenid -X quit}
         file delete "$fifo.in"
         file delete "$fifo.out"
-
-        disconnect_screen_monitoring $h
     }
 }
 
@@ -1759,7 +1755,6 @@ proc disconnect_screen_monitoring {host} {
     if {! [info exists ::MONITOR_CHAN($host)]} return
     set chan $::MONITOR_CHAN($host)
     if {[string match "err:*" $chan]} return
-
     dputs "disconnecting monitor channel $chan for host $host" 2
     kill HUP [lindex [pid $chan] 0]
     close $chan

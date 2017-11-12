@@ -22,8 +22,8 @@ host10=${host10:-localhost}
 #   Options:
 #      -w <n> wait n seconds for process to start completely
 #      -W <n> set delay an asynchronous check is performed in case -w is not specified
-#      -l     activate initial logging for the component
-#      -x     use own X server for the component
+#      -l     activate logging for the component
+#      -x     detect and use remote X server for the component
 #      -n     do not include in autostart
 #      -g <s> allow to define a group (string: name of group)
 #      -L <n> component level, affects starting order (numeric: level)
@@ -31,6 +31,9 @@ host10=${host10:-localhost}
 #             leaves it open all the time (-1), default is 10 seconds
 #      -t     title of the component / provide unique names for multiple instances on the same host
 #      -v     export variable varname=var to component script
+#      -r     ask to restart component on crash
+#      -R     automatically component on crash
+#      -Q     Quit vdemo if component terminates
 
 
 export VDEMO_components="

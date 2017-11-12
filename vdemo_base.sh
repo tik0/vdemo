@@ -86,7 +86,7 @@ function vdemo_showlog {
 
 function vdemo_inspect {
 	xterm -fg white -bg black -title "inspect ${1}@${HOSTNAME}" -e \
-		vdemo_inspect_cmd "$@" &
+		bash -c vdemo_inspect_cmd "$@" &
 }
 
 function vdemo_logging {
