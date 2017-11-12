@@ -14,6 +14,7 @@ function vdemo_coredump {
 export -f vdemo_coredump
 
 function vdemo_inspect_cmd {
+    echo pstree output:
     source "$VDEMO_root/vdemo_base.sh"
     pid=$(vdemo_pidFromScreen "${VDEMO_component_title}")
     if [ -z "$pid" ]; then
@@ -21,6 +22,9 @@ function vdemo_inspect_cmd {
     else
         pstree -p "$pid"
     fi
+    echo press any key to continue
+    read -N 1
+    screen -r $pid -p0 -X hardcopy -h $(tty)
     read -N 1
 }
 export -f vdemo_inspect_cmd
