@@ -3,11 +3,11 @@
     <div class="cell">$title</div>
     <div class="cell">$host</div>
     <div class="cell">$group</div>
-    <div class="cell">$status</div>
+    <div class="cell"><div class='button $status'>$status</div></div>
     <div class="cell">
-        <input type="button" value="start" onclick="client.get('/vdemo/api/component/id/$component/start', handleresponse);"/>
-        <input type="button" value="stop" onclick="client.get('/vdemo/api/component/id/$component/stop', handleresponse);"/>
-        <input type="button" value="check" onclick="client.get('/vdemo/api/component/id/$component/check', handleresponse);"/>
+        <input type="button" value="start" onclick="client.get('/vdemo/api/component/id/$component/start', handleresponse); event.srcElement.disabled = true;"/>
+        <input type="button" value="stop" onclick="client.get('/vdemo/api/component/id/$component/stop', handleresponse); event.srcElement.disabled = true;"/>
+        <input type="button" value="check" onclick="client.get('/vdemo/api/component/id/$component/check', handleresponse); event.srcElement.disabled = true;"/>
         <input type="button" value="log" onclick="window.open('/vdemo/api/component/id/$component/log/1000', '_blank');"/>
     </div>
 </div>
