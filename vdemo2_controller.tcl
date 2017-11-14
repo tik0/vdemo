@@ -1,10 +1,7 @@
 # kate: replace-tabs on; indent-width 4;
 
-# required for scrollable frame
-package require Iwidgets 4.0
 # required for signal handling
 package require Tclx
-
 
 set VDEMO_CONNECTION_TIMEOUT 5
 catch {set VDEMO_CONNECTION_TIMEOUT $::env(VDEMO_CONNECTION_TIMEOUT)}
@@ -298,11 +295,6 @@ proc parse_env_var {} {
     set ::HOSTS [lsort -unique $::HOSTS]
 }
 
-proc bind_wheel_sf {widget} {
-    bind all <4> [list $widget yview scroll -5 units]
-    bind all <5> [list $widget yview scroll  5 units]
-}
-
 proc find_component {src what} {
     global _SEARCH
     set what "*[string trim $what]*"
@@ -361,7 +353,7 @@ proc show_component {comp} {
         $::COMPONENTS_WIDGET select [string tolower $::COMPONENTS_WIDGET.$::TAB($comp)]
     }
     set pos [lsearch -exact $::COMPONENTS_ON_TAB($::TAB($comp)) $comp]
-    .main.scrollable yview moveto [expr {double($pos)/$::MAX_NUM}]
+    sframe ymoveto .main.scrollable [expr {double($pos)/$::MAX_NUM}]
 }
 
 set _LAST_HILITED ""
@@ -421,17 +413,16 @@ proc gui_tcl {} {
     # main gui frame
     ttk::frame .main
     # scrollable frame
-    iwidgets::scrolledframe .main.scrollable -vscrollmode dynamic -hscrollmode none -height 400 -width 890
-    bind_wheel_sf .main.scrollable
+    sframe new .main.scrollable -toplevel false -anchor w
     pack .main.scrollable -side top -fill both -expand yes
-    set COMPONENTS_WIDGET [.main.scrollable childsite].components
+    set COMPONENTS_WIDGET [sframe content .main.scrollable].components
 
     if {[llength $::TABS] > 1} {
         ttk::notebook $COMPONENTS_WIDGET
     } else {
         ttk::frame $COMPONENTS_WIDGET
     }
-    pack $COMPONENTS_WIDGET -side top -fill both
+    pack $COMPONENTS_WIDGET -side top -fill both -expand yes
 
     foreach {c} "$COMPONENTS" {
         set groups "$groups $GROUP($c)"
@@ -509,7 +500,7 @@ proc gui_tcl {} {
     ttk::button $allcmd.all.start -style cmd.TButton -text "start" -command "all_cmd start"
     ttk::button $allcmd.all.stop  -style cmd.TButton -text "stop"  -command "all_cmd stop"
     ttk::button $allcmd.all.check -style cmd.TButton -text "check" -command "all_cmd check"
-    pack $allcmd.all.label -side left -fill x -padx {2 10} -pady 2
+    pack $allcmd.all.label -side left -padx {2 10} -pady 2
     pack $allcmd.all.start $allcmd.all.stop $allcmd.all.check -side left -pady 2
     # search widgets
     set ::SEARCH_STRING ""
@@ -517,8 +508,9 @@ proc gui_tcl {} {
         find_component .main.allcmd.all.searchText $::SEARCH_STRING}
     ttk::entry  $allcmd.all.searchText -textvariable SEARCH_STRING -width 40
     bind $allcmd.all.searchText <Return> {find_component .main.allcmd.all.searchText $::SEARCH_STRING}
-    pack $allcmd.all.searchText -side left -fill x -expand 1 -pady 2
+    pack $allcmd.all.searchText -side left -pady 2
     pack $allcmd.all.searchBtn -side right -ipadx 15 -padx 2 -pady 2
+
     # buttons for group control:
     set ::GROUPS [lsort -unique $groups]
     set idx 0
@@ -1884,6 +1876,124 @@ proc handle_remote_request { request args } {
         default {
             error "no handler for $request"
         }
+    }
+}
+
+# sframe.tcl
+# Paul Walton
+# Create a ttk-compatible, scrollable frame widget.
+#   Usage:
+#       sframe new <path> ?-toplevel true?  ?-anchor nsew?
+#       -> <path>
+#
+#       sframe content <path>
+#       -> <path of child frame where the content should go>
+
+namespace eval ::sframe {
+    namespace ensemble create
+    namespace export *
+
+    # Create a scrollable frame or window.
+    proc new {path args} {
+        # Create the main frame or toplevel.
+        if { [dict exists $args -toplevel]  &&  [dict get $args -toplevel] } {
+            toplevel $path
+        } else {
+            ttk::frame $path -relief sunken -borderwidth 1
+        }
+
+        # Create a scrollable canvas with scrollbars which will always be the same size as the main frame.
+        set canvas [canvas $path.canvas -bd 0 -highlightthickness 0 -yscrollcommand [list $path.scrolly set] -xscrollcommand [list $path.scrollx set]]
+        ttk::scrollbar $path.scrolly -orient vertical   -command [list $canvas yview]
+        ttk::scrollbar $path.scrollx -orient horizontal -command [list $canvas xview]
+
+        # Create a container frame which will always be the same size as the canvas or content, whichever is greater.
+        # This allows the child content frame to be properly packed and also is a surefire way to use the proper ttk background.
+        set container [ttk::frame $canvas.container]
+        pack propagate $container 0
+
+        # Create the content frame. Its size will be determined by its contents. This is useful for determining if the
+        # scrollbars need to be shown.
+        set content [ttk::frame $container.content]
+
+        # Pack the content frame and place the container as a canvas item.
+        set anchor "n"
+        if { [dict exists $args -anchor] } {
+            set anchor [dict get $args -anchor]
+        }
+        pack $content -anchor $anchor
+        $canvas create window 0 0 -window $container -anchor nw
+
+        # Grid the scrollable canvas sans scrollbars within the main frame.
+        grid $canvas   -row 0 -column 0 -sticky nsew
+        grid rowconfigure    $path 0 -weight 1
+        grid columnconfigure $path 0 -weight 1
+
+        # Make adjustments when the sframe is resized or the contents change size.
+        bind $path.canvas <Configure> [list [namespace current]::resize $path]
+        bind $path.canvas <Expose> [list [namespace current]::resize $path]
+        bind [winfo toplevel $path] <4> [list +[namespace current] scroll $path yview -5]
+        bind [winfo toplevel $path] <5> [list +[namespace current] scroll $path yview 5]
+
+        return $path
+    }
+
+
+    # Given the toplevel path of an sframe widget, return the path of the child frame suitable for content.
+    proc content {path} {
+        return $path.canvas.container.content
+    }
+
+    proc ymoveto {path pos} {
+        $path.canvas yview moveto $pos
+    }
+
+    # Make adjustments when the the sframe is resized or the contents change size.
+    proc resize {path} {
+        set canvas    $path.canvas
+        set container $canvas.container
+        set content   $container.content
+
+        # Set the size of the container. At a minimum use the same width & height as the canvas.
+        set width  [winfo width $canvas]
+        set height [winfo height $canvas]
+
+        # If the requested width or height of the content frame is greater then use that width or height.
+        if { [winfo reqwidth $content] > $width } {
+            set width [winfo reqwidth $content]
+        }
+        if { [winfo reqheight $content] > $height } {
+            set height [winfo reqheight $content]
+        }
+        $container configure  -width $width  -height $height
+
+        # Configure the canvas's scroll region to match the height and width of the container.
+        $canvas configure -scrollregion [list 0 0 $width $height]
+        #automatic width adjustment
+        $canvas configure -width $width
+
+        # Show or hide the scrollbars as necessary.
+        # Horizontal scrolling.
+        if { [winfo reqwidth $content] > [winfo width $canvas] } {
+            grid $path.scrollx  -row 1 -column 0 -sticky ew
+        } else {
+            grid forget $path.scrollx
+        }
+        # Vertical scrolling.
+        if { [winfo reqheight $content] > [winfo height $canvas] } {
+            grid $path.scrolly  -row 0 -column 1 -sticky ns
+        } else {
+            grid forget $path.scrolly
+        }
+        return
+    }
+
+    # Handle mousewheel scrolling.
+    proc scroll {path view D} {
+        if { [winfo exists $path.canvas] } {
+            $path.canvas $view scroll [expr {$D}] units
+        }
+        return
     }
 }
 
