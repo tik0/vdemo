@@ -48,9 +48,9 @@ var handleresponse = function(response, status, lochdr) {
         <div class="row">
             <div class="cell">all</div>
             <div class="cell">
-                <input type="button" value="start" onclick="client.get('/vdemo/api/all/start', handleresponse);"/>
-                <input type="button" value="stop" onclick="client.get('/vdemo/api/all/stop', handleresponse);"/>
-                <input type="button" value="check" onclick="client.get('/vdemo/api/all/check', handleresponse);"/>
+                <input type="button" value="start" onclick="client.get('/vdemo/api/all/start', handleresponse); event.srcElement.disabled = true;"/>
+                <input type="button" value="stop" onclick="client.get('/vdemo/api/all/stop', handleresponse); event.srcElement.disabled = true;"/>
+                <input type="button" value="check" onclick="client.get('/vdemo/api/all/check', handleresponse); event.srcElement.disabled = true;"/>
             </div>
         </div>
         $grouprows
