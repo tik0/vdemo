@@ -964,7 +964,7 @@ proc cancel_detach_timer {comp} {
 proc component_cmd {comp cmd {allcmd_group ""}} {
     global HOST COMPONENTS ARGS TERMINAL USEX WAIT_READY LOGGING SCREENED DETACHTIME WIDGET COMMAND EXPORTS TITLE COMPSTATUS TIMERDETACH
     set cpath "$::env(VDEMO_componentPath)"
-    set component_script "$cpath/component_$COMMAND($comp)"
+    set component_script "bash $cpath/component_$COMMAND($comp)"
     set component_options "-t $TITLE($comp)"
     if {$USEX($comp)} {
         set component_options "$component_options -x"
