@@ -273,7 +273,7 @@ proc parse_env_var {} {
             set COMMAND($component_name) "$thisCommand"
             set TITLE($component_name) "$thisCommand"
             lappend COMPONENTS $component_name
-            set TAB($component_name) "$tab"
+            set TAB($component_name) $tab
             lappend $components_on_tab_list $component_name
             if {"$host" != ""} {lappend ::HOSTS $host}
             set HOST($component_name) $host
@@ -348,12 +348,13 @@ proc find_component {src what} {
 }
 
 proc show_component {comp} {
+    set tab [string tolower $::COMPONENTS_WIDGET.$::TAB($comp)]
     catch {
         # show tab widget containing the component
-        $::COMPONENTS_WIDGET select [string tolower $::COMPONENTS_WIDGET.$::TAB($comp)]
+        $::COMPONENTS_WIDGET select $tab
     }
     set pos [lsearch -exact $::COMPONENTS_ON_TAB($::TAB($comp)) $comp]
-    sframe ymoveto .main.scrollable [expr {double($pos)/$::MAX_NUM}]
+    sframe ymoveto $tab [expr {double($pos)/[llength $::COMPONENTS_ON_TAB($::TAB($comp))]}]
 }
 
 set _LAST_HILITED ""
@@ -390,10 +391,21 @@ proc set_group_logging {grp} {
 proc get_tab {name} {
     set name [string tolower $name]
     if {[winfo exists $name] == 0} {
-        ttk::frame $name
+        sframe new $name -toplevel false -anchor w
         pack $name -side top -fill both -expand yes
     }
-    return $name
+    return [sframe content $name]
+}
+
+proc wheelEvent {x y delta} {
+    set widget [winfo containing $x $y]
+    if {$widget == ""} return
+    foreach {tab} $::TABS {
+        set tab [string tolower $::COMPONENTS_WIDGET.$tab]
+        if {[string match "$tab*" $widget]} {
+            sframe scroll $tab yview $delta
+        }
+    }
 }
 
 proc gui_tcl {} {
@@ -412,11 +424,8 @@ proc gui_tcl {} {
 
     # main gui frame
     ttk::frame .main
-    # scrollable frame
-    sframe new .main.scrollable -toplevel false -anchor w
-    pack .main.scrollable -side top -fill both -expand yes
-    set COMPONENTS_WIDGET [sframe content .main.scrollable].components
-
+    set COMPONENTS_WIDGET .main.components
+    
     if {[llength $::TABS] > 1} {
         ttk::notebook $COMPONENTS_WIDGET
     } else {
@@ -434,7 +443,7 @@ proc gui_tcl {} {
         set w [get_tab $COMPONENTS_WIDGET.$TAB($c)]
 
         ttk::frame $w.$c -style groove.TFrame
-        pack $w.$c -side top -fill both
+        grid $w.$c -column 0 -sticky we
         set WIDGET($c) $w.$c
 
         ttk::label $w.$c.level -style level.TLabel -text "$COMP_LEVEL($c)"
@@ -474,6 +483,7 @@ proc gui_tcl {} {
         pack $w.$c.stop -side right -pady 2
         pack $w.$c.start -side right -pady 2
         set_status $c unknown
+        sframe resize [string tolower $COMPONENTS_WIDGET.$TAB($c)] 1
     }
     set LEVELS [lsort -integer -unique "$LEVELS"]
 
@@ -572,6 +582,9 @@ proc gui_tcl {} {
         ttk::label .exit.orlabel -style info.TLabel -text $::env(VDEMO_info_string)
         pack .exit.orlabel -fill x
     }
+    # mouse wheel handler
+    bind all <4> "+wheelEvent %X %Y -5"
+    bind all <5> "+wheelEvent %X %Y  5"
 }
 
 proc gui_add_host {host} {
@@ -1925,16 +1938,13 @@ namespace eval ::sframe {
         $canvas create window 0 0 -window $container -anchor nw
 
         # Grid the scrollable canvas sans scrollbars within the main frame.
-        grid $canvas   -row 0 -column 0 -sticky nsew
+        grid $canvas   -row 0 -column 0 -sticky nsew -padx 1 -pady 1
         grid rowconfigure    $path 0 -weight 1
         grid columnconfigure $path 0 -weight 1
 
         # Make adjustments when the sframe is resized or the contents change size.
         bind $path.canvas <Configure> [list [namespace current]::resize $path]
         bind $path.canvas <Expose> [list [namespace current]::resize $path]
-        bind [winfo toplevel $path] <4> [list +[namespace current] scroll $path yview -5]
-        bind [winfo toplevel $path] <5> [list +[namespace current] scroll $path yview 5]
-
         return $path
     }
 
@@ -1949,7 +1959,7 @@ namespace eval ::sframe {
     }
 
     # Make adjustments when the the sframe is resized or the contents change size.
-    proc resize {path} {
+    proc resize {path {autowidth 0} } {
         set canvas    $path.canvas
         set container $canvas.container
         set content   $container.content
@@ -1970,7 +1980,10 @@ namespace eval ::sframe {
         # Configure the canvas's scroll region to match the height and width of the container.
         $canvas configure -scrollregion [list 0 0 $width $height]
         #automatic width adjustment
-        $canvas configure -width $width
+        
+        if {$autowidth} {
+            $canvas configure -width $width
+        }
 
         # Show or hide the scrollbars as necessary.
         # Horizontal scrolling.
