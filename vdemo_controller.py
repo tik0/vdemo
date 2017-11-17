@@ -154,6 +154,7 @@ class ServerRequestHandler(BaseHTTPRequestHandler):
             self.send_header("Content-length", len(content))
             if response.location:
                 self.send_header("Location", response.location)
+            self.send_header("X-Content-Type-Options", "nosniff")
             self.end_headers()
             if response.content:
                 self.wfile.write(content)
