@@ -92,13 +92,16 @@ function vdemo_inspect {
 }
 
 function vdemo_logging {
+	function vdemo_screendump {
+		if [ ! -e "${VDEMO_logfile}" ]; then
+			screen -S "$STY" -X -p0 hardcopy -h "${VDEMO_logfile}"
+			sed -i -e '1i#VDEMO note: screen hardcopy' -e '/./,$!d' "${VDEMO_logfile}"
+		fi
+	}
+	# always run screendump on exit. E.g. it will catch if rotatelogs is missing.
+	trap vdemo_screendump EXIT
 	case $1 in
 		"onexit")
-			function vdemo_screendump {
-				screen -S "$STY" -X -p0 hardcopy -h "${VDEMO_logfile}"
-				sed -i -e '1i#VDEMO note: screen hardcopy' -e '/./,$!d' "${VDEMO_logfile}"
-			}
-			trap vdemo_screendump EXIT
 			;;
 		"rotatelogs")
 			exec &> >(VDEMO_logfile="${VDEMO_logfile}" exec rotatelogs -p "${VDEMO_root}"/vdemo_remove_logfiles \
@@ -108,13 +111,13 @@ function vdemo_logging {
 			exec &> >(exec tee -i -a "${VDEMO_logfile}")
 			;;
 		esac
-		read -d '' startmsg <<- EOF
-		#########################################
-		vdemo component start: ${VDEMO_component_title}
-		$(date -Ins)
-		#########################################
-		EOF
-		echo "$startmsg"
+	read -d '' startmsg <<- EOF
+	#########################################
+	vdemo component start: ${VDEMO_component_title}
+	$(date -Ins)
+	#########################################
+	EOF
+	echo "$startmsg"
 }
 
 # start a component. This function has the following options:
