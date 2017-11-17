@@ -21,7 +21,9 @@ function start_Xserver {
 function vdemo_pidFromScreen {
 	# we append underscore to distinguish between components with same prefix
 	local VDEMO_title="$1_"
-	screen -ls | grep "${VDEMO_title}\s" | cut -f1 -d. | tr -d "\t "
+	local screendir="/var/run/screen/S-$USER"
+	local screensocks=("$screendir"/*."$VDEMO_title")
+	[[ "${screensocks[0]}" =~ $screendir/([0-9]+)\.$VDEMO_title ]] && echo -n "${BASH_REMATCH[1]}"
 }
 
 # check for a running component
@@ -226,10 +228,10 @@ function vdemo_stop_component {
 		fi
 		# kill remaining children processes
 		local REMAIN_PIDS=$(ps --no-headers -o pid,comm -p $PIDS)
-		test -n "$REMAIN_PIDS" && \
-			(echo "killing remaining processes"; echo "$REMAIN_PIDS")
-		kill -9 $PIDS > /dev/null 2>&1
-
+		if [ -n "$REMAIN_PIDS" ]; then
+			echo $'killing remaining processes\n'"$REMAIN_PIDS"
+			kill -9 $PIDS > /dev/null 2>&1
+		fi
 		# call on_stop function
 		if declare -F on_stop > /dev/null; then
 			on_stop "$1"
