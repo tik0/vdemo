@@ -447,7 +447,7 @@ proc gui_tcl {} {
         set WIDGET($c) $w.$c
 
         ttk::label $w.$c.level -style level.TLabel -text "$COMP_LEVEL($c)"
-        ttk::label $w.$c.label -width -20 -style label.TLabel -text "$TITLE($c)@"
+        ttk::label $w.$c.label -width -10 -style label.TLabel -text "$TITLE($c)@"
         ttk::entry $w.$c.host  -width 14 -textvariable HOST($c)
         # disable host field for spreaddaemon: cannot add/change hosts in spread config
         if {"$COMMAND($c)" == "spreaddaemon"} { $w.$c.host state disabled }

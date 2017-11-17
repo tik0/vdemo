@@ -48,7 +48,7 @@ function vdemo_check_component {
 # reattach to a running "screened" component
 # $1:   title of the component
 function vdemo_reattach_screen {
-	local VDEMO_pid=$(vdemo_pidFromScreen $1)
+	local VDEMO_pid=$(vdemo_pidFromScreen "$1")
 	if [ -n "$VDEMO_pid" ] ; then
 		screen -d -r "$VDEMO_pid"
 		failure=$?
@@ -75,7 +75,7 @@ function vdemo_reattach_screen {
 # detach a  "screened" component
 # $1:   title of the component
 function vdemo_detach_screen {
-	local VDEMO_pid=$(vdemo_pidFromScreen $1)
+	local VDEMO_pid=$(vdemo_pidFromScreen "$1")
 	test -n "$VDEMO_pid" && screen -d "$VDEMO_pid"
 }
 
@@ -123,7 +123,7 @@ function vdemo_logging {
 #   -D    start detached
 # remaining arguments are treated as command line of the component to start
 function vdemo_start_component {
-	local VDEMO_title=$1; shift
+	local VDEMO_title="$1"; shift
 	local VDEMO_componentDisplay="${DISPLAY}"
 	local VDEMO_startDetached="no"
 	local COLOR="white"
@@ -174,7 +174,7 @@ function vdemo_start_component {
 
     # bash needs to be started in in interactive mode to have job control available
     # --norc is used to prevent inclusion of the use configuration in the execution.
-	if [ "x$VDEMO_startDetached" == "xno" ]; then
+	if [ "$VDEMO_startDetached" == "no" ]; then
 		xterm -fg $COLOR -bg black -title "starting $VDEMO_title" -e \
 			screen -t "$VDEMO_title" -S "${VDEMO_title}_" \
 			stdbuf -oL bash --norc -i -c "vdemo_component" &
