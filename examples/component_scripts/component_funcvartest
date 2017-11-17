@@ -1,0 +1,56 @@
+#!/bin/bash
+
+# show all functions and display variables with VDEMO in it.
+# Some of the output will only be visible when checking the control connection
+
+function component {
+	echo "+++ ${FUNCNAME[0]} +++"
+	env | grep VDEMO
+	read -N 1
+	echo "--- ${FUNCNAME[0]} ---"
+}
+
+function on_check {
+	echo "+++ ${FUNCNAME[0]} +++"
+    env | grep VDEMO
+    pid=$(vdemo_pidFromScreen "${VDEMO_component_title}")
+    screen -S "$pid" -Q echo ''
+    res="$?"
+    echo "--- ${FUNCNAME[0]} ---"
+    return "$res"
+}
+
+function on_start {
+	echo "+++ ${FUNCNAME[0]} +++"
+	env | grep VDEMO
+	echo "--- ${FUNCNAME[0]} ---"
+}
+
+function on_stop {
+	echo "+++ ${FUNCNAME[0]} +++"
+	env | grep VDEMO
+	echo "--- ${FUNCNAME[0]} ---"
+}
+
+function clean_component {
+	echo "+++ ${FUNCNAME[0]} +++"
+	env | grep VDEMO
+	echo "--- ${FUNCNAME[0]} ---"
+}
+
+# we should manually stop the component when overriding this function
+# note that a SIGKILL (kill -9) will be sent after calling this function
+function stop_component {
+	echo function: ${FUNCNAME[0]}
+	env | grep VDEMO
+	pid=$(vdemo_pidFromScreen "${VDEMO_component_title}")
+    if [ -z "$pid" ]; then
+        echo "component not running"
+    else
+        screen -S "$pid" -X quit
+    fi
+}
+
+source "$VDEMO_root/vdemo_standard_component_suffix.sh"
+
+

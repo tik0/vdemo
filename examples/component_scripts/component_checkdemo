@@ -1,7 +1,5 @@
 #!/bin/bash
 
-title="sleep"
-
 function component {
   sleep infinity
 }

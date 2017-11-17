@@ -121,11 +121,11 @@ function vdemo_logging {
 #   -D    start detached
 # remaining arguments are treated as command line of the component to start
 function vdemo_start_component {
-	export VDEMO_component_title=$1; shift
+	local VDEMO_title=$1; shift
 	local VDEMO_componentDisplay="${DISPLAY}"
 	local VDEMO_startDetached="no"
 	local COLOR="white"
-	export VDEMO_logfile="${VDEMO_logfile_prefix}${VDEMO_component_title}.log"
+	export VDEMO_logfile="${VDEMO_logfile_prefix}${VDEMO_title}.log"
 	local logfiledir="${VDEMO_logfile%/*}"
 	if [ ! -d "$logfiledir" ]; then mkdir -p "$logfiledir"; fi
 	local VDEMO_logging="onexit"
@@ -173,11 +173,11 @@ function vdemo_start_component {
     # bash needs to be started in in interactive mode to have job control available
     # --norc is used to prevent inclusion of the use configuration in the execution.
 	if [ "x$VDEMO_startDetached" == "xno" ]; then
-		xterm -fg $COLOR -bg black -title "starting $VDEMO_component_title" -e \
-			screen -t "$VDEMO_component_title" -S "${VDEMO_component_title}_" \
+		xterm -fg $COLOR -bg black -title "starting $VDEMO_title" -e \
+			screen -t "$VDEMO_title" -S "${VDEMO_title}_" \
 			stdbuf -oL bash --norc -i -c "vdemo_component" &
 	else
-		screen -t "$VDEMO_component_title" -S "${VDEMO_component_title}_" -d -m \
+		screen -t "$VDEMO_title" -S "${VDEMO_title}_" -d -m \
 			stdbuf -oL bash --norc -i -c "vdemo_component"
 	fi
 }
@@ -211,8 +211,8 @@ function all_children {
 # stop a component
 # $1: title of the component
 function vdemo_stop_component {
-	export VDEMO_component_title="$1"
-	local VDEMO_pid=$(vdemo_pidFromScreen ${VDEMO_component_title})
+	local VDEMO_title="$1"
+	local VDEMO_pid=$(vdemo_pidFromScreen ${VDEMO_title})
 	if [ "$VDEMO_pid" ]; then
 		echo "stopping $VDEMO_title: screen pid: ${VDEMO_pid}" >&2
 		local PIDS=$(all_children $VDEMO_pid)

@@ -28,5 +28,6 @@ host01=${host01:-localhost}
 
 
 export VDEMO_components="
-sleep,             $host01,            -t sleep01-01A -L 1  -g sleepers -w 0 -W 1 -x:
+funcvartest,             $host01,            -t specific_title -L 1  -g mygroup -w 0 -W 1 -x:
+funcvartest,             $host01,            -L 1  -g mygroup -w 0 -W 1 -x:
 "
