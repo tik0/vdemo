@@ -93,6 +93,7 @@ function vdemo_inspect {
 
 function vdemo_logging {
 	function vdemo_screendump {
+		set +x
 		if [ ! -e "${VDEMO_logfile}" ]; then
 			screen -S "$STY" -X -p0 hardcopy -h "${VDEMO_logfile}"
 			sed -i -e '1i#VDEMO note: screen hardcopy' -e '/./,$!d' "${VDEMO_logfile}"
@@ -118,6 +119,8 @@ function vdemo_logging {
 	#########################################
 	EOF
 	echo "$startmsg"
+	set -o functrace
+	set -x
 }
 
 # start a component. This function has the following options:
