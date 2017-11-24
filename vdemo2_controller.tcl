@@ -558,7 +558,8 @@ proc gui_tcl {} {
         pack .terminal -side top -fill x -expand yes
         bind .terminal <Map> {
             bind %W <Map> {}
-            exec xterm -bg white -fg black -geometry 500x500 -into [winfo id %W] -e tail --pid=[pid] -n 100 -f $::env(VDEMO_watchfile) &
+            exec xterm -bg white -fg black -geometry 500x500 -into [winfo id %W] -e "trap : INT; l=100; while true; do \
+                printf \033c; tail --pid=[pid] -n \$l -F $::env(VDEMO_watchfile); l=0; done" &
         }
         
     }
