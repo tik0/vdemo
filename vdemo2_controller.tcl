@@ -391,7 +391,7 @@ proc set_group_logging {grp} {
 proc get_tab {name} {
     set name [string tolower $name]
     if {[winfo exists $name] == 0} {
-        sframe new $name -toplevel false -anchor w
+        sframe new $name -toplevel false -anchor nw
         pack $name -side top -fill both -expand yes
     }
     return [sframe content $name]
@@ -427,9 +427,9 @@ proc gui_tcl {} {
     set COMPONENTS_WIDGET .main.components
     
     if {[llength $::TABS] > 1} {
-        ttk::notebook $COMPONENTS_WIDGET
+        ttk::notebook $COMPONENTS_WIDGET -height 200
     } else {
-        ttk::frame $COMPONENTS_WIDGET
+        ttk::frame $COMPONENTS_WIDGET -height 200
     }
     pack $COMPONENTS_WIDGET -side top -fill both -expand yes
 
@@ -555,11 +555,11 @@ proc gui_tcl {} {
     #replaces logger area to keep some compatibility
     if {[info exists ::env(VDEMO_watchfile)]} {
         ttk::frame .terminal -height 150 -style groove.TFrame
-        pack .terminal -side top -fill x -expand yes
+        pack .terminal -side top -fill x -anchor s
         bind .terminal <Map> {
             bind %W <Map> {}
             exec xterm -bg white -fg black -geometry 500x500 -into [winfo id %W] -e "trap : INT; l=100; while true; do \
-                printf \033c; tail --pid=[pid] -n \$l -F $::env(VDEMO_watchfile); l=0; done" &
+                printf \033c; tail --pid=[pid] -n \$l -F $::env(VDEMO_watchfile); l=0; done" >>& /dev/null &
         }
         
     }
@@ -1945,7 +1945,6 @@ namespace eval ::sframe {
 
         # Make adjustments when the sframe is resized or the contents change size.
         bind $path.canvas <Configure> [list [namespace current]::resize $path]
-        bind $path.canvas <Expose> [list [namespace current]::resize $path]
         return $path
     }
 
