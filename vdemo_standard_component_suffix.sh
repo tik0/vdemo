@@ -69,7 +69,8 @@ if [ -z "$VDEMO_root" ]; then
 fi
 
 if [ -z "$VDEMO_logfile_prefix" ]; then
-   export VDEMO_logfile_prefix="/tmp/vdemo-$USER/component_"
+   echo '$VDEMO_logfile_prefix is not set.' >&2
+   exit 3
 fi
 
 if ! declare -F "component" >/dev/null; then

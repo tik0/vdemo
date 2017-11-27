@@ -122,7 +122,7 @@ export VDEMO_demoRoot=$(dirname "$VDEMO_demoConfig")
 export VDEMO_demoName="$(basename "$VDEMO_demoConfig" .sh)"
 export VDEMO_componentPath="$VDEMO_demoRoot/component_scripts"
 export VDEMO_logPath="/tmp/vdemo-${USER}"
-export VDEMO_logfile_prefix="$VDEMO_logPath/VDEMO_component_"
+export VDEMO_logfile_prefix="$VDEMO_logPath/component_"
 mkdir -p "$VDEMO_logPath"
 
 source "$VDEMO_demoConfig"
