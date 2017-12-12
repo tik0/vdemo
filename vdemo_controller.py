@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+del os.environ["PYTHONPATH"]
 import queue
 import sys
 import threading
