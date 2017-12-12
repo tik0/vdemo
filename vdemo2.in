@@ -145,5 +145,5 @@ fi
 if [ -z "$VDEMO_SERVER_PORT" ]; then
     exec wish $VDEMO_root/vdemo2_controller.tcl
 else
-    exec python3 $VDEMO_root/vdemo_controller.py $VDEMO_root/vdemo2_controller.tcl
+    PYTHONPATH= exec python3 $VDEMO_root/vdemo_controller.py $VDEMO_root/vdemo2_controller.tcl
 fi
