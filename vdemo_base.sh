@@ -1,8 +1,8 @@
 function start_Xserver {
 	echo -n "Trying to find an accessible X session ..." >&2
 	# prefer $USER's own x sessions over other
-	_user_sessions=$(who | grep -oP "$USER.*\(\K:[0-9]+(?=\))")
-	_other_sessions=$(who | grep -oP '^(?!'"$USER"' ).*\(\K:[0-9]+(?=\))')
+	_user_sessions=$(who | grep -oP "$USER.*\(\K:[0-9.]+(?=\))")
+	_other_sessions=$(who | grep -oP '^(?!'"$USER"' ).*\(\K:[0-9.]+(?=\))')
 	# above expressions fail on Ubuntu 12.04 (Precise), list all sessions as fallback:
 	_all_sessions=$(for x in /tmp/.X*-lock; do x=${x#/tmp/.X}; echo ":${x%-lock}"; done)
 	for d in $_user_sessions $_other_sessions $_all_sessions; do
