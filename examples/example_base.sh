@@ -44,9 +44,9 @@ sleep,             $host01,            -t sleep01-01Baskrestart   -L 1  -g sleep
 sleep,             $host02,            -t sleep01-02Azautorestart -L 1  -g sleepers -w 0 -W 1 -R:
 xedit,             $host02,            -t xedit                   -L 1  -g sleepers -w 0 -W 1 -x :
 sleep,             $host03,            -t sleep01-03AX -L 1  -g sleepers -w 0 -W 1 -x:
-sleep,             $host03,            -t sleep01-03B -L 1  -g sleepers -g abc -w 0 -W 1:
-sleep,             $host04,            -t sleep01-04A -L 1  -g sleepers -w 0 -W 1:
-sleep,             $host04,            -t sleep01-04B -L 1  -g sleepers -w 0 -W 1:
+sleep,             $host03,            -t sleep01-03B -L 1  -g sleepers -g groupa -g groupb -w 0 -W 1:
+sleep,             $host04,            -t sleep01-04A -L 1  -g sleepers -g groupa -g groupb -w 0 -W 1:
+sleep,             $host04,            -t sleep01-04B -L 1  -g sleepers -g groupa -w 0 -W 1:
 sleep,             $host05,            -t sleep01-05A -L 1  -g sleepers -w 0 -W 1:
 sleep,             $host05,            -t sleep01-05B -L 1  -g sleepers -w 0 -W 1:
 sleep,             $host06,            -t sleep01-06A -L 1  -g sleepers -w 0 -W 1:

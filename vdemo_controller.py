@@ -73,9 +73,9 @@ class ServerRequestHandler(BaseHTTPRequestHandler):
         grouprows = []
         groups = []
         for row in reader:
-            gn = row['group']
-            if not gn in groups:
-                groups.append(gn)
+            for gn in row['group'].split(" "):
+                if not gn in groups:
+                    groups.append(gn)
             rows.append(Template(self.templates['row.html']).safe_substitute(row))
         for group in groups:
             grouprows.append(Template(self.templates['grouprow.html']).safe_substitute(group=group))

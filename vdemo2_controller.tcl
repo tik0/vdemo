@@ -191,7 +191,7 @@ proc parse_options {comp} {
                 incr i
             }
             -g {
-                set GROUP($comp) [string tolower "$val"]
+                lappend GROUP($comp) [string tolower "$val"]
                 incr i
             }
             -v {
@@ -372,7 +372,7 @@ proc set_group_noauto {grp} {
     global COMPONENTS GROUP NOAUTO
     set state [.main.allcmd.$grp.noauto instate selected]
     foreach {comp} "$COMPONENTS" {
-        if {$GROUP($comp) == $grp} {
+        if {[lsearch -exact $GROUP($comp) $grp] >= 0} {
             set NOAUTO($comp) $state
         }
     }
@@ -382,7 +382,7 @@ proc set_group_logging {grp} {
     global COMPONENTS GROUP LOGGING
     set state [.main.allcmd.$grp.logging instate selected]
     foreach {comp} "$COMPONENTS" {
-        if {$GROUP($comp) == $grp} {
+        if {[lsearch -exact $GROUP($comp) $grp] >= 0} {
             set LOGGING($comp) $state
         }
     }
@@ -434,7 +434,7 @@ proc gui_tcl {} {
     pack $COMPONENTS_WIDGET -side top -fill both -expand yes
 
     foreach {c} "$COMPONENTS" {
-        set groups "$groups $GROUP($c)"
+        lappend groups {*}$GROUP($c)
         set LEVELS "$LEVELS $COMP_LEVEL($c)"
         set TIMERDETACH($c) 0
         set ::LAST_GUI_INTERACTION($c) 0
@@ -453,6 +453,7 @@ proc gui_tcl {} {
         if {"$COMMAND($c)" == "spreaddaemon"} { $w.$c.host state disabled }
 
         ttk::label $w.$c.group -style group.TLabel -width 12 -text "$GROUP($c)"
+        tooltip $w.$c.group [concat {[list } $GROUP($c) {]} ]
 
         ttk::button $w.$c.start -style cmd.TButton -text "start" -command "component_cmd $c start"
         ttk::button $w.$c.stop  -style cmd.TButton -text "stop" -command "component_cmd $c stop"
@@ -915,7 +916,7 @@ proc level_cmd { cmd level group {lazy 0} } {
     foreach {comp} "$components" {
         set ignore [expr {[lsearch -exact $::ALLCMD(ignore_hosts) $::HOST($comp)] >= 0}]
         if {$::COMP_LEVEL($comp) == $level && \
-                ($group == "all" || $::GROUP($comp) == $group) && !$ignore} {
+                ($group == "all" || [lsearch -exact $::GROUP($comp) $group] >= 0) && !$ignore} {
             switch -exact -- $cmd {
                 check {set doIt 1}
                 stop  {set doIt [expr  {!$lazy || ![all_cmd_comp_stopped $::COMPSTATUS($comp)]}]}
