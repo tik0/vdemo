@@ -24,7 +24,7 @@ var client = new HttpClient();
 
 var waitready = function(response, status, lochdr) {
     if (lochdr == null) {
-        location.reload(true);
+        document.location.reload()
     } else {
         setTimeout(function() {client.get(lochdr, waitready);}, 1000);
     }
