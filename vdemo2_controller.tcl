@@ -535,7 +535,7 @@ proc gui_tcl {} {
         ttk::checkbutton $allcmd.$g.noauto -text "no auto" -command "set_group_noauto $g"
         ttk::checkbutton $allcmd.$g.logging -text "logging" -command "set_group_logging $g"
 
-        grid $allcmd.$g.label -row 0 -column 0 -columnspan 3 -sticky w -padx {4 0} -pady {2 0}
+        grid $allcmd.$g.label -row 0 -column 0 -columnspan 3 -sticky we -padx {4 0} -pady {2 0}
         grid $allcmd.$g.start -row 1 -column 0 -padx {3 0} -pady {0 2}
         grid $allcmd.$g.stop -row 1 -column 1 -padx {0 3} -pady {0 2}
         grid $allcmd.$g.check -row 1 -column 2 -padx {0 3} -pady {0 2}
@@ -785,7 +785,6 @@ proc all_cmd_update_gui {cmd group status style} {
     }
     .main.allcmd.$group.start configure -style "cmd.TButton"
     .main.allcmd.$group.$cmd state $status
-    .main.allcmd.$group.$cmd configure -style $style
 }
 
 set ::ALLCMD(pending_cmds) [list]
@@ -1197,6 +1196,36 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
     return 0
 }
 
+proc update_group_stats {} {
+    if {![info exists ::GROUPS]} {return}
+    foreach {grp} $::GROUPS {
+        incr groupstats($grp,count) 0
+        incr groupstats($grp,running) 0
+    }
+    foreach {comp} $::COMPONENTS {
+        if {![info exists ::COMPSTATUS($comp)]} {return}
+        if {$::NOAUTO($comp)} {continue}
+        set state $::COMPSTATUS($comp)
+        foreach {grp} $::GROUP($comp) {
+            incr groupstats($grp,count)
+            if {$state == "ok_screen"} {
+                incr groupstats($grp,running)
+            }
+        }
+    }
+    foreach {grp} $::GROUPS {
+        .main.allcmd.$grp.label configure -text "$grp  \[$groupstats($grp,running)/$groupstats($grp,count)\]"
+        if {$groupstats($grp,running) == $groupstats($grp,count)} {
+            .main.allcmd.$grp.check configure -style "ok.cmd.TButton"
+        } else {
+            .main.allcmd.$grp.check configure -style "failed.cmd.TButton"
+        }
+        if {$groupstats($grp,count) == 0} {
+            .main.allcmd.$grp.check configure -style "cmd.TButton"
+        }
+    }
+}
+
 proc set_status {comp status} {
     global WIDGET COMPSTATUS
     set COMPSTATUS($comp) $status
@@ -1211,6 +1240,7 @@ proc set_status {comp status} {
     dputs "change status of $comp to $status: $style" 2
     blink_stop $WIDGET($comp).check
     $WIDGET($comp).check configure -style $style
+    update_group_stats
     update
 }
 
