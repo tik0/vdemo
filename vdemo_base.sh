@@ -25,6 +25,7 @@ function vdemo_pidFromScreen {
 	local screensocks=("$screendir"/*."$VDEMO_title")
 	[[ "${screensocks[0]}" =~ $screendir/([0-9]+)\.$VDEMO_title ]] && echo -n "${BASH_REMATCH[1]}"
 }
+export -f vdemo_pidFromScreen
 
 # check for a running component
 # $1:   title of the component

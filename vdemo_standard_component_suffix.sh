@@ -38,7 +38,7 @@ while [ $# -gt 0 ]; do
         "-t"|"--title")
             shift
             title="$title.$1"
-            export VDEMO_component_title="$1"
+            export VDEMO_component_title="$title"
             ;;
         "-D"|"--detached")
             vdemo_start_DETACHED="-D"
