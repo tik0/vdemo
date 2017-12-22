@@ -78,8 +78,6 @@ if ! declare -F "component" >/dev/null; then
    exit 11
 fi
 
-# run the
-test -f "$VDEMO_sysConfig" && source "$VDEMO_sysConfig" $VDEMO_sysConfigOptions
 source "$VDEMO_root/vdemo_base.sh"
 
 # Calls a function if it exists, else return true.
