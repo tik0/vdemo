@@ -1,4 +1,4 @@
-function start_Xserver {
+function vdemo_find_xdisplay {
 	echo -n "Trying to find an accessible X session ..." >&2
 	# prefer $USER's own x sessions over other
 	_user_sessions=$(who | grep -oP "$USER.*\(\K:[0-9.]+(?=\))")
@@ -216,6 +216,7 @@ function all_children {
 		fi
 	done
 }
+export -f all_children
 
 # stop a component
 # $1: title of the component
@@ -273,3 +274,4 @@ function vdemo_stop_signal_children {
 		echo
 	done
 }
+export -f vdemo_stop_signal_children

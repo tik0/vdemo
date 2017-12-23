@@ -105,7 +105,7 @@ case "$cmd" in
         call_if_exists on_start
 
         if [ "${vdemo_start_XSERVER}" ]; then
-           comp_display=$(start_Xserver)
+           comp_display=$(vdemo_find_xdisplay)
            if [ $? == 2 ]; then exit 12; fi
            echo "DISPLAY: $comp_display" >&2
            display_arg="-d $comp_display"
