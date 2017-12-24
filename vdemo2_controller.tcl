@@ -148,7 +148,7 @@ proc parse_options {comp} {
     # time to wait for a process to startup
     set WAIT_READY($comp) 5000
     # time until process is checked after start (when not waiting)
-    set CHECKNOWAIT_TIME($comp) 1000
+    set CHECKNOWAIT_TIME($comp) 500
     set GROUP($comp) ""
     # detach a component after this time
     set DETACHTIME($comp) [expr {1000 * $::env(VDEMO_DETACH_TIME)}]
@@ -1033,9 +1033,7 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
                 set SCREENED($comp) 0
             }
             set ::LAST_GUI_INTERACTION($comp) [clock milliseconds]
-            set check_time 500
-            if { $WAIT_READY($comp) <= 0 } {set check_time $::CHECKNOWAIT_TIME($comp)}
-            after $check_time component_cmd $comp check $allcmd_group
+            after $::CHECKNOWAIT_TIME($comp) component_cmd $comp check $allcmd_group
         }
         stopwait -
         stop {
