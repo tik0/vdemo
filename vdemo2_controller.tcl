@@ -2057,6 +2057,7 @@ disconnect_hosts
 connect_hosts
 update
 gui_tcl
+if {![info exists ::geometry]} {wm geometry . ""}
 update
 
 # autostart
