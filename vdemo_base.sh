@@ -120,8 +120,6 @@ function vdemo_logging {
 	#########################################
 	EOF
 	echo "$startmsg"
-	set -o functrace
-	set -x
 }
 
 # start a component. This function has the following options:
@@ -172,7 +170,7 @@ function vdemo_start_component {
 
 	# Logging has missing lines at the end (or is completely empty) when finishing fast.
 	# Adding a small sleep seems to fix this issue.
-	eval "function vdemo_component { vdemo_logging $VDEMO_logging; LD_LIBRARY_PATH=${LD_LIBRARY_PATH} DISPLAY=${VDEMO_componentDisplay} component $*; sleep 0.01; }"
+	eval "function vdemo_component { vdemo_logging $VDEMO_logging; set -x; LD_LIBRARY_PATH=${LD_LIBRARY_PATH} DISPLAY=${VDEMO_componentDisplay} component $*; sleep 0.01; }"
 
 	export -f vdemo_logging
 	export -f component
