@@ -237,6 +237,8 @@ function vdemo_stop_component {
 		if [ -n "$REMAIN_PIDS" ]; then
 			echo $'killing remaining processes\n'"$REMAIN_PIDS"
 			kill -9 $PIDS > /dev/null 2>&1
+			# if sigkill was necessary, remove dead screens right away
+			screen -wipe > /dev/null 2>&1
 		fi
 		# call on_stop function
 		if declare -F on_stop > /dev/null; then
