@@ -143,7 +143,7 @@ proc number {val type} {
 }
 
 proc parse_options {comp} {
-    global COMPONENTS ARGS USEX TERMINAL WAIT_READY NOAUTO LOGGING GROUP DETACHTIME COMP_LEVEL EXPORTS TITLE CHECKNOWAIT_TIME RESTART
+    global COMPONENTS ARGS USEX TERMINAL WAIT_READY NOAUTO NOAUTOCONFIG LOGGING GROUP DETACHTIME COMP_LEVEL EXPORTS TITLE CHECKNOWAIT_TIME RESTART
 
     set USEX($comp) 0
     # time to wait for a process to startup
@@ -230,6 +230,7 @@ proc parse_options {comp} {
     }
     # re-assign remaining arguments:
     set ARGS($comp) [lrange $TOKENS [expr {$i+1}] end]
+    array set NOAUTOCONFIG [array get NOAUTO]
 }
 
 # split $str on $sep, but don't split when $sep is preceeded by $protector
@@ -370,11 +371,14 @@ proc hilite_component {comp} {
 }
 
 proc set_group_noauto {grp} {
-    global COMPONENTS GROUP NOAUTO
     set state [.main.allcmd.$grp.noauto instate selected]
-    foreach {comp} "$COMPONENTS" {
-        if {[lsearch -exact $GROUP($comp) $grp] >= 0} {
-            set NOAUTO($comp) $state
+    foreach {comp} "$::COMPONENTS" {
+        if {[lsearch -exact $::GROUP($comp) $grp] >= 0} {
+            if {$state == 1} {
+                set ::NOAUTO($comp) 1
+            } else {
+                set ::NOAUTO($comp) $::NOAUTOCONFIG($comp)
+            }
         }
     }
 }
