@@ -20,18 +20,18 @@ function vdemo_find_xdisplay {
 
 function vdemo_pidFromScreen {
 	# we append underscore to distinguish between components with same prefix
-	local VDEMO_title="$1_"
+	local VDEMO_screen_title="$1_"
 	local screendir="/var/run/screen/S-$USER"
-	local screensocks=("$screendir"/*."$VDEMO_title")
-	[[ "${screensocks[0]}" =~ $screendir/([0-9]+)\.$VDEMO_title ]] && echo -n "${BASH_REMATCH[1]}"
+	local screensocks=("$screendir"/*."$VDEMO_screen_title")
+	[[ "${screensocks[0]}" =~ $screendir/([0-9]+)\.$VDEMO_screen_title ]] && echo -n "${BASH_REMATCH[1]}"
 }
 export -f vdemo_pidFromScreen
 
 # check for a running component
 # $1:   title of the component
 function vdemo_check_component {
-	local VDEMO_title="$1"
-	local VDEMO_pid=$(vdemo_pidFromScreen ${VDEMO_title})
+	local VDEMO_screen_title="$1"
+	local VDEMO_pid=$(vdemo_pidFromScreen ${VDEMO_screen_title})
 	if [ "$VDEMO_pid" ]; then
 		if ps -p "${VDEMO_pid}" > /dev/null; then
 			echo "running" >&2
@@ -128,11 +128,11 @@ function vdemo_logging {
 #   -D    start detached
 # remaining arguments are treated as command line of the component to start
 function vdemo_start_component {
-	local VDEMO_title="$1"; shift
+	local VDEMO_screen_title="$1"; shift
 	local VDEMO_componentDisplay="${DISPLAY}"
 	local VDEMO_startDetached="no"
 	local COLOR="white"
-	export VDEMO_logfile="${VDEMO_logfile_prefix}${VDEMO_title}.log"
+	export VDEMO_logfile="${VDEMO_logfile_prefix}${VDEMO_screen_title}.log"
 	local logfiledir="${VDEMO_logfile%/*}"
 	if [ ! -d "$logfiledir" ]; then mkdir -p "$logfiledir"; fi
 	local VDEMO_logging="onexit"
@@ -180,11 +180,11 @@ function vdemo_start_component {
     # bash needs to be started in in interactive mode to have job control available
     # --norc is used to prevent inclusion of the use configuration in the execution.
 	if [ "$VDEMO_startDetached" == "no" ]; then
-		xterm -fg $COLOR -bg black -title "starting $VDEMO_title" -e \
-			screen -t "$VDEMO_title" -S "${VDEMO_title}_" \
+		xterm -fg $COLOR -bg black -title "starting $VDEMO_screen_title" -e \
+			screen -t "$VDEMO_screen_title" -S "${VDEMO_screen_title}_" \
 			stdbuf -oL bash --norc -i -c "vdemo_component" &
 	else
-		screen -t "$VDEMO_title" -S "${VDEMO_title}_" -d -m \
+		screen -t "$VDEMO_screen_title" -S "${VDEMO_screen_title}_" -d -m \
 			stdbuf -oL bash --norc -i -c "vdemo_component"
 	fi
 }
@@ -219,10 +219,10 @@ export -f all_children
 # stop a component
 # $1: title of the component
 function vdemo_stop_component {
-	local VDEMO_title="$1"
-	local VDEMO_pid=$(vdemo_pidFromScreen ${VDEMO_title})
+	local VDEMO_screen_title="$1"
+	local VDEMO_pid=$(vdemo_pidFromScreen ${VDEMO_screen_title})
 	if [ "$VDEMO_pid" ]; then
-		echo "stopping $VDEMO_title: screen pid: ${VDEMO_pid}" >&2
+		echo "stopping $VDEMO_screen_title: screen pid: ${VDEMO_pid}" >&2
 		local PIDS=$(all_children $VDEMO_pid)
 		# call stop_component if that function exists
 		if declare -F stop_component > /dev/null; then
@@ -253,9 +253,9 @@ function vdemo_stop_component {
 # $2 - signal to use (default: SIGINT)
 # $3 - timeout, waiting for a single component (default: 2s)
 function vdemo_stop_signal_children {
-	local VDEMO_title="$1"
+	local VDEMO_screen_title="$1"
 	# get pids of screen and of all children
-	local VDEMO_pid=$(vdemo_pidFromScreen ${VDEMO_title})
+	local VDEMO_pid=$(vdemo_pidFromScreen ${VDEMO_screen_title})
 	local VDEMO_compo_pids=$(all_children $VDEMO_pid)
 	local SIGNAL=${2:-SIGINT}
 	local TIMEOUT=$((10*${3:-2}))

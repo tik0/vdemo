@@ -22,11 +22,12 @@ usage: $vdemo_component_scriptname [options] command [component options]
 # option checks
 title="${vdemo_component_scriptname#component_}"
 export VDEMO_component_title="$title"
+export VDEMO_title="$title" # short title, see -t
 
 while [ $# -gt 0 ]; do
     case $1 in
         "-h"|"--help")
-            echo "$HELP" >& 2
+            echo "$HELP" >&2
             exit 0
             ;;
         "-l"|"--logging")
@@ -37,6 +38,7 @@ while [ $# -gt 0 ]; do
             ;;
         "-t"|"--title")
             shift
+            export VDEMO_title="$1"
             title="$title.$1"
             export VDEMO_component_title="$title"
             ;;
@@ -44,8 +46,8 @@ while [ $# -gt 0 ]; do
             vdemo_start_DETACHED="-D"
             ;;
         -*)
-            echo "illegal option '$1'" >& 2
-            echo "$HELP" >& 2
+            echo "illegal option '$1'" >&2
+            echo "$HELP" >&2
             exit 3
             ;;
         *)
