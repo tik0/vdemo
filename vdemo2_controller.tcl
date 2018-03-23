@@ -28,6 +28,7 @@ ttk::style configure cmd.TButton -padding "2 -1" -width -5
 define_theme_color ok green3 [list active green2]
 define_theme_color noscreen.ok orange2 [list active orange]
 define_theme_color failed red2 [list active red]
+define_theme_color failed.noauto gray60 [list active red]
 define_theme_color check.failed pink [list active pink2]
 define_theme_color starting yellow2 [list active yellow]
 
@@ -1231,7 +1232,10 @@ proc set_status {comp status} {
         starting {set style "starting.cmd.TButton"}
         ok_screen {set style "ok.cmd.TButton"}
         ok_noscreen {set style "noscreen.ok.cmd.TButton"}
-        failed_noscreen {set style "failed.cmd.TButton"}
+        failed_noscreen {
+            set style "failed.cmd.TButton"
+            if {$::NOAUTO($comp)} {set style "failed.noauto.cmd.TButton"}
+        }
         failed_check {set style "check.failed.cmd.TButton"}
         default  {set style "cmd.TButton"}
     }
