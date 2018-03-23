@@ -2064,6 +2064,12 @@ gui_tcl
 if {![info exists ::geometry]} {wm geometry . ""}
 update
 
+# autocheck
+if {[info exists ::env(VDEMO_autocheck)] && $::env(VDEMO_autocheck) == "true"} {
+    dputs "Checking all components due to autocheck request" -1
+    all_cmd check all
+}
+
 # autostart
 if {[info exists ::env(VDEMO_autostart)] && $::env(VDEMO_autostart) == "true"} {
     dputs "Starting all components due to autostart request" -1

@@ -52,8 +52,12 @@ while [ $# -gt 0 ]; do
         exit 0
         ;;
     "-a"|"--auto")
-        echo "Automatically starting all components"
+        echo "Automatically start all components"
         export VDEMO_autostart="true"
+        ;;
+    "-c"|"--autocheck")
+        echo "Check all components when opening vdemo"
+        export VDEMO_autocheck="true"
         ;;
     "-l"|"--log")
         export VDEMO_LOGGING=1
