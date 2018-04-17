@@ -1,0 +1,10 @@
+#!/bin/bash
+
+title="fail"
+
+function component {
+  sleep 0.5
+  echo "meh"
+}
+
+source "$VDEMO_root/vdemo_standard_component_suffix.sh"

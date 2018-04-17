@@ -442,7 +442,8 @@ proc gui_tcl {} {
         lappend groups {*}$GROUP($c)
         set LEVELS "$LEVELS $COMP_LEVEL($c)"
         set TIMERDETACH($c) 0
-        set ::LAST_GUI_INTERACTION($c) 0
+        set ::COMP_START_TIME($c) 0
+        set ::COMP_STATUS_INTENT($c) unknown
 
         # get the frame widget where this component should go to
         set w [get_tab $COMPONENTS_WIDGET.$TAB($c)]
@@ -1037,7 +1038,8 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
             } elseif {$DETACHTIME($comp) == 0} {
                 set SCREENED($comp) 0
             }
-            set ::LAST_GUI_INTERACTION($comp) [clock milliseconds]
+            set ::COMP_START_TIME($comp) [clock milliseconds]
+            set ::COMP_STATUS_INTENT($comp) start
             after $::CHECKNOWAIT_TIME($comp) component_cmd $comp check $allcmd_group
         }
         stopwait -
@@ -1054,12 +1056,12 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
             set old_status $::COMPSTATUS($comp)
             set_status $comp unknown
             cancel_detach_timer $comp
+            set ::COMP_STATUS_INTENT($comp) stop
 
             set cmd_line "$VARS $component_script $component_options $cmd"
             set res [ssh_command "$cmd_line" "$HOST($comp)"]
             set SCREENED($comp) 0
 
-            set ::LAST_GUI_INTERACTION($comp) [clock milliseconds]
             if {$res == -1} { # an error occurred when issuing the ssh_command
                 $WIDGET($comp).stop state !disabled
                 # restore old status
@@ -1145,7 +1147,7 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
 
             # handle started component
             if { [$::WIDGET($comp).start instate disabled] } {
-                set endtime [expr {$::LAST_GUI_INTERACTION($comp) + $WAIT_READY($comp)}]
+                set endtime [expr {$::COMP_START_TIME($comp) + $WAIT_READY($comp)}]
                 if {$onCheckResult != 0 && $screenResult == 0} {
                     if {$endtime < [clock milliseconds]} {
                         dputs "$TITLE($comp) failed: timeout" 0
@@ -1172,7 +1174,6 @@ proc component_cmd {comp cmd {allcmd_group ""}} {
             set_status $comp $s
             # re-enable start button?
             if {"$s" != "starting"} {
-                set ::LAST_GUI_INTERACTION($comp) [clock milliseconds]
                 $WIDGET($comp).start state !disabled
             }
 
@@ -1720,12 +1721,8 @@ proc handle_screen_failure {chan host} {
         if {$::HOST($comp) == $host && \
             [string match "*.$::COMMAND($comp).$::TITLE($comp)_" "$line"]} {
             dputs "$comp closed its screen session on $host" 2
-            if {[$::WIDGET($comp).stop  instate disabled] || \
-                [$::WIDGET($comp).start instate disabled] ||
-                [expr {[clock milliseconds] - $::LAST_GUI_INTERACTION($comp) < $::SCREEN_FAILURE_DELAY}]} {
+            if {$::COMP_STATUS_INTENT($comp) == "stop"} {
                 # component was stopped or just started via gui -> ignore event
-                # trigger stop: component's on_stop() might do some cleanup
-                # component_cmd $comp stop
                 component_cmd $comp check
             } else {
                 # if this is not a user initiated stop, exit the system if requested
