@@ -226,7 +226,7 @@ function vdemo_stop_component {
 		local PIDS=$(all_children $VDEMO_pid)
 		# call stop_component if that function exists
 		if declare -F stop_component > /dev/null; then
-			echo "calling stop_component"
+			echo "calling stop_component" >&2
 			stop_component "$1"
 		else
 			# by default we first kill children processes with SIGINT (2s timeout)
@@ -235,7 +235,7 @@ function vdemo_stop_component {
 		# kill remaining children processes
 		local REMAIN_PIDS=$(ps --no-headers -o pid,comm -p $PIDS)
 		if [ -n "$REMAIN_PIDS" ]; then
-			echo $'killing remaining processes\n'"$REMAIN_PIDS"
+			echo $'killing remaining processes\n'"$REMAIN_PIDS" >&2
 			kill -9 $PIDS > /dev/null 2>&1
 			# if sigkill was necessary, remove dead screens right away
 			screen -wipe > /dev/null 2>&1
@@ -262,7 +262,7 @@ function vdemo_stop_signal_children {
 	for pid in $VDEMO_compo_pids; do
 		# don't send a kill signal when process is already gone
 		kill -0 $pid > /dev/null 2>&1 || continue
-		echo -n "${SIGNAL}ing $pid: $(ps -p $pid -o comm=) "
+		echo -n "${SIGNAL}ing $pid: $(ps -p $pid -o comm=) " >&2
 		kill -$SIGNAL $pid > /dev/null 2>&1
 		# wait for process to be finished
 		for i in $(seq $TIMEOUT); do
@@ -271,7 +271,7 @@ function vdemo_stop_signal_children {
 			kill -0 $pid > /dev/null 2>&1 || break
 		done
 		sleep 0.01 # give parent processes some time to quit themselves
-		echo
+		echo >&2
 	done
 }
 export -f vdemo_stop_signal_children
