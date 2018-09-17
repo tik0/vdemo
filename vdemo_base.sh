@@ -15,7 +15,7 @@ function vdemo_find_xdisplay {
 	done
 	echo >&2
 	echo "Couldn't find an accessible X session. Consider copying the sessions X authority file (xauth info) to ~/.Xauthority" >&2
-	exit 2
+	return 2
 }
 
 function vdemo_pidFromScreen {
