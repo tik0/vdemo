@@ -108,12 +108,12 @@ function on_check {
 Vice-versa, components might be running independently from vdemo, and thus often interfere with a demo. In this case on_check would indicate a running component, although no screen process is present. This is indicated in vdemo with orange component color. The following indicator colors are used:
 
 
-* ![#d3d3d3](https://via.placeholder.com/35x32.png/d3d3d3/ffffff?text=check) unknown
-* ![#ffff00](https://via.placeholder.com/35x32.png/ffff00/ffffff?text=check) starting
-* ![#008000](https://via.placeholder.com/35x32.png/008000/ffffff?text=check) running + responding
-* ![#ffa500](https://via.placeholder.com/35x32.png/ffa500/ffffff?text=check) responding, but not started from vdemo
-* ![#ffc0cb](https://via.placeholder.com/35x32.png/ffc0cb/ffffff?text=check) running, but not responding
-* ![#ff0000](https://via.placeholder.com/35x32.png/ff0000/ffffff?text=check) not running
+* ![#d3d3d3](https://via.placeholder.com/35x25.png/d3d3d3/ffffff?text=check) unknown
+* ![#ffff00](https://via.placeholder.com/35x25.png/ffff00/ffffff?text=check) starting
+* ![#008000](https://via.placeholder.com/35x25.png/008000/ffffff?text=check) running + responding
+* ![#ffa500](https://via.placeholder.com/35x25.png/ffa500/ffffff?text=check) responding, but not started from vdemo
+* ![#ffc0cb](https://via.placeholder.com/35x25.png/ffc0cb/ffffff?text=check) running, but not responding
+* ![#ff0000](https://via.placeholder.com/35x25.png/ff0000/ffffff?text=check) not running
 
 ## Spread configuration
 
