@@ -83,8 +83,8 @@ function vdemo_detach_screen {
 # show log output of a component
 # $1:   title of the component
 function vdemo_showlog {
-	xterm -fg white -bg darkblue -title "log of ${1}@${HOSTNAME}" -e \
-		less -R "$VDEMO_logfile_prefix${1}.log" &
+	xterm -fg white -bg darkblue -title "log of ${1}@${HOSTNAME} | Copy: Select | Paste: Shift+Ins" -e \
+		less ++G -R "$VDEMO_logfile_prefix${1}.log" &
 }
 
 function vdemo_inspect {
